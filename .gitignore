@@ -1,0 +1,8 @@
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.img
+build/
+out/
