@@ -6,3 +6,17 @@
 *.img
 build/
 out/
+
+# Reproducible OP-TEE checkouts and local build environments (multi-GB)
+optee_full/
+optee_project/
+pre-laptop-linux-clean/
+optee-build-venv/
+
+# Generated Python/editor files
+__pycache__/
+*.pyc
+*.orig
+
+# Curated outputs under ignored trees are force-added explicitly; see
+# GITHUB_BACKUP.md and the Step*_Verification directories.
