@@ -1,0 +1,5 @@
+39fa3171b447234bf232a5c7cf36fc14e53e6e00ccd2d8dbb260ea2d04b61b58  optee_full/out/rpi3-sdcard.img
+bc75b2c22b5c563eca1cc751c277eb7da8c56a6880a99fcd567c406e53eb9055  optee_full/out-br/images/rootfs.cpio.gz
+7746f56d6895943a0dc1dc01941e9c74c728deecfc077d7a9e1ab36f0cc5ff36  optee_full/out-br/images/rootfs.ext2
+a378c680d6f2a87deab6186ee814df562e3f4d66367eaf3f7cbcb772ef06533a  optee_full/out/boot/armstub8.bin
+6be92b85e6bb1e2256c27a964af059a26dc34d43b13601a14eb4d5cf62e60e35  optee_full/out/boot/kernel8.img

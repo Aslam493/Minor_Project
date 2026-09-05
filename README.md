@@ -16,8 +16,8 @@ Steps 1 through 6 are complete:
 | 4 | Select and verify the authoritative source tree | Complete |
 | 5 | Build the root filesystem and OP-TEE user space | Complete |
 | 6 | Assemble the Raspberry Pi boot files | Complete |
-| 7 | Generate and write the SD-card image | Not started |
-| 8 | Capture the first serial boot | Not started |
+| 7 | Generate and write the SD-card image to 8 GB test card | Complete |
+| 8 | Capture the first serial boot | Next |
 
 The detailed implementation plan is in
 [`RPI3_SECURE_CAN_FULL_ROADMAP.md`](RPI3_SECURE_CAN_FULL_ROADMAP.md).
@@ -155,12 +155,15 @@ make -j1 -C build \
   update_bootfs
 ```
 
-## Next step: SD-card image
+## Next step: first physical boot
 
-Step 7 will generate `optee_full/out/rpi3-sdcard.img`, identify the SD card
-using read-only commands, confirm its exact device name and capacity, and only
-then write the image.
+Step 7 generated `optee_full/out/rpi3-sdcard.img` and wrote it to a verified
+8 GB test card. The card's boot and root filesystems passed read-only checks.
+See [`Step7_Verification/STEP7_COMPLETION.md`](Step7_Verification/STEP7_COMPLETION.md).
 
 Do not copy and run a `dd` command with a guessed device such as `/dev/sdb`.
 Writing to the wrong device can destroy the laptop's data. The SD-card write
 must wait until the actual removable device has been identified and confirmed.
+
+The next action is Step 8: boot the 8 GB test card in the Raspberry Pi and
+capture the serial console output.

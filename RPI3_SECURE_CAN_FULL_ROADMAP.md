@@ -127,7 +127,8 @@ Pi 3 DTBs          ✅
 Root filesystem    ✅
 OP-TEE user space  ✅
 Boot packaging     ✅
-Physical boot      ❌
+SD-card image      ✅
+Physical boot      ❌ ← START HERE
 OP-TEE runtime     ❌
 Secure CAN path    ❌
 Validation         ❌
@@ -223,7 +224,7 @@ Do not copy `fip.bin` separately if the selected TF-A build already combines it 
 
 Completion evidence is in `Step6_Verification/STEP6_COMPLETION.md`. Continue with Step 7.
 
-## Step 7 — Generate and Write the SD-Card Image
+## Step 7 — Generate and Write the SD-Card Image: COMPLETE ON 8 GB TEST CARD
 
 ### Safety tasks
 
@@ -235,9 +236,11 @@ Completion evidence is in `Step6_Verification/STEP6_COMPLETION.md`. Continue wit
 
 ### Completion test
 
-- Boot and root partitions are readable after writing.
-- Required files exist on the SD card.
-- The SD card can be cleanly unmounted.
+- [x] Boot and root partitions are readable after writing.
+- [x] Required files exist on the SD card.
+- [x] The SD card can be cleanly unmounted.
+
+Completion evidence is in `Step7_Verification/STEP7_COMPLETION.md`. Continue with Step 8.
 
 ## Step 8 — Capture the First Serial Boot
 
