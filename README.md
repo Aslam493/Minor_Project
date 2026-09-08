@@ -6,7 +6,8 @@ Raspberry Pi 3 Model B or Model B+.
 
 ## Current status
 
-Steps 1 through 6 are complete:
+Steps 1 through 7 and Steps 9 through 10 are complete. Physical HDMI boot is confirmed;
+Step 8 still needs an optional early UART/serial capture:
 
 | Step | Work | Status |
 | --- | --- | --- |
@@ -17,7 +18,9 @@ Steps 1 through 6 are complete:
 | 5 | Build the root filesystem and OP-TEE user space | Complete |
 | 6 | Assemble the Raspberry Pi boot files | Complete |
 | 7 | Generate and write the SD-card image to 8 GB test card | Complete |
-| 8 | Capture the first serial boot | Next |
+| 8 | Capture the first serial boot | HDMI boot complete; UART capture pending |
+| 9 | Verify Linux-to-OP-TEE communication | Complete: 36,114 subtests passed |
+| 10 | Build and run a project-specific custom TA | Complete |
 
 The detailed implementation plan is in
 [`RPI3_SECURE_CAN_FULL_ROADMAP.md`](RPI3_SECURE_CAN_FULL_ROADMAP.md).
@@ -155,15 +158,18 @@ make -j1 -C build \
   update_bootfs
 ```
 
-## Next step: first physical boot
+## Physical runtime result
 
-Step 7 generated `optee_full/out/rpi3-sdcard.img` and wrote it to a verified
-8 GB test card. The card's boot and root filesystems passed read-only checks.
-See [`Step7_Verification/STEP7_COMPLETION.md`](Step7_Verification/STEP7_COMPLETION.md).
+The corrected 8 GB test image boots Linux `6.7.0-rc6-v8`, initializes OP-TEE
+4.10, exposes `/dev/tee0` and `/dev/teepriv0`, automatically runs
+`tee-supplicant`, and loads compressed kernel modules correctly. The complete
+`xtest` run passed 36,114 subtests and 114 test cases with zero failures. The
+packaged hello-world TA also returned the expected value 43.
 
-Do not copy and run a `dd` command with a guessed device such as `/dev/sdb`.
-Writing to the wrong device can destroy the laptop's data. The SD-card write
-must wait until the actual removable device has been identified and confirmed.
+Evidence is saved in [`Step8_Verification/STEP8_RUNTIME_COMPLETION.md`](Step8_Verification/STEP8_RUNTIME_COMPLETION.md)
+and [`Step8-xtest.log`](Step8-xtest.log).
 
-The next action is Step 8: boot the 8 GB test card in the Raspberry Pi and
-capture the serial console output.
+The project-specific Step 10 TA passed on the physical Pi. See
+[`Step10_Verification/STEP10_COMPLETION.md`](Step10_Verification/STEP10_COMPLETION.md).
+Next: capture early UART output when an adapter is available and freeze the CAN
+hardware specification in Step 11.

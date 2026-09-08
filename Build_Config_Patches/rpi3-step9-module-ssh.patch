@@ -1,0 +1,20 @@
+diff --git a/kconfigs/rpi3.conf b/kconfigs/rpi3.conf
+index 07554cf..72849e6 100644
+--- a/kconfigs/rpi3.conf
++++ b/kconfigs/rpi3.conf
+@@ -1,2 +1,3 @@
+ CONFIG_TEE=y
+ CONFIG_OPTEE=y
++CONFIG_MODULE_DECOMPRESS=y
+diff --git a/rpi3.mk b/rpi3.mk
+index 4703f64..bf9b374 100644
+--- a/rpi3.mk
++++ b/rpi3.mk
+@@ -11,6 +11,7 @@ override COMPILE_S_KERNEL  := 64
+ # Need to set this before including common.mk
+ BR2_TARGET_GENERIC_GETTY_PORT ?= ttyS0
+ BR2_ROOTFS_POST_BUILD_SCRIPT ?= "board/raspberrypi3-64/post-build.sh"
++BR2_ROOTFS_OVERLAY ?= "$(ROOT)/build/br-ext/board/rpi3/overlay"
+
+ # Network support related packages:
+ BR2_PACKAGE_DHCPCD ?= y

@@ -1,0 +1,4 @@
+Normal World challenge: 0x12345678
+Secure World response: 0xb791f3dd
+Secure World marker:   0x5343414e (SCAN)
+PASS: project-specific Normal World to Secure World round trip

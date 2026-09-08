@@ -289,7 +289,7 @@ xtest
 - OP-TEE driver successfully exchanges SMC calls with Secure World.
 - Core `xtest` tests pass or every failure is documented and understood.
 
-## Step 10 — Build and Run a Minimal Custom TA
+## Step 10 — Build and Run a Minimal Custom TA: COMPLETE
 
 Create a project-specific Hello World pair:
 
@@ -308,6 +308,11 @@ returns known response
 - TA debug output and client output are recorded.
 
 This is the gate before any CAN-specific secure driver development.
+
+Completed with the project-owned `secure_can_demo` client and TA. The physical
+Pi returned the expected Secure World response and marker with a zero exit
+status. Evidence is in `Step10_Verification/STEP10_COMPLETION.md` and
+`Step10-runtime.log`. Continue with Step 11.
 
 ---
 
@@ -858,4 +863,3 @@ custom Hello World TA passes
 ```
 
 After that milestone, the project moves to the secure-first external CAN reception path.
-

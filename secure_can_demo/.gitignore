@@ -1,0 +1,12 @@
+host/*.o
+host/secure_can_demo
+ta/*.cmd
+ta/*.d
+ta/*.dmp
+ta/*.elf
+ta/*.map
+ta/*.o
+ta/*.stripped.elf
+ta/*.ta
+ta/dyn_list
+ta/ta.lds
