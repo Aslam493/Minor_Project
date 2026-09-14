@@ -21,6 +21,7 @@
 #include <util.h>
 
 #define RPI3_LOCAL_TIMER_INT_CONTROL0 0x40
+#define RPI3_LOCAL_TIMER_INT_ROUTING  0x24
 #define RPI3_LOCAL_FIQ_PENDING0       0x70
 #define RPI3_LOCAL_CNTPSIRQ           0
 #define RPI3_LOCAL_TIMER_FIQ_BIT      BIT(4)
@@ -59,6 +60,7 @@ static void timer_irq_configure(struct itr_chip *chip __unused,
 static void timer_irq_unmask(struct itr_chip *chip __unused, size_t it)
 {
 	vaddr_t reg = core_reg(RPI3_LOCAL_TIMER_INT_CONTROL0);
+#define RPI3_LOCAL_TIMER_INT_ROUTING  0x24
 	uint32_t value = 0;
 
 	assert(it == RPI3_LOCAL_CNTPSIRQ);
@@ -69,6 +71,7 @@ static void timer_irq_unmask(struct itr_chip *chip __unused, size_t it)
 static void timer_irq_mask(struct itr_chip *chip __unused, size_t it)
 {
 	vaddr_t reg = core_reg(RPI3_LOCAL_TIMER_INT_CONTROL0);
+#define RPI3_LOCAL_TIMER_INT_ROUTING  0x24
 	uint32_t value = 0;
 
 	assert(it == RPI3_LOCAL_CNTPSIRQ);
@@ -129,8 +132,10 @@ void interrupt_main_handler(void)
 	uint32_t pending = io_read32(core_reg(RPI3_LOCAL_FIQ_PENDING0));
 
 	if (pending & BIT(RPI3_LOCAL_CNTPSIRQ)) {
+		timer_irq_mask(&rpi3_timer_chip, RPI3_LOCAL_CNTPSIRQ);
 		interrupt_call_handlers(&rpi3_timer_chip,
 					RPI3_LOCAL_CNTPSIRQ);
+		timer_irq_unmask(&rpi3_timer_chip, RPI3_LOCAL_CNTPSIRQ);
 		return;
 	}
 
@@ -171,6 +176,9 @@ static TEE_Result arm_phase_a_timer(uint32_t param_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 	if (get_core_pos() != RPI3_DUMMY_TIMER_CORE)
 		return TEE_ERROR_BAD_STATE;
+
+	/* Route the local timer explicitly to core 1 FIQ (100b + core 1). */
+	io_write32(intc_base + RPI3_LOCAL_TIMER_INT_ROUTING, 5);
 
 	exceptions = cpu_spin_lock_xsave(&counter_lock);
 	if (timer_initialized) {
