@@ -10,8 +10,8 @@ CFG_TEE_RAM_VA_SIZE ?= 0x00700000
 
 $(call force,CFG_8250_UART,y)
 $(call force,CFG_SECURE_TIME_SOURCE_CNTPCT,y)
-$(call force,CFG_WITH_ARM_TRUSTED_FW,y)
 $(call force,CFG_CALLOUT,y)
+$(call force,CFG_WITH_ARM_TRUSTED_FW,y)
 
 CFG_NUM_THREADS ?= 4
 CFG_CRYPTO_WITH_CE ?= n

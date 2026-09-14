@@ -31,6 +31,7 @@
 	{ 0x7cb1a48e, 0x3b5f, 0x4b73, \
 	  { 0x91, 0xe8, 0x73, 0x31, 0xc4, 0x7a, 0xd2, 0x10 } }
 #define PTA_SECURE_CAN_PHASE_A_GET_STATUS 0
+#define PTA_SECURE_CAN_PHASE_A_ARM_TIMER  1
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, RPI3_LOCAL_INTC_BASE,
 			RPI3_LOCAL_INTC_SIZE);
@@ -120,22 +121,7 @@ void boot_primary_init_intc(void)
 
 void boot_secondary_init_intc(void)
 {
-	uint32_t exceptions = 0;
-
-	if (get_core_pos() != RPI3_DUMMY_TIMER_CORE)
-		return;
-
-	exceptions = cpu_spin_lock_xsave(&counter_lock);
-	if (!timer_initialized) {
-		timer_initialized = true;
-		cpu_spin_unlock_xrestore(&counter_lock, exceptions);
-		timer_init_callout_service(&rpi3_timer_chip,
-					   RPI3_LOCAL_CNTPSIRQ);
-		IMSG("Phase A secure timer armed on core %u at %u ms",
-		     RPI3_DUMMY_TIMER_CORE, RPI3_DUMMY_TIMER_PERIOD_MS);
-		return;
-	}
-	cpu_spin_unlock_xrestore(&counter_lock, exceptions);
+	/* Timer activation is deliberately deferred until Linux is stable. */
 }
 
 void interrupt_main_handler(void)
@@ -174,12 +160,42 @@ static TEE_Result get_phase_a_status(uint32_t param_types,
 	return TEE_SUCCESS;
 }
 
+static TEE_Result arm_phase_a_timer(uint32_t param_types)
+{
+	uint32_t exceptions = 0;
+
+	if (param_types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_NONE,
+					   TEE_PARAM_TYPE_NONE,
+					   TEE_PARAM_TYPE_NONE,
+					   TEE_PARAM_TYPE_NONE))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (get_core_pos() != RPI3_DUMMY_TIMER_CORE)
+		return TEE_ERROR_BAD_STATE;
+
+	exceptions = cpu_spin_lock_xsave(&counter_lock);
+	if (timer_initialized) {
+		cpu_spin_unlock_xrestore(&counter_lock, exceptions);
+		return TEE_SUCCESS;
+	}
+	cpu_spin_unlock_xrestore(&counter_lock, exceptions);
+
+	timer_init_callout_service(&rpi3_timer_chip, RPI3_LOCAL_CNTPSIRQ);
+	exceptions = cpu_spin_lock_xsave(&counter_lock);
+	timer_initialized = true;
+	cpu_spin_unlock_xrestore(&counter_lock, exceptions);
+	IMSG("Phase A secure timer armed at runtime on core %u at %u ms",
+	     RPI3_DUMMY_TIMER_CORE, RPI3_DUMMY_TIMER_PERIOD_MS);
+	return TEE_SUCCESS;
+}
+
 static TEE_Result phase_a_invoke(void *session __unused, uint32_t command,
 				 uint32_t param_types,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
 	if (command == PTA_SECURE_CAN_PHASE_A_GET_STATUS)
 		return get_phase_a_status(param_types, params);
+	if (command == PTA_SECURE_CAN_PHASE_A_ARM_TIMER)
+		return arm_phase_a_timer(param_types);
 
 	return TEE_ERROR_NOT_SUPPORTED;
 }

@@ -16,18 +16,18 @@ static int report_teec_error(const char *operation, TEEC_Result result,
 		" origin=0x%08" PRIx32 "\n", operation, result, origin);
 	return 1;
 }
-static int pin_to_linux_cpu0(void)
+static int pin_to_linux_cpu(unsigned int cpu)
 {
 	cpu_set_t set;
 
 	CPU_ZERO(&set);
-	CPU_SET(0, &set);
+	CPU_SET(cpu, &set);
 	if (sched_setaffinity(0, sizeof(set), &set)) {
-		perror("sched_setaffinity(CPU 0)");
+		perror("sched_setaffinity");
 		return 1;
 	}
 
-	puts("Linux verifier pinned to CPU 0");
+	printf("Linux verifier pinned to CPU %u\n", cpu);
 	return 0;
 }
 
@@ -55,6 +55,24 @@ static int get_phase_a_status(TEEC_Session *session, uint32_t *counter,
 	return 0;
 }
 
+static int arm_phase_a_timer(TEEC_Session *session)
+{
+	TEEC_Operation operation;
+	TEEC_Result result;
+	uint32_t origin = 0;
+
+	memset(&operation, 0, sizeof(operation));
+	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_NONE, TEEC_NONE,
+					       TEEC_NONE, TEEC_NONE);
+	result = TEEC_InvokeCommand(session, PTA_SECURE_CAN_PHASE_A_ARM_TIMER,
+				    &operation, &origin);
+	if (result != TEEC_SUCCESS)
+		return report_teec_error("Phase A ARM_TIMER", result, origin);
+
+	puts("Secure timer activated from Linux CPU 1");
+	return 0;
+}
+
 static int verify_phase_a_timer(TEEC_Context *context)
 {
 	TEEC_UUID uuid = PTA_SECURE_CAN_PHASE_A_UUID;
@@ -74,6 +92,10 @@ static int verify_phase_a_timer(TEEC_Context *context)
 	if (result != TEEC_SUCCESS)
 		return report_teec_error("Phase A TEEC_OpenSession", result,
 					 origin);
+
+	if (pin_to_linux_cpu(1) || arm_phase_a_timer(&session) ||
+	    pin_to_linux_cpu(0))
+		goto out;
 
 	if (get_phase_a_status(&session, &first, &handler_core, &target_core,
 			       &initialized))
@@ -113,7 +135,7 @@ int main(void)
 	uint32_t origin = 0;
 	int status = 1;
 
-	if (pin_to_linux_cpu0())
+	if (pin_to_linux_cpu(0))
 		return 1;
 
 	result = TEEC_InitializeContext(NULL, &context);
