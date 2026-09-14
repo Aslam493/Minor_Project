@@ -134,8 +134,8 @@ void interrupt_main_handler(void)
 	if (pending & BIT(RPI3_LOCAL_CNTPSIRQ)) {
 		timer_irq_mask(&rpi3_timer_chip, RPI3_LOCAL_CNTPSIRQ);
 		interrupt_call_handlers(&rpi3_timer_chip,
+		/* One-shot diagnostic: keep source masked after first event. */
 					RPI3_LOCAL_CNTPSIRQ);
-		timer_irq_unmask(&rpi3_timer_chip, RPI3_LOCAL_CNTPSIRQ);
 		return;
 	}
 
