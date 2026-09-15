@@ -1,5 +1,0 @@
-enable_uart=1
-kernel_address=0x02000000
-device_tree_address=0x01000000
-hdmi_force_hotplug=1
-hdmi_safe=1

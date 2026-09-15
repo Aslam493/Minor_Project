@@ -1,0 +1,232 @@
+# Project Knowledge Base
+
+This file records real incidents on this project, how they were diagnosed, and
+how they were fixed — so a future problem that *looks* similar can be solved
+the same way instead of being re-debugged from scratch.
+
+Keep entries short and factual: **symptom → root cause → fix → prevention**.
+Add a new entry every time something breaks and gets fixed for a non-obvious
+reason. Do not delete old entries even after the code moves on; the reasoning
+stays useful.
+
+---
+
+## Incident 1 — Phase A secure timer broke Raspberry Pi 3 boot (September 2026)
+
+### Symptom
+After Step 10 (the project-specific `secure_can_demo` TA) was verified working
+and booting on the physical Pi, a new feature — a custom OP-TEE secure-world
+timer/interrupt handler ("Phase A", meant as groundwork for independent
+secure-world timing ahead of CAN work) — was added. After that, the SD card
+stopped booting correctly. Five separate attempted fixes across five commits
+(`3de1eb4` → `9006265`) tried to correct the secure interrupt routing and
+timer arming logic. None of them restored a working boot.
+
+### Root cause
+The Phase A work touched low-level EL3/secure-world interrupt routing:
+
+- `trusted-firmware-a/plat/rpi/common/rpi3_common.c` — changed
+  `plat_ic_get_pending_interrupt_type()` and `plat_interrupt_type_to_line()`
+  to route a new secure per-core local timer IRQ to `INTR_TYPE_S_EL1`/the IRQ
+  line instead of TF-A's default (route everything to FIQ at EL3).
+- `optee_os/core/arch/arm/plat-rpi3/secure_timer.c` (new file) — a per-core
+  BCM2836 local timer handler, registered via `conf.mk`/`sub.mk` additions
+  (`CFG_CALLOUT`, `srcs-y += secure_timer.c`).
+- `build/rpi3/firmware/uboot.env.txt` — added `maxcpus=2` to the kernel
+  bootargs (an attempt to work around core-routing issues by limiting Linux
+  to 2 CPUs).
+- `build/rpi3/firmware/config.txt` — added `hdmi_force_hotplug=1` /
+  `hdmi_safe=1` (added during display debugging of the same incident).
+
+Changing EL3 interrupt classification on real, undocumented-in-detail
+BCM2837 hardware is exactly the kind of change that can silently wedge early
+boot (before any UART/HDMI output exists to explain why) — and that's what
+happened. No single one of the five follow-up fix attempts addressed the
+actual defect; each was a guess without hardware-level UART evidence, because
+**Step 8 in this project never actually captured a UART log** (the roadmap
+even lists "UART capture pending"). Debugging EL3/secure-IRQ boot failures
+essentially requires a UART capture — HDMI alone doesn't show TF-A/OP-TEE
+early boot output reliably.
+
+### Fix
+Rather than keep guessing, the working tree was rolled back to exactly the
+state that was verified working for Step 10 (7 Sept build):
+
+1. In each of the three separate upstream git checkouts under `optee_full/`
+   (`optee_os`, `trusted-firmware-a`, `build` — these are pinned upstream
+   trees, not part of this repo's history, see `COMPONENT_REVISIONS.md`),
+   ran `git status`/`git diff` to see exactly what was locally modified
+   relative to the pinned revision.
+2. Distinguished Phase-A-only changes from unrelated legitimate prior work:
+   `build/rpi3.mk` and `build/kconfigs/rpi3.conf` also showed as "modified",
+   but diffing them against `Build_Config_Patches/rpi3-step9-module-ssh.patch`
+   showed they were **Step 9's SSH/overlay patch**, already tracked in this
+   repo, unrelated to Phase A. Those were **kept**.
+3. Reverted only the Phase A files:
+   ```sh
+   cd optee_full/optee_os
+   git checkout -- core/arch/arm/plat-rpi3/conf.mk \
+                    core/arch/arm/plat-rpi3/platform_config.h \
+                    core/arch/arm/plat-rpi3/sub.mk
+   rm -f core/arch/arm/plat-rpi3/secure_timer.c
+
+   cd ../trusted-firmware-a
+   git checkout -- plat/rpi/common/rpi3_common.c \
+                    plat/rpi/rpi3/include/rpi_hw.h
+
+   cd ../build
+   git checkout -- rpi3/firmware/config.txt rpi3/firmware/uboot.env.txt
+   ```
+4. `secure_can_demo/host/main.c` and `secure_can_demo/ta/include/secure_can_ta.h`
+   had also picked up Phase A test code (CPU pinning, a second pseudo-TA
+   invocation) — reverted to the plain Step 10 challenge/response app.
+   `secure_can_demo/ta/secure_can_ta.c` itself had never been touched by
+   Phase A and needed no change.
+5. Rebuilt in dependency order and reflashed. See "Rebuild procedure" below.
+6. Verified byte-for-byte on the card and functionally over SSH on the real
+   Pi (see "Verification checklist" below). The resulting host binary hash
+   matched the *original* Step 10 build's recorded SHA-256 exactly
+   (`4de3897e53b1515822881f140a922637a0e33ab99b0fb5045d0b10bc748ab548`),
+   confirming a true, exact rollback rather than a "close enough" rebuild.
+
+Phase A's commits (`3de1eb4`…`9006265`) were **not deleted** — they remain in
+git history on this branch if the timer work is revisited later.
+
+### Prevention / how to redo this kind of work more safely next time
+- Before touching EL3/secure-IRQ code again, **get the UART capture working
+  first** (wiring is documented in `RPI3_BOOT_TROUBLESHOOTING.md`). Without
+  it you are debugging blind — this is what turned one bad change into five
+  failed fix attempts.
+- Do experimental secure-world platform changes on a separate branch, and
+  keep the last-known-good `rpi3-sdcard.img` (or its SHA-256) recorded so a
+  broken experiment can be identified and rolled back in minutes, not hours.
+- Change one variable at a time (e.g. IRQ routing *or* the timer handler,
+  not both in the same commit) so a boot break points at a single suspect.
+- When a "verified" fix still doesn't boot, stop iterating blind and roll
+  back to the last physically-confirmed-booting state before trying again.
+
+---
+
+## Incident 2 — `/dev/sda` silently became a regular file, not the SD card (September 2026)
+
+### Symptom
+`lsblk /dev/sda` reported `not a block device`, even though `/dev/sda1` and
+`/dev/sda2` (the card's partitions) were normal, mountable block devices.
+`file /dev/sda` showed a valid DOS/MBR boot sector — i.e. **old SD-card image
+contents were sitting in a plain file named `/dev/sda`**, not on the real
+device.
+
+### Root cause
+At some earlier point, a `dd if=... of=/dev/sda` (or similar) was run while
+the real `/dev/sda` device node did not exist (card unplugged, or udev
+hadn't created it yet). On Linux, `dd`/`cp` writing to a path that doesn't
+exist under `/dev` (a tmpfs/devtmpfs) just **creates an ordinary file there**
+instead of erroring — it does not fail loudly. Every subsequent "flash" that
+targeted `/dev/sda` was silently writing into that stale file in RAM, never
+touching the actual card. This is almost certainly why earlier "verified"
+images never actually reached the physical SD card, even though `dd`
+reported success each time.
+
+### Fix
+```sh
+stat /dev/sda                     # confirms: regular file, not block special
+cat /sys/class/block/sda/dev      # get the real device's major:minor (8:0 here)
+sudo rm -f /dev/sda               # safe: only removes the stray tmpfs file,
+                                   # the real card and /dev/sda1 /dev/sda2 are untouched
+sudo mknod -m 660 /dev/sda b 8 0  # recreate the proper block special device
+sudo chown root:disk /dev/sda
+lsblk /dev/sda                    # should now show TYPE=disk, correct SIZE, RM=1
+```
+(`udevadm trigger` / writing to `.../uevent` did *not* recreate the node in
+this environment — manual `mknod` with the major:minor from sysfs was what
+worked.)
+
+### Prevention
+- **Before every flash**, run `file /dev/sdX` (not just `lsblk`) and confirm
+  it says `block special`, not a filesystem/boot-sector description. A
+  boot-sector description from `file` on a `/dev/*` path is itself the
+  red flag that the "device" is actually a leftover file.
+- Never write to a `/dev/sdX` path without having just confirmed it with
+  `lsblk -o TYPE,RM,SIZE` immediately beforehand in the same terminal
+  session — device names and node validity are not stable across unplug/
+  replug or reboots.
+
+---
+
+## Rebuild procedure (reference)
+
+From `/home/aslam/Minor_Project/optee_full`, using the pinned toolchain paths:
+
+```sh
+PY=/home/aslam/Minor_Project/optee-build-venv/bin/python
+
+# 1. Core components, in dependency order
+make -j4 -C build PYTHON3=$PY optee-os     # regenerates the TA dev kit too
+make -j4 -C build PYTHON3=$PY tf-a
+
+# 2. Project TA/host app, against the fresh dev kit
+cd ../secure_can_demo
+CROSS_COMPILE=../optee_full/out-br/host/bin/aarch64-linux-gnu- \
+TEEC_EXPORT=../optee_full/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr \
+TA_DEV_KIT_DIR=../optee_full/optee_os/out/arm/export-ta_arm64 \
+make clean all
+
+cp host/secure_can_demo \
+   ../optee_full/build/br-ext/board/rpi3/overlay/usr/bin/secure_can_demo
+cp ta/abecf637-ca20-467e-8e6c-0b8779ba6b2f.ta \
+   ../optee_full/build/br-ext/board/rpi3/overlay/lib/optee_armtz/
+
+# 3. Rootfs + boot files + final image, in that order
+cd ../optee_full
+make -j4 -C build PYTHON3=$PY buildroot
+make -j4 -C build PYTHON3=$PY update_bootfs
+make -j4 -C build PYTHON3=$PY sdcard-image
+# -> out/rpi3-sdcard.img
+```
+
+## Flash + verification checklist
+
+```sh
+# Identify the card — NEVER guess. /dev/nvme0n1 is this laptop's system disk.
+lsblk -b -o NAME,PATH,SIZE,MODEL,TRAN,RM,RO,TYPE,FSTYPE,LABEL,MOUNTPOINTS
+file /dev/sdX                      # must say "block special", see Incident 2
+
+udisksctl unmount -b /dev/sdX1
+udisksctl unmount -b /dev/sdX2
+sudo dd if=out/rpi3-sdcard.img of=/dev/sdX bs=4M conv=fsync status=progress
+sync
+sudo cmp --bytes="$(stat -c %s out/rpi3-sdcard.img)" out/rpi3-sdcard.img /dev/sdX \
+  && echo VERIFICATION PASS
+udisksctl power-off -b /dev/sdX
+```
+
+Functional check once the card is booted on the Pi (find its IP, then):
+
+```sh
+ssh -i ~/.ssh/id_ed25519 root@<pi-ip> "
+  dmesg | grep -i optee
+  /usr/bin/secure_can_demo
+  strings /usr/bin/secure_can_demo | grep -i 'phase a'   # must find nothing
+"
+```
+
+Expected `secure_can_demo` output (matches `Step10-runtime.log`):
+```
+Normal World challenge: 0x12345678
+Secure World response: 0xb791f3dd
+Secure World marker:   0x5343414e (SCAN)
+PASS: project-specific Normal World to Secure World round trip
+```
+
+---
+
+## Where things are
+
+| Thing | Location |
+|---|---|
+| Authoritative build tree | `optee_full/` (gitignored — 20GB+ of upstream checkouts) |
+| Pinned upstream revisions | `COMPONENT_REVISIONS.md` |
+| Project-specific TA + host app | `secure_can_demo/` |
+| SD card boot/troubleshooting steps | `RPI3_BOOT_TROUBLESHOOTING.md` |
+| Full step-by-step roadmap | `RPI3_SECURE_CAN_FULL_ROADMAP.md` |
+| Step-by-step completion status | `README.md`, `Step*_Verification/` |
