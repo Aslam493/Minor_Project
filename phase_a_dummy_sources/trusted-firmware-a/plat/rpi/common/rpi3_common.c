@@ -233,12 +233,12 @@ uint32_t plat_ic_get_pending_interrupt_type(void)
 	uint32_t pending = 0;
 
 	pending = mmio_read_32(RPI3_INTC_BASE_ADDRESS +
-			       RPI3_INTC_PENDING_FIQ_OFFSET +
+			       RPI3_INTC_PENDING_IRQ_OFFSET +
 			       sizeof(uint32_t) * core);
 	if (pending & BIT(0))
 		return INTR_TYPE_S_EL1;
 
-	ERROR("rpi3: Unknown interrupt routed to EL3 (FIQ=%#x).\n", pending);
+	ERROR("rpi3: Unknown interrupt routed to EL3 (IRQ=%#x).\n", pending);
 	return INTR_TYPE_INVAL;
 }
 
@@ -253,6 +253,9 @@ uint32_t plat_interrupt_type_to_line(uint32_t type, uint32_t security_state)
 	if (type == INTR_TYPE_NS)
 		return __builtin_ctz(SCR_IRQ_BIT);
 
-	/* Secure interrupts are signalled on the FIQ line always. */
-	return  __builtin_ctz(SCR_FIQ_BIT);
+	/* Secure EL1 interrupts use the IRQ line; EL3 remains on FIQ. */
+	if (type == INTR_TYPE_S_EL1)
+		return __builtin_ctz(SCR_IRQ_BIT);
+
+	return __builtin_ctz(SCR_FIQ_BIT);
 }
