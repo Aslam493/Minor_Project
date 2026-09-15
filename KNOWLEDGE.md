@@ -153,6 +153,67 @@ worked.)
 
 ---
 
+## Incident 3 — Undersized TA stack hung the whole board during HMAC crypto (September 2026)
+
+### Symptom
+Added a new TA command (`PROCESS_FRAME`) that authenticates a simulated CAN
+frame with HMAC-SHA256 via the GP TEE Crypto API, deployed it live over SSH
+(app-layer files only, not a reflash), and ran it. The command never
+returned. Within ~30s the whole board stopped responding to **everything**,
+including plain ICMP ping — not just SSH. It stayed down for minutes with no
+recovery, and needed a physical power cycle.
+
+### Root cause
+`secure_can_demo/ta/user_ta_header_defines.h` set `TA_STACK_SIZE (2 * 1024)`
+— fine for the original TA (one XOR on a 32-bit value), far too small once
+`compute_frame_tag()` was added: allocating a transient HMAC-SHA256 key
+object, an operation handle, and local buffers overflowed the 2KB S-EL0
+stack. Corrupting secure-world memory this way doesn't fail gracefully like
+a normal TA error return — it took down the whole system, consistent with
+corrupting state OP-TEE core (and therefore Linux, since Linux depends on
+the same CPU/secure monitor) needed to keep running.
+
+A live-flash side note: right before this, the SD card had been reflashed
+*while the system was booted from it* (see Incident 2's flash procedure) and
+the kernel had already logged an `mmc_rescan` hung-task warning during that.
+That turned out to be a red herring — the actual fix (below) fully resolved
+the hang on a cleanly, physically-reflashed card — but it looked like a
+strong suspect at the time and was worth ruling out explicitly rather than
+assumed away.
+
+### Fix
+```c
+// secure_can_demo/ta/user_ta_header_defines.h
+#define TA_STACK_SIZE (8 * 1024)   /* was (2 * 1024) */
+```
+Rebuilt the TA, rebuilt the full SD card image (not a live SSH push this
+time — a clean physical reflash, to also rule out the mmc angle), and
+verified on real hardware: the full round trip + 5-frame HMAC pipeline ran
+twice in a row, tags were byte-identical between runs (HMAC is deterministic
+for the same key+input, confirming the crypto path itself is correct, not
+flaky), and the board stayed responsive (`uptime`/`dmesg` clean) throughout.
+
+### Prevention
+- **Any time a TA gains new local state — crypto operation handles, key
+  objects, stack buffers — increase `TA_STACK_SIZE` deliberately, don't
+  assume the old value still fits.** OP-TEE does not warn you at build time
+  if a TA's stack is merely tight; it only shows up as a runtime corruption,
+  and on this hardware that corruption isn't contained to the one TA
+  session — it can take the whole board down.
+- **After any change to secure-world code (TA or platform), test the new
+  code path in isolation first**, not bundled behind an already-proven step
+  in the same binary. Here the plain challenge/response ran fine before the
+  new frame pipeline; a hang after that point should immediately point at
+  the *new* code, not force re-litigating whether the whole binary is
+  suspect.
+- When remotely testing new secure-world code on hardware you can't see,
+  use a short timeout and treat "no response in a few seconds" as a stop
+  signal, not something to wait out for 30s+ — the faster you notice, the
+  smaller the risk window before you'd otherwise pile on a second risky
+  action.
+
+---
+
 ## Rebuild procedure (reference)
 
 From `/home/aslam/Minor_Project/optee_full`, using the pinned toolchain paths:

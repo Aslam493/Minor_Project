@@ -2,9 +2,13 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <tee_client_api.h>
 #include <secure_can_ta.h>
+
+#define SECURE_CAN_FRAME_COUNT           5U
+#define SECURE_CAN_SEND_INTERVAL_SECONDS 1U
 
 static int report_teec_error(const char *operation, TEEC_Result result,
 			     uint32_t origin)
@@ -12,6 +16,76 @@ static int report_teec_error(const char *operation, TEEC_Result result,
 	fprintf(stderr, "%s failed: result=0x%08" PRIx32
 		" origin=0x%08" PRIx32 "\n", operation, result, origin);
 	return 1;
+}
+
+/* Stands in for a real CAN controller: builds a deterministic dummy frame
+ * so the pipeline is reproducible without CAN hardware.
+ */
+static void fill_dummy_frame(struct secure_can_frame *frame,
+			     unsigned int index)
+{
+	unsigned int i;
+
+	frame->can_id = 0x100 + index;
+	for (i = 0; i < SECURE_CAN_FRAME_DATA_LEN; i++)
+		frame->data[i] = (uint8_t)((index * 0x11) + i);
+}
+
+static void print_frame_result(const struct secure_can_frame *frame,
+			       const uint8_t *tag)
+{
+	unsigned int i;
+
+	printf("Linux: CAN id=0x%03" PRIx32 " data=", frame->can_id);
+	for (i = 0; i < SECURE_CAN_FRAME_DATA_LEN; i++)
+		printf("%02" PRIx8 " ", frame->data[i]);
+	printf("-> Secure World tag=");
+	for (i = 0; i < SECURE_CAN_FRAME_TAG_LEN; i++)
+		printf("%02" PRIx8, tag[i]);
+	puts("  [Linux forwards the authenticated frame]");
+}
+
+/* Linux alone decides when each simulated frame is "received" and sent in
+ * for authentication; Secure World only reacts to calls Normal World makes,
+ * it never runs on its own timer or interrupt.
+ */
+static int run_can_frame_pipeline(TEEC_Session *session)
+{
+	unsigned int i;
+
+	puts("Linux (Normal World) starting simulated CAN message pipeline");
+
+	for (i = 0; i < SECURE_CAN_FRAME_COUNT; i++) {
+		struct secure_can_frame frame;
+		uint8_t tag[SECURE_CAN_FRAME_TAG_LEN];
+		TEEC_Operation operation;
+		TEEC_Result result;
+		uint32_t origin = 0;
+
+		fill_dummy_frame(&frame, i);
+
+		memset(&operation, 0, sizeof(operation));
+		operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
+							 TEEC_MEMREF_TEMP_OUTPUT,
+							 TEEC_NONE, TEEC_NONE);
+		operation.params[0].tmpref.buffer = &frame;
+		operation.params[0].tmpref.size = sizeof(frame);
+		operation.params[1].tmpref.buffer = tag;
+		operation.params[1].tmpref.size = sizeof(tag);
+
+		result = TEEC_InvokeCommand(session,
+				TA_SECURE_CAN_CMD_PROCESS_FRAME, &operation,
+				&origin);
+		if (result != TEEC_SUCCESS)
+			return report_teec_error("PROCESS_FRAME", result,
+						 origin);
+
+		print_frame_result(&frame, tag);
+		sleep(SECURE_CAN_SEND_INTERVAL_SECONDS);
+	}
+
+	puts("PASS: Linux-controlled simulated CAN frames authenticated by Secure World");
+	return 0;
 }
 
 int main(void)
@@ -61,6 +135,10 @@ int main(void)
 	}
 
 	puts("PASS: project-specific Normal World to Secure World round trip");
+
+	if (run_can_frame_pipeline(&session))
+		goto close;
+
 	status = 0;
 
 close:
