@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <string.h>
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
@@ -150,6 +152,57 @@ static TEE_Result process_frame(uint32_t param_types, TEE_Param params[4])
 	return TEE_SUCCESS;
 }
 
+/* Constant-time so a timing side channel can't help a Normal World attacker
+ * guess a valid tag one byte at a time.
+ */
+static bool tags_match(const uint8_t *a, const uint8_t *b, size_t len)
+{
+	uint8_t diff = 0;
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		diff |= a[i] ^ b[i];
+
+	return diff == 0;
+}
+
+static TEE_Result verify_frame(uint32_t param_types, TEE_Param params[4])
+{
+	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+			TEE_PARAM_TYPE_MEMREF_INPUT, TEE_PARAM_TYPE_VALUE_OUTPUT,
+			TEE_PARAM_TYPE_NONE);
+	struct secure_can_frame frame;
+	uint8_t claimed_tag[SECURE_CAN_FRAME_TAG_LEN];
+	uint8_t full_tag[32]; /* HMAC-SHA256 output size */
+	uint32_t full_tag_len = sizeof(full_tag);
+	TEE_Result res;
+
+	if (param_types != expected)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (params[0].memref.size != sizeof(frame))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (params[1].memref.size != SECURE_CAN_FRAME_TAG_LEN)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	memcpy(&frame, params[0].memref.buffer, sizeof(frame));
+	memcpy(claimed_tag, params[1].memref.buffer, SECURE_CAN_FRAME_TAG_LEN);
+
+	res = compute_frame_tag(&frame, full_tag, &full_tag_len);
+	if (res != TEE_SUCCESS) {
+		EMSG("Secure World frame verification failed: 0x%08" PRIx32,
+		     res);
+		return res;
+	}
+
+	params[2].value.a = tags_match(claimed_tag, full_tag,
+				       SECURE_CAN_FRAME_TAG_LEN) ? 1 : 0;
+
+	IMSG("Secure World verified CAN frame id=0x%03" PRIx32 ": %s",
+	     frame.can_id, params[2].value.a ? "AUTHENTIC" : "REJECTED");
+	return TEE_SUCCESS;
+}
+
 TEE_Result TA_InvokeCommandEntryPoint(void __unused *session_context,
 				      uint32_t command_id,
 				      uint32_t param_types,
@@ -160,6 +213,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void __unused *session_context,
 		return process_challenge(param_types, params);
 	case TA_SECURE_CAN_CMD_PROCESS_FRAME:
 		return process_frame(param_types, params);
+	case TA_SECURE_CAN_CMD_VERIFY_FRAME:
+		return verify_frame(param_types, params);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}

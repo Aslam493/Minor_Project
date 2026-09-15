@@ -45,13 +45,42 @@ static void print_frame_result(const struct secure_can_frame *frame,
 	puts("  [Linux forwards the authenticated frame]");
 }
 
+static int verify_frame(TEEC_Session *session,
+			const struct secure_can_frame *frame,
+			const uint8_t *tag, int *accepted)
+{
+	TEEC_Operation operation;
+	TEEC_Result result;
+	uint32_t origin = 0;
+
+	memset(&operation, 0, sizeof(operation));
+	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
+						TEEC_MEMREF_TEMP_INPUT,
+						TEEC_VALUE_OUTPUT, TEEC_NONE);
+	operation.params[0].tmpref.buffer = (void *)frame;
+	operation.params[0].tmpref.size = sizeof(*frame);
+	operation.params[1].tmpref.buffer = (void *)tag;
+	operation.params[1].tmpref.size = SECURE_CAN_FRAME_TAG_LEN;
+
+	result = TEEC_InvokeCommand(session, TA_SECURE_CAN_CMD_VERIFY_FRAME,
+				    &operation, &origin);
+	if (result != TEEC_SUCCESS)
+		return report_teec_error("VERIFY_FRAME", result, origin);
+
+	*accepted = (int)operation.params[2].value.a;
+	return 0;
+}
+
 /* Linux alone decides when each simulated frame is "received" and sent in
  * for authentication; Secure World only reacts to calls Normal World makes,
  * it never runs on its own timer or interrupt.
  */
 static int run_can_frame_pipeline(TEEC_Session *session)
 {
+	struct secure_can_frame last_frame;
+	uint8_t last_tag[SECURE_CAN_FRAME_TAG_LEN];
 	unsigned int i;
+	int accepted = 0;
 
 	puts("Linux (Normal World) starting simulated CAN message pipeline");
 
@@ -81,10 +110,32 @@ static int run_can_frame_pipeline(TEEC_Session *session)
 						 origin);
 
 		print_frame_result(&frame, tag);
+		last_frame = frame;
+		memcpy(last_tag, tag, sizeof(last_tag));
 		sleep(SECURE_CAN_SEND_INTERVAL_SECONDS);
 	}
 
 	puts("PASS: Linux-controlled simulated CAN frames authenticated by Secure World");
+
+	puts("Linux: simulating receipt of the last frame, asking Secure World to verify it");
+	if (verify_frame(session, &last_frame, last_tag, &accepted))
+		return 1;
+	if (!accepted) {
+		fprintf(stderr, "FAIL: Secure World rejected an authentic frame\n");
+		return 1;
+	}
+	puts("PASS: Secure World accepted the authentic frame");
+
+	puts("Linux: simulating a tampered frame on the bus (one data byte flipped)");
+	last_frame.data[0] ^= 0xff;
+	if (verify_frame(session, &last_frame, last_tag, &accepted))
+		return 1;
+	if (accepted) {
+		fprintf(stderr, "FAIL: Secure World accepted a tampered frame\n");
+		return 1;
+	}
+	puts("PASS: Secure World rejected the tampered frame");
+
 	return 0;
 }
 
