@@ -832,6 +832,21 @@ stolen event.
   `spi0.0`/`can0` entirely so classification genuinely happens before
   Normal World ever sees a frame (the user's original stated goal).
 
+A known-good SD card image backup of this exact state (Step 15 complete,
+verified) was taken before starting Steps 16/17:
+```text
+SD_Card_Backups/step15-can-fiq-routing-complete/rpi3-sdcard-known-good-step15.img
+SHA-256: d51a2814497ad82d55d9572a4dd605a2535c1e2ccdbd0957f534297dd042145a
+```
+This matters specifically because the prior backup
+(`pre-secure-peripheral-ownership/`) predates Step 15 entirely - without
+this one, a Step 16/17 problem could only be rolled back to *before*
+Step 15, losing this addendum's verified progress. Steps 16/17 introduce
+a different risk than Step 15's (a polling loop that doesn't terminate
+inside the FIQ handler would hang the board with interrupts masked, no
+scheduler to recover it - a live hang rather than a silent boot brick),
+so the same two-card iteration protocol continues to apply.
+
 ---
 
 ## Rebuild procedure (reference)
