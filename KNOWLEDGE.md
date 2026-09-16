@@ -485,15 +485,35 @@ never needed before) — added
 `build/br-ext/board/rpi3/overlay/etc/modules-load.d/can-shield.conf`
 listing both modules, one per line, no init script changes needed.
 
-**Known follow-up, not yet resolved**: `can0` (`spi0.0`) detected real
+**Known follow-up, partially resolved**: `can0` (`spi0.0`) detected real
 hardware successfully; `can1` (`spi0.1`) did not —
 `error -ENODEV: Failed to detect MCP251xFD` with the oscillator register
 reading back all zeros, the classic "nothing responded on this SPI chip
 select" signature. Likely a physical wiring/seating issue specific to
 that channel rather than anything software-side, since it's the exact
-same driver code that worked for channel 0. Worth reseating the shield
-and rechecking the `1_H`/`1_L`/`GND` connections before assuming a bad
-board.
+same driver code that worked for channel 0.
+
+Follow-up investigation (17 Sept 2026) found the shield was resting on
+improvised bent-wire "supports" rather than being rigidly seated flush
+against the Pi's GPIO header. This caused a second, distinct symptom on
+`can0`: it would detect the chip fine at boot, then fall into a
+continuous SPI CRC-error loop (`CRC read error ... data=00 00 00 00
+00 00 00 00, CRC=0x0000`, never recovering) the moment sustained SPI
+traffic started (i.e. as soon as the interface was brought `up`). After
+remounting the shield rigidly (no wire props) and rebooting, `can0` came
+up with **zero CRC errors**, and a live loopback test (`ip link set can0
+type can bitrate 500000 loopback on`, then `cansend`/`candump`) round-
+tripped a real frame through actual SPI hardware cleanly. **`can0` is
+now confirmed solid.**
+
+`can1` remains completely dead through every reseat/remount attempted so
+far — unlike `can0`, it has never once detected the chip, even
+transiently. This points to a fault on that specific chip/its solder
+joints (not the shared header/mounting, since `can0` on the same header
+now works reliably) — most likely requires board-level rework or
+replacement to fix. Not currently blocking project progress: the
+project's real-CAN-hardware requirement is satisfiable with `can0` alone
+using internal loopback mode, without needing a second physical node.
 
 **Prevention**: a device tree node existing and being `status = "okay"`
 only means the *kernel* knows the device *should* exist — it says nothing
@@ -504,6 +524,186 @@ a correct device tree, check `/sys/bus/<bus>/devices/` and
 present driver directory means the *bus itself* never registered
 anything, which points at the bus controller driver, not the device
 driver you were focused on.
+
+### Fourth addendum — `can0` detected hardware but never came up (no bitrate, no `up`)
+
+With modules auto-loading (third addendum) and `can1` set aside as a known
+hardware issue, `can0` still showed as `NOARP` with `qdisc noop` after
+boot — the interface existed and the chip was initialized, but nothing
+ever set a bitrate or brought the link up, so `secure_can_demo` had no
+usable SocketCAN interface to attach to.
+
+**Root cause**: nothing in the boot chain ever called `ip link set can0
+type can bitrate ... up`. `S11modules` only loads kernel modules; bringing
+up a CAN link is a separate step SocketCAN always requires manually (it's
+not DHCP-style auto-configuring).
+
+**Fix**: added `build/br-ext/board/rpi3/overlay/etc/init.d/S12can`, run
+right after `S11modules` in the init sequence, which brings up `can0`
+(and `can1`, once its hardware is fixed) at 500000 bps per
+`STEP11_CAN_HARDWARE_SPEC.md`. It's written to skip an interface that
+isn't present (`can1` today) rather than fail boot, since `can1` isn't
+expected to exist until the wiring issue is fixed. Verified by copying
+the script to the running device over SSH and confirming `start`/`stop`/
+`restart` all behave correctly before baking it into the image.
+
+**Prevention**: a chip driver reporting successful init
+(`mcp251xfd ... successfully initialized`) only proves the SPI
+transaction layer works — it says nothing about the SocketCAN network
+link state, which always needs an explicit bitrate + `up` regardless of
+how correctly the lower layers are wired.
+
+### Fifth addendum — `secure_can_demo` now reads real frames from `can0`, needs loopback mode
+
+`secure_can_demo` (`host/main.c`) no longer builds its test frames purely
+in memory — it now transmits each one over a real `AF_CAN`/`SOCK_RAW`
+socket bound to `can0` and reads it back over that same socket before
+handing it to Secure World, exercising the real SPI/driver/hardware path
+on every frame instead of simulating it.
+
+Since `can1` is still dead (see above), there is no second physical node
+on the bus to ACK a real transmission, so **`can0` must be in
+controller-level loopback mode** for this to work at all — otherwise
+`secure_can_demo` will time out after `SECURE_CAN_RECV_TIMEOUT_SECONDS`
+(2s) waiting for a frame that never arrives, with a message pointing at
+this. Enable it before running the demo:
+```sh
+ip link set can0 down
+ip link set can0 type can bitrate 500000 loopback on
+ip link set can0 up
+```
+This is deliberately **not** baked into `S12can` (which brings `can0` up
+in normal, non-loopback mode) — loopback is a bench-test-only stand-in
+for `can1`, and should not become the silent default in case `can1` gets
+fixed/replaced or a real external bus is connected later, either of
+which needs loopback back off.
+
+**Verified working end to end (17 Sept 2026)**: with loopback enabled,
+`secure_can_demo` sent all 5 test frames over real SPI to the MCP2518FD
+and read them back over genuine hardware, with the TA correctly
+classifying, authenticating, and verifying each one (including
+rejecting a tampered replay) — zero CRC errors throughout the run. This
+closes the project's last major gap: real CAN hardware is now proven
+into the secure pipeline, not just simulated in memory.
+
+### Sixth addendum — real, provable Normal/Secure World parallelism (no boot-flow changes)
+
+The project's roadmap (`RPI3_SECURE_CAN_FULL_ROADMAP.md`, Step 14+) calls
+for Secure World to eventually own the CAN/SPI/GPIO hardware directly and
+run independently of any Normal World call. An earlier attempt at a
+lighter version of this — running Secure and Normal World simultaneously
+on dedicated cores — is what caused **Incident 4** above: flipping
+`RPI_PRIMARY_CPU` to move which core does what broke boot outright, since
+that constant only changes what TF-A *reports*, not which physical core
+the SoC actually releases first.
+
+Instead of resuming that boot-flow surgery, `secure_can_demo` now
+demonstrates the same "independent and parallel" property entirely in
+userspace, with no TF-A/BL31 changes at all: `main()` pins itself to CPU
+0 and runs the real CAN→Secure World pipeline there, while a second
+pthread is pinned to CPU 1 and runs a fully independent Normal-World-only
+loop (no TEE calls) for the pipeline's whole duration. Both streams print
+timestamps sharing the same `CLOCK_MONOTONIC` origin, so their log lines
+provably interleave in real time rather than just looking concurrent.
+This works because a Secure World call (SMC) only ever blocks the *core
+that issued it* — other cores keep running Normal World Linux code the
+entire time, which is standard, safe OP-TEE/TrustZone behavior on this
+already-SMP-capable kernel (confirmed: `nproc` reports 4, all cores
+`0-3` online).
+
+Verified on hardware: `[core 1]`'s independent worker printed 8 messages
+(every 20ms) continuously interleaved with `[core 0]`'s real frame
+classify/authenticate/verify calls, only stopping after the pipeline
+fully completed — proof the two genuinely ran concurrently, not
+sequentially.
+
+**Prevention**: "make Secure and Normal World run in parallel" does not
+require changing which core boots what (that's what bricked boot in
+Incident 4). If the goal is just to *show* independent parallel
+execution — as opposed to Step 14's full goal of Secure World owning the
+peripheral with zero Normal World involvement — ordinary per-thread CPU
+affinity is sufficient and carries none of the boot-flow risk.
+
+### Seventh addendum — Secure Peripheral Ownership, Phase 1: OP-TEE core talks to the CAN chip directly (real threat-model fix)
+
+The actual security gap in this project up to this point: Normal World
+(Linux) received every CAN frame first via ordinary SocketCAN, and only
+*afterward* asked Secure World "is this SECURE or not?" via
+`classify_frame()`. Since TrustZone assumes Normal World may be
+compromised, a malicious Normal World could simply skip that call
+entirely — Secure World had no independent path to the hardware. This
+addendum starts fixing that for real, per roadmap Step 14
+("Define Secure Peripheral Ownership"): OP-TEE core must be able to talk
+to the CAN chip directly, with no Linux driver involved at all.
+
+**No existing infrastructure to build on**: this platform (`plat-rpi3`)
+had zero GPIO/SPI driver code in OP-TEE - `core/drivers/bcm_gpio.c` and
+`core/pta/bcm/*` are for an unrelated Broadcom "iProc" server-SoC family
+that only happens to share the "bcm" name; nothing there is reusable for
+the BCM2835 on this board. Everything below is from-scratch.
+
+**What was built**: a new pseudo-TA, `core/pta/rpi3_can_spi_poc.c`
+(UUID `9a986af1-...`, gated by `CFG_RPI3_CAN_SPI_POC_PTA`), implements a
+polled, from-scratch BCM2835 SPI0 driver and reads the MCP2518FD's
+Oscillator Configuration Register (`0xE00`, `READ` instruction `0x3000`
+— same protocol constants as Linux's `mcp251xfd` driver, used here only
+as a specification reference, not reused code). `SPI0_BASE`
+(`0x3f204000`) and `GPIO_BASE` (`0x3f200000`) were added to
+`platform_config.h` and registered `MEM_AREA_IO_SEC` in
+`plat-rpi3/main.c`. A standalone test client, `spi_poc_test/`, invokes
+it and checks for a non-zero register value (same success/failure
+signature as Linux's own driver: non-zero = real chip response, all-zero
+= nothing answered).
+
+**Real bug hit and fixed**: the first version read back all-zero even
+though the transfer "completed" with no timeout (TXD/RXD/DONE all
+toggled correctly). Root cause, found by checking the *live* device tree
+on the Pi (`/proc/device-tree/soc/spi@7e204000/cs-gpios`): this board's
+DTB gives `spi0` a `cs-gpios` property (GPIO 8 for CS0, active-low) —
+Linux drives chip-select as a **plain GPIO**, not the SPI controller's
+native 2-bit CS field. The first version relied entirely on the native
+CS field, so it never actually asserted the chip's real CS pin — the
+controller happily shifted clock/data internally, "succeeding" by its
+own bookkeeping, while the chip itself never saw a real transaction.
+Fix: drive GPIO 8 directly (`GPCLR0`/`GPSET0`) around the transfer,
+exactly mirroring what Linux's own gpio-cs mechanism does. After the
+fix: real register value `0x00000468` read directly by OP-TEE core,
+zero regression on the existing `secure_can_demo` (same boot, same
+image).
+
+**No hardware-enforced isolation on this SoC**: this platform's own
+comment says *"No secure memory on RPi..."* - there is no TZASC/TZPC
+equivalent. Marking `SPI0_BASE`/`GPIO_BASE` `MEM_AREA_IO_SEC` only
+affects OP-TEE's own page tables; it does not and cannot, on this
+hardware, physically stop a root-compromised Linux kernel from reaching
+the same physical registers via `/dev/mem`. The real isolation here is
+that Linux is simply never given a driver/device-tree node for this
+controller — a software/configuration boundary, not a hardware-enforced
+one. State this precisely in the report rather than overclaiming
+hardware isolation - the roadmap's own Step 14 task list anticipates
+exactly this ("Document which limitations are enforced by hardware and
+which are prototype software policy on RPi3").
+
+**Not yet done** (tracked as the next phases, in this order): Step 15
+(secure GPIO interrupt handling - the actually risky part, since GPIO
+25/24 share a single GIC line with the *entire* first GPIO bank, meaning
+"make can0's interrupt secure" really means claiming that whole shared
+line for Secure World); Step 16/17 (a real secure CAN receive driver,
+not just a single register read); Step 18 (secure RAM queues); disabling
+Linux's `mcp251xfd`/`spi0.0` binding entirely; and reworking
+`secure_can_ta.c` so Normal World only ever polls for Secure-World-
+released results instead of handing it raw frames to classify.
+
+**Prevention**: when a register-level driver "succeeds" by its own
+status bits but returns implausible data (all-zero, all-ones), don't
+assume the low-level protocol logic is wrong before checking the
+*actual* physical wiring assumption first - specifically, check the
+*live* device tree (`/proc/device-tree/...`) for how chip-select is
+really wired on the exact board in hand, not just the SPI controller's
+generic datasheet behavior. A `cs-gpios` property changes chip-select
+from "automatic, tied to the TA bit" to "software must drive it
+separately" - a difference invisible from the SPI controller's registers
+alone.
 
 ---
 
