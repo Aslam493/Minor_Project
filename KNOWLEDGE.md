@@ -214,6 +214,88 @@ flaky), and the board stayed responsive (`uptime`/`dmesg` clean) throughout.
 
 ---
 
+## Incident 4 — Flipping the "primary CPU" constant hung boot completely, no UART needed to find why (September 2026)
+
+### Symptom
+On branch `step11-dual-core-worlds`, attempting to dedicate Core 0 to an
+independent Secure World worker (Core 1 running Normal World, cores 2/3
+excluded) by changing `RPI_PRIMARY_CPU` from `U(0)` to `U(1)` in
+`trusted-firmware-a/plat/rpi/rpi3/include/platform_def.h`: after flashing
+and powering on, the Raspberry Pi showed its normal GPU-firmware rainbow
+splash for about a second, then went to a permanently black screen. No
+green (SD activity) LED blinking at all after that point. No UART was
+available to capture what happened at the exact failure point.
+
+### Root cause
+**Physical core 0 is hardware-mandated to be the one that starts executing
+first on this SoC — no software constant changes that.** The GPU firmware
+(`bootcode.bin`/`start.elf`, completely unmodified — which is exactly why
+the splash screen still appeared normally) only powers on and releases
+physical core 0 to run the ARM boot stub (`armstub8.bin`, i.e. TF-A's BL1).
+Cores 1–3 stay inert in hardware until core 0's own boot code explicitly
+wakes each one via a spin-table/mailbox address.
+
+`RPI_PRIMARY_CPU` only controls what `plat_is_my_cpu_primary()` *reports*
+when called — it does not change which physical core hardware actually
+starts. Setting it to `1` meant that core 0 (the only core hardware ever
+starts) called `plat_is_my_cpu_primary()` and got back "false" (0 ≠ 1), so
+it took the *secondary* cold-boot path — straight into the holding-pen loop
+(here, the new independent-counter loop) — instead of doing the primary
+core's actual job: initializing the platform and releasing cores 1–3 from
+their holding pens. Since nothing ever released core 1, core 1 never ran,
+Linux never loaded, and core 0 spun forever incrementing a counter nobody
+was ever able to read. This traces exactly to the observed symptom: the
+GPU-firmware splash is unrelated code that still ran fine, and everything
+after the handoff to TF-A simply never produced output again.
+
+This was root-caused entirely from the symptom pattern and reading the
+boot code afterward — no UART capture was needed for *this* specific bug,
+because "brief GPU splash, then permanently nothing, ever" is a strong
+enough signature on its own once you know which unmodified vs. modified
+code runs at each stage.
+
+### Fix (not yet attempted — recovery only, see below)
+`RPI_PRIMARY_CPU` cannot be used to relocate which physical core boots
+first on this hardware. The correct approach for the original goal (Core 0
+does independent Secure World work, Core 1 runs Normal World) is
+architecturally different: **keep `RPI_PRIMARY_CPU` at `0`** so core 0
+keeps doing its real job (platform init, releasing cores 1–3 as normal),
+and instead modify BL31's own hand-off logic (`rpi3_bl31_setup.c` /
+`bl31_main`'s final jump to BL33) so that, at the very end, core 0
+explicitly releases core 1 into the BL33/Linux entry point (reusing the
+existing hold-pen release + `sev()` mechanism already used for waking any
+secondary core) and only *then* diverts itself into the independent worker
+loop — rather than trying to make a non-primary core pretend to be
+primary. This is a different, more surgical insertion point than a single
+constant, in `bl31`-level C code rather than the early assembly helpers.
+
+### Recovery
+Immediate physical reflash of the last known-good backup, taken
+deliberately before this attempt:
+```text
+SD_Card_Backups/pre-dual-core/rpi3-sdcard-known-good-classification.img
+SHA-256: e247e459ad2e4ae6ee550a363755d6798fd10b4114e5f0101e46ef8de33acb6b
+```
+Flashed, verified byte-for-byte (`cmp`), and confirmed booting normally
+again. This is exactly why a known-good backup was taken *before* this
+attempt (see "Rebuild procedure" below) rather than only relying on git —
+the physical card needed restoring, not just the source tree.
+
+### Prevention
+- **Before changing any "which core does X" constant, verify what the
+  underlying hardware — not just the software abstraction — actually
+  guarantees.** TF-A's `plat_is_my_cpu_primary()` is a *report*, not a
+  *cause*; changing it doesn't change hardware reset behavior.
+- **Always keep a known-good physical image backup before any boot-flow
+  change**, separate from git commits. Git preserves the *source*, but
+  recovering a bricked-looking board needs the *flashed artifact* on hand
+  immediately, not a rebuild-from-source under time pressure.
+- Attribute-level symptom reading (what ran vs. didn't, based on what code
+  was and wasn't touched) can root-cause an EL3/cold-boot failure without
+  UART, if you're precise about which stages are provably unmodified.
+
+---
+
 ## Rebuild procedure (reference)
 
 From `/home/aslam/Minor_Project/optee_full`, using the pinned toolchain paths:
