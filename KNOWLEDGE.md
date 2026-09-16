@@ -413,6 +413,53 @@ an external checkout, always `git status`/`git diff` that checkout
 directly and confirm it's clean — don't infer it from the main repo's
 state.
 
+### Second addendum — `dtoverlay=` never worked in this boot chain at all
+
+With the TF-A bug actually fixed, boot succeeded — but `can0`/`can1` still
+never appeared, and `/proc/device-tree/soc/spi@7e204000/` on the running
+Pi still showed the plain `spidev@0`/`spidev@1` nodes, not
+`mcp251xfd@0`/`@1`. The overlay was never being applied at all, regardless
+of its content.
+
+**Root cause**: `build/rpi3/firmware/uboot.env.txt` loads the device tree
+like this:
+```text
+load_fdt=run select_fdt; fatload mmc 0:1 ${fdt_addr_r} ${fdtfile}
+```
+U-Boot loads the `.dtb` **file directly from the SD card's FAT boot
+partition**. `dtoverlay=`/`device_tree_address=` in `config.txt` only
+affect what the *GPU firmware* (bootcode.bin/start.elf) does before U-Boot
+even runs — and this project's boot chain never uses that copy. Compounding
+this: TF-A is built with `RPI3_PRELOADED_DTB_BASE=0x00010000` while
+`config.txt` sets `device_tree_address=0x01000000` — two different
+addresses that were never meant to refer to the same thing here. `dtoverlay=`
+is simply not a mechanism this boot architecture honors, independent of
+whether the overlay itself is correct.
+
+**Fix**: don't rely on runtime overlay application at all — merge the
+overlay into the shipped `.dtb` at **build time** instead, using the same
+`fdtoverlay` tool already used to verify the merge offline. Added to
+`build/rpi3.mk`'s `update_bootfs` target:
+```make
+$(LINUX_PATH)/scripts/dtc/fdtoverlay -i $(LINUX_DTB_RPI3_B) \
+	-o $(BOOT_PARTITION_FILES)/bcm2710-rpi-3-b.dtb \
+	$(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2-nortc.dtbo
+```
+(and the same for the B+ variant). Removed the now-inert `dtoverlay=` line
+from `config.txt` and the now-unnecessary `overlays/` directory on the boot
+partition entirely — the merge is baked into the one `.dtb` file U-Boot
+already loads, so nothing else needs to change. Verified before flashing:
+decompiled the shipped `.dtb` and confirmed `spidev@0`/`@1` show
+`status = "disabled"` and `mcp251xfd@0`/`@1` have fully resolved phandles
+(not placeholder values) for `clocks`/`interrupt-parent`/`pinctrl-0`.
+
+**Prevention**: `dtoverlay=` being "standard Raspberry Pi firmware
+behavior" says nothing about whether a *particular* boot chain actually
+uses the copy that mechanism produces. Before relying on it, trace where
+the OS's device tree pointer actually comes from (here: grep the U-Boot
+env for `load_fdt`) rather than assuming the GPU-firmware-merged copy is
+the one that matters.
+
 ---
 
 ## Rebuild procedure (reference)

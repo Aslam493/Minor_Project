@@ -1,5 +1,5 @@
 diff --git a/rpi3.mk b/rpi3.mk
-index 4703f64..c558a2e 100644
+index 4703f64..51943d4 100644
 --- a/rpi3.mk
 +++ b/rpi3.mk
 @@ -11,10 +11,12 @@ override COMPILE_S_KERNEL  := 64
@@ -15,21 +15,23 @@ index 4703f64..c558a2e 100644
  BR2_PACKAGE_XINETD ?= y
  
  # SSH Packages :
-@@ -199,6 +201,8 @@ update_bootfs: tf-a linux u-boot-env
- 	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start_db.elf $(BOOT_PARTITION_FILES)/start_db.elf
- 	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start.elf $(BOOT_PARTITION_FILES)/start.elf
- 	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start_x.elf $(BOOT_PARTITION_FILES)/start_x.elf
-+	@mkdir -p --mode=755 $(BOOT_PARTITION_FILES)/overlays
-+	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2-nortc.dtbo $(BOOT_PARTITION_FILES)/overlays/seeed-can-fd-hat-v2-nortc.dtbo
+@@ -182,8 +184,17 @@ update_rootfs: linux
  
- .PHONY: sdcard-image
- sdcard-image: update_bootfs update_rootfs buildroot
-diff --git a/rpi3/firmware/config.txt b/rpi3/firmware/config.txt
-index a9cf780..dddae0f 100644
---- a/rpi3/firmware/config.txt
-+++ b/rpi3/firmware/config.txt
-@@ -1,3 +1,4 @@
- enable_uart=1
- kernel_address=0x02000000
- device_tree_address=0x01000000
-+dtoverlay=seeed-can-fd-hat-v2-nortc
+ update_bootfs: tf-a linux u-boot-env
+ 	@mkdir -p --mode=755 $(BOOT_PARTITION_FILES)
+-	@install -v -p --mode=755 $(LINUX_DTB_RPI3_B) $(BOOT_PARTITION_FILES)/bcm2710-rpi-3-b.dtb
+-	@install -v -p --mode=755 $(LINUX_DTB_RPI3_BPLUS) $(BOOT_PARTITION_FILES)/bcm2710-rpi-3-b-plus.dtb
++	@# U-Boot loads the .dtb straight off the FAT boot partition
++	@# (uboot.env.txt: load_fdt = fatload mmc 0:1 ...) -- it never sees
++	@# whatever the GPU firmware does with dtoverlay=/device_tree_address,
++	@# so any overlay has to be baked into the shipped .dtb at build time
++	@# instead (see KNOWLEDGE.md Incident 5).
++	@$(LINUX_PATH)/scripts/dtc/fdtoverlay -i $(LINUX_DTB_RPI3_B) \
++		-o $(BOOT_PARTITION_FILES)/bcm2710-rpi-3-b.dtb \
++		$(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2-nortc.dtbo
++	@$(LINUX_PATH)/scripts/dtc/fdtoverlay -i $(LINUX_DTB_RPI3_BPLUS) \
++		-o $(BOOT_PARTITION_FILES)/bcm2710-rpi-3-b-plus.dtb \
++		$(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2-nortc.dtbo
+ 	@install -v -p --mode=755 $(RPI3_BOOT_CONFIG) $(BOOT_PARTITION_FILES)/config.txt
+ 	@install -v -p --mode=755 $(LINUX_IMAGE) $(BOOT_PARTITION_FILES)/kernel8.img
+ 	@install -v -p --mode=755 $(TF_A_BOOT) $(BOOT_PARTITION_FILES)/armstub8.bin
