@@ -296,6 +296,80 @@ the physical card needed restoring, not just the source tree.
 
 ---
 
+## Incident 5 — CAN shield overlay hung boot via an invalid device-tree label (September 2026)
+
+### Symptom
+Enabling `dtoverlay=seeed-can-fd-hat-v2` in `config.txt` for the Seeed
+CAN-BUS FD Shield (see `STEP11_CAN_HARDWARE_SPEC.md`) produced the exact
+same failure signature as Incident 4: brief GPU-firmware rainbow splash,
+then a permanently black screen, no SD-card (green LED) activity
+afterward. This was unexpected — a `dtoverlay=` line is normally one of
+the safest, most standard pieces of Raspberry Pi firmware behavior, with
+no relation to TF-A/OP-TEE/boot-flow code at all.
+
+### Root cause
+The stock overlay (`firmware/boot/overlays/seeed-can-fd-hat-v2.dtbo`,
+from `arch/arm/boot/dts/overlays/seeed-can-fd-hat-v2-overlay.dts`) has 10
+fragments. Fragments 0–7 add the two MCP2518FD CAN controllers and are
+fine. Fragments 8–9 add the shield's bonus onboard RTC chip (unrelated to
+CAN) and target a device-tree label called `i2c_arm`:
+```c
+fragment@9 {
+	target = <&i2c_arm>;
+	...
+```
+**That label does not exist in this project's kernel.** `i2c_arm` is
+defined only in the Raspberry Pi Foundation's downstream kernel fork
+(`arch/arm/boot/dts/broadcom/bcm270x-rpi.dtsi`, not part of this build).
+This project deliberately builds **mainline Linux** (see
+`COMPONENT_REVISIONS.md`), whose actual base tree
+(`bcm283x.dtsi`/`bcm2835-rpi.dtsi`) only defines `serial0`/`serial1` in
+`aliases` — no `i2c_arm` anywhere. Confirmed directly by grepping the
+compiled tree's source rather than guessing. With an unresolvable target
+label, the firmware's device-tree overlay merge at boot could not
+complete, which — on this firmware/hardware combination — manifested as a
+hang rather than a graceful skip-and-continue.
+
+### Fix
+Verified the CAN-only fragments (0–7) target `spidev0`, `spidev1`, `spi0`,
+and `gpio` — all confirmed present and valid in this tree — before relying
+on them. Created a trimmed overlay,
+`seeed-can-fd-hat-v2-nortc-overlay.dts`, keeping only fragments 0–7 and
+dropping the RTC fragments entirely (the RTC was already documented as
+"unrelated to CAN, safe to ignore" in the hardware spec — losing it costs
+nothing). Compiled with the kernel's own toolchain, replicating its exact
+build recipe read from the existing `.cmd` file rather than guessing dtc
+flags:
+```sh
+$CC -E -nostdinc -I./scripts/dtc/include-prefixes -undef -D__DTS__ \
+  -x assembler-with-cpp -o out.tmp seeed-can-fd-hat-v2-nortc-overlay.dts
+./scripts/dtc/dtc -@ -H epapr -O dtb -o out.dtbo -b 0 \
+  -i arch/arm64/boot/dts/overlays/ <same -Wno-* flags as the stock overlay> out.tmp
+```
+Decompiled the result and grepped for `i2c_arm` to confirm it's gone and
+the `__fixups__` list only references the four valid labels, before
+wiring it into `config.txt`
+(`dtoverlay=seeed-can-fd-hat-v2-nortc`) and rebuilding.
+
+### Prevention
+- **A `dtoverlay=` addition is not automatically risk-free just because
+  it's "normal Raspberry Pi firmware behavior."** Overlays distributed for
+  the stock Raspberry Pi Foundation kernel can reference labels/aliases
+  that don't exist in a different (e.g. mainline) kernel build. Before
+  trusting a third-party overlay, grep the actual compiled device-tree
+  source for every label it targets — don't assume compatibility from the
+  overlay working elsewhere.
+- When an overlay bundles unrelated hardware (here: CAN + a bonus RTC),
+  consider trimming it to only the fragments actually needed — smaller
+  surface area, fewer chances for an unrelated part to break the whole
+  merge.
+- The same recovery discipline as Incident 4 applied here and worked
+  immediately: a known-good backup image, taken before the risky change,
+  flashed straight back the moment the symptom appeared, no time lost
+  debugging a live "why won't it boot" on hardware you need working.
+
+---
+
 ## Rebuild procedure (reference)
 
 From `/home/aslam/Minor_Project/optee_full`, using the pinned toolchain paths:

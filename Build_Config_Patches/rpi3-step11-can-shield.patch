@@ -1,5 +1,5 @@
 diff --git a/rpi3.mk b/rpi3.mk
-index 4703f64..f3aa8d9 100644
+index 4703f64..c558a2e 100644
 --- a/rpi3.mk
 +++ b/rpi3.mk
 @@ -11,10 +11,12 @@ override COMPILE_S_KERNEL  := 64
@@ -15,22 +15,21 @@ index 4703f64..f3aa8d9 100644
  BR2_PACKAGE_XINETD ?= y
  
  # SSH Packages :
-@@ -199,6 +201,9 @@ update_bootfs: tf-a linux u-boot-env
+@@ -199,6 +201,8 @@ update_bootfs: tf-a linux u-boot-env
  	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start_db.elf $(BOOT_PARTITION_FILES)/start_db.elf
  	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start.elf $(BOOT_PARTITION_FILES)/start.elf
  	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/start_x.elf $(BOOT_PARTITION_FILES)/start_x.elf
 +	@mkdir -p --mode=755 $(BOOT_PARTITION_FILES)/overlays
-+	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2.dtbo $(BOOT_PARTITION_FILES)/overlays/seeed-can-fd-hat-v2.dtbo
-+	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/overlays/mcp251xfd.dtbo $(BOOT_PARTITION_FILES)/overlays/mcp251xfd.dtbo
++	@install -v -p --mode=755 $(RPI3_STOCK_FW_PATH)/boot/overlays/seeed-can-fd-hat-v2-nortc.dtbo $(BOOT_PARTITION_FILES)/overlays/seeed-can-fd-hat-v2-nortc.dtbo
  
  .PHONY: sdcard-image
  sdcard-image: update_bootfs update_rootfs buildroot
 diff --git a/rpi3/firmware/config.txt b/rpi3/firmware/config.txt
-index a9cf780..dc9197f 100644
+index a9cf780..dddae0f 100644
 --- a/rpi3/firmware/config.txt
 +++ b/rpi3/firmware/config.txt
 @@ -1,3 +1,4 @@
  enable_uart=1
  kernel_address=0x02000000
  device_tree_address=0x01000000
-+dtoverlay=seeed-can-fd-hat-v2
++dtoverlay=seeed-can-fd-hat-v2-nortc
