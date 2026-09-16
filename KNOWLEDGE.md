@@ -705,6 +705,133 @@ from "automatic, tied to the TA bit" to "software must drive it
 separately" - a difference invisible from the SPI controller's registers
 alone.
 
+### Eighth addendum — Secure Peripheral Ownership, Phase 2: the CAN controller's interrupt reaches Secure World directly (Step 15, succeeded)
+
+Goal, stated precisely by the user: an interrupt from the CAN controller
+reaches Secure World's CPU core directly, with **no Linux/Normal World
+involvement in between**. Achieved and verified on hardware, with zero
+regression to the existing pipeline.
+
+**Why this was the highest-risk step in the whole project**: this is the
+exact same function, in the exact same file
+(`trusted-firmware-a/plat/rpi/common/rpi3_common.c`,
+`plat_ic_get_pending_interrupt_type()`), that caused **Incident 1** the
+very first time this project touched EL3 interrupt routing - 5 failed
+attempts across 5 commits before a full revert. That function was still,
+until this addendum, a hard-coded stub that unconditionally errored on
+any interrupt reaching EL3:
+```c
+uint32_t plat_ic_get_pending_interrupt_type(void)
+{
+	ERROR("rpi3: Interrupt routed to EL3.\n");
+	return INTR_TYPE_INVAL;
+}
+```
+No UART was available for this attempt either (same blind-debugging
+constraint that turned Incident 1's one bad change into five). Given
+that, this was done with: a known-good SD card image backup taken first
+(`SD_Card_Backups/pre-secure-peripheral-ownership/`), and **every
+iteration flashed to a second, physically separate spare SD card**,
+never the original - a two-card protocol adopted specifically because of
+this exact risk history. The original card was never touched or at risk
+at any point during this work.
+
+**Key platform facts, verified rather than assumed, before writing any
+code**:
+- The RPi3 (BCM2837) has **no ARM GIC at all** - TF-A's GIC driver files
+  only exist for the Pi 4 port. This platform uses Broadcom's own
+  simpler, non-GIC interrupt controller, so none of the usual
+  GICv2/Group0/Group1 security-partitioning concepts apply here.
+- `can0`'s interrupt (GPIO 25) and `can1`'s (GPIO 24) **share a single
+  physical GIC-equivalent line** with the entire first GPIO bank
+  (pins 0-31) - confirmed from this board's live device tree
+  (`gpio@7e200000`'s interrupt-controller comment, and the `spi0`
+  chip-select layout established in the seventh addendum). Routing
+  "can0's interrupt" to Secure World really means claiming that whole
+  shared bank's line - acceptable here since nothing else on this
+  minimal Buildroot rootfs uses other GPIO interrupts, but not a
+  decision to make casually on a fuller system.
+- Exact register derivation (cross-checked against Linux's own
+  `drivers/irqchip/irq-bcm2835.c` and this board's live device tree,
+  not written from memory):
+  - `spi0`'s GPIO bank-0 interrupt = peripheral source **49**
+    (`gpio@7e200000`'s live `interrupts` property is `<2 17> <2 18>`
+    i.e. bank 2 ["IRQ pending 2"], bit 17 → 32+17=49; cross-checked
+    against Linux's own `hwirq_to_fiq()` encoding, which independently
+    derives the same value 49).
+  - VC (peripheral) interrupt controller: physical `0x3f00b200`
+    (confirmed via `/proc/device-tree/soc/interrupt-controller@7e00b200`),
+    `FIQ_CONTROL` at offset `0x0c`, bit 7 = enable, low bits = source
+    number. Arm value = `0x80 | 49 = 0xB1`.
+  - ARM Local Peripherals block: physical `0x40000000` (already used by
+    TF-A for its own mailbox-based secondary-core wake mechanism -
+    `RPI3_INTC_BASE_ADDRESS` in `rpi_hw.h` - a *different* register on
+    the *same* block), `GPU_INT_ROUTING` at offset `0x0c`, bits[3:2]
+    select which physical core (0-3) receives peripheral FIQs/IRQs.
+    Explicitly cleared to 0 (core 0) rather than trusting the power-on
+    default.
+  - These are three genuinely separate hardware blocks
+    (SPI0/GPIO-pinmux from the seventh addendum, this VC interrupt
+    controller, and the ARM Local block) - easy to conflate, kept as
+    three distinct `#define` groups in `platform_config.h`.
+
+**What was built**:
+- `optee_os/core/arch/arm/plat-rpi3/rpi3_can_fiq.c` (new file) -
+  overrides the weak default `interrupt_main_handler()` (which panics
+  unconditionally on any secure interrupt - see `core/kernel/interrupt.c`).
+  On the one FIQ it's designed to ever see, it disables further FIQ
+  generation immediately (self-disarming, one-shot by design) and
+  increments a counter - deliberately not a full production interrupt
+  handler yet, matching this increment's narrow scope.
+- `trusted-firmware-a/plat/rpi/common/rpi3_common.c` -
+  `plat_ic_get_pending_interrupt_type()` now unconditionally returns
+  `INTR_TYPE_S_EL1` instead of erroring. Safe specifically *because*
+  only one interrupt source is ever configured to reach EL3 on this
+  platform (nothing else touches `FIQ_CONTROL`) - a much smaller,
+  simpler change than Incident 1's attempt, which modified this same
+  function *and* `plat_interrupt_type_to_line()` to introduce a new
+  IRQ-not-FIQ special case. This addendum needed no change to
+  `plat_interrupt_type_to_line()` at all, since it already correctly
+  defaults every non-NS type to the FIQ line.
+- `rpi3_can_spi_poc.c` gained two new commands: `GET_FIQ_COUNT` (poll
+  the counter) and `ARM_FIQ` (see next paragraph).
+
+**A real bug hit and fixed**: the first version armed FIQ routing from a
+`driver_init()` call (matching the established pattern in
+`core/drivers/bcm_gpio.c`) - it booted fine, but reading `FIQ_CONTROL`
+back afterward showed `0x0`: the write never took effect, most likely a
+memory-mapping timing subtlety at that early boot phase (`driver_init()`
+runs very early, before Normal World/Linux ever starts). Rather than
+debug that blind further (no UART), the arming write was moved to a new
+`ARM_FIQ` PTA command instead - the same `invoke_command` context
+already *proven* correct by the seventh addendum's SPI/GPIO code -
+called explicitly once after boot. This worked immediately: `FIQ_CONTROL`
+read back as `0xB1` exactly as computed.
+
+**Verified end to end on hardware**: after arming, running
+`secure_can_demo` (real CAN traffic) produced exactly one FIQ
+(`GET_FIQ_COUNT` → 1), `FIQ_CONTROL` correctly back to `0x0` afterward
+(self-disarmed), and `secure_can_demo` itself still completed with every
+`PASS` and zero CRC errors - Linux transparently recovered and received
+its own interrupts normally for the rest of the traffic after the one
+stolen event.
+
+**Prevention / what to reuse next time**:
+- When TF-A/OP-TEE boot-flow or interrupt-routing code must be changed
+  again with no UART available: get a known-good backup first, flash
+  every iteration to a spare card, and keep the original untouched until
+  a change is *proven* working - this is what actually made repeated
+  fast iteration safe here despite the historical risk.
+- `driver_init()`-time hardware writes are not automatically safe to
+  assume correct just because another driver in the tree uses the same
+  pattern - verify with a readback, especially for anything touching
+  interrupt controllers this early in boot.
+- Not yet done: the real secure CAN receive driver (Steps 16/17 - read
+  the actual frame via SPI from within the FIQ path, not just count an
+  event), secure RAM queues (Step 18), and disabling Linux's binding to
+  `spi0.0`/`can0` entirely so classification genuinely happens before
+  Normal World ever sees a frame (the user's original stated goal).
+
 ---
 
 ## Rebuild procedure (reference)
