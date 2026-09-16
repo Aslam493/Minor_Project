@@ -460,6 +460,51 @@ the OS's device tree pointer actually comes from (here: grep the U-Boot
 env for `load_fdt`) rather than assuming the GPU-firmware-merged copy is
 the one that matters.
 
+### Third addendum — the SPI controller driver never auto-loaded
+
+With the DTB fix in place, boot succeeded and the live device tree
+correctly showed `mcp251xfd@0`/`@1` with `spi0` `status = "okay"` — but
+`can0`/`can1` still didn't appear, and `/sys/bus/spi/devices/` was
+completely empty even though `/sys/bus/spi/drivers/mcp251xfd` existed.
+
+**Root cause**: `CONFIG_SPI_BCM2835=m` — the SPI *controller* driver
+(distinct from the `mcp251xfd` CAN chip driver) is built as a loadable
+module, not built-in. Nothing else in this project ever used SPI before
+tonight, so nothing ever triggered loading it. The CAN driver itself was
+loaded and ready, but with no SPI master registered, there was no bus for
+it to find devices on.
+
+**Fix**: `modprobe spi_bcm2835` (then `mcp251xfd`, in that order) made
+`can0` appear immediately, with real hardware detected:
+```text
+mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (...) successfully initialized.
+```
+Made permanent via Buildroot's existing `/etc/init.d/S11modules` +
+`/etc/modules-load.d/*.conf` mechanism (already used by this rootfs, just
+never needed before) — added
+`build/br-ext/board/rpi3/overlay/etc/modules-load.d/can-shield.conf`
+listing both modules, one per line, no init script changes needed.
+
+**Known follow-up, not yet resolved**: `can0` (`spi0.0`) detected real
+hardware successfully; `can1` (`spi0.1`) did not —
+`error -ENODEV: Failed to detect MCP251xFD` with the oscillator register
+reading back all zeros, the classic "nothing responded on this SPI chip
+select" signature. Likely a physical wiring/seating issue specific to
+that channel rather than anything software-side, since it's the exact
+same driver code that worked for channel 0. Worth reseating the shield
+and rechecking the `1_H`/`1_L`/`GND` connections before assuming a bad
+board.
+
+**Prevention**: a device tree node existing and being `status = "okay"`
+only means the *kernel* knows the device *should* exist — it says nothing
+about whether every driver in the dependency chain (here: bus controller
+→ chip driver) is actually loaded. When a device doesn't show up despite
+a correct device tree, check `/sys/bus/<bus>/devices/` and
+`/sys/bus/<bus>/drivers/` separately — an empty devices list with a
+present driver directory means the *bus itself* never registered
+anything, which points at the bus controller driver, not the device
+driver you were focused on.
+
 ---
 
 ## Rebuild procedure (reference)
