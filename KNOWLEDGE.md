@@ -368,6 +368,51 @@ wiring it into `config.txt`
   flashed straight back the moment the symptom appeared, no time lost
   debugging a live "why won't it boot" on hardware you need working.
 
+### Addendum — this fix alone did not actually solve it
+
+Flashing the corrected overlay produced the **exact same boot failure
+again**. The overlay fix above was real (confirmed independently, see
+below) but incomplete as an explanation — there was a second, unrelated
+bug still present.
+
+**The real cause**: Incident 4's `RPI_PRIMARY_CPU=1` change was still sitting
+**uncommitted in the separate `trusted-firmware-a` checkout**. Incident 4's
+recovery only restored the curated *binary* (`armstub8.bin`) tracked in
+git — it never reverted the actual TF-A *source* files
+(`platform_def.h`, `plat_helpers.S`, `rpi3_pm.c`). Every later
+`update_bootfs` (including this CAN shield work, since it depends on the
+`tf-a` target) silently **rebuilt `armstub8.bin` from the still-broken
+source**, overwriting the earlier restoration without any explicit sign
+that it had happened. Both "CAN shield" boot failures were actually
+Incident 4's bug recurring, not the overlay at all — the overlay was never
+reached, because boot hung before Linux (and therefore before any overlay
+processing) even ran.
+
+**Found by**: refusing to keep guessing at the overlay a third time, and
+instead diffing every file in the known-good and failing boot partitions
+directly (`diff -qr`) — which showed `armstub8.bin` differing, despite
+nothing in the CAN shield work having any reason to touch TF-A. Also used
+`fdtoverlay` to apply the fixed overlay to the real base `.dtb` completely
+offline (no hardware needed) and confirmed a clean merge with all
+phandles resolved — proving the overlay itself was fine before looking
+elsewhere.
+
+**Actual fix**: `git checkout --` the three TF-A files in that separate
+checkout back to their committed originals, rebuild `tf-a` explicitly,
+and *verify* the resulting `armstub8.bin` — a byte-level diff against the
+known-good baseline showed exactly 20 differing bytes, all inside the
+embedded build-timestamp string, confirming the binaries are now
+functionally identical.
+
+**Prevention, the part that actually mattered**: when a risky change lives
+in a separate, uncommitted checkout (not the main tracked repo), "restore
+the curated binary artifact" is not the same as "revert the source." Any
+later rebuild that target depends on will silently regenerate the broken
+binary from the still-dirty source. After recovering from an incident in
+an external checkout, always `git status`/`git diff` that checkout
+directly and confirm it's clean — don't infer it from the main repo's
+state.
+
 ---
 
 ## Rebuild procedure (reference)
