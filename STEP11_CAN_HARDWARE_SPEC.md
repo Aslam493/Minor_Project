@@ -1,94 +1,112 @@
 # Step 11 — CAN Hardware Specification
 
-Frozen while no CAN hardware was available, so Step 11's software side
-(secure frame authentication) could proceed against a simulated source. This
-document is what to buy and exactly how it replaces the simulation once it
-arrives — no further Secure World changes are needed.
+Originally frozen while no CAN hardware was available. **Updated 16 Sept
+2026**: the actual board is now identified and verified against this
+project's kernel — see photos, confirmed as a Seeed Studio 2-Channel
+CAN-BUS(FD) Shield (MCP2518FD, v2.0). This document is both the spec and a
+practical step-by-step guide to install, bring up, and wire it into the
+already-verified secure pipeline.
 
-## Recommended hardware
+## The hardware
 
-**MCP2515 CAN controller + TJA1050/SN65HVD230 transceiver breakout board**
-("MCP2515 CAN module"), connected to the Pi over SPI.
+**Seeed Studio 2-Channel CAN-BUS(FD) Shield for Raspberry Pi, v2.0**
+(`www.seeedstudio.com`, chip: **MCP2518FD**).
 
 | Property | Value |
 |---|---|
-| Typical cost | $3–6 for a breakout board (widely available) |
-| Interface to the Pi | SPI0 (`MOSI`/`MISO`/`SCLK`/`CE0`) + one GPIO for the controller's `INT` line |
-| Linux driver | `mcp251x` — already in mainline Linux, exposed as `CONFIG_CAN_MCP251X` |
-| Bus API | Linux SocketCAN (`PF_CAN`, `can0` interface) — standard, not project-specific |
+| Chip | MCP2518FD (CAN-FD capable, backward compatible with classic CAN) — newer/better than a plain MCP2515 |
+| Form factor | Full 40-pin HAT — plugs straight onto the Pi's GPIO header, no manual wiring for the SPI/interrupt lines |
+| Channels | 2 independent CAN buses: **CAN_0** and **CAN_1**, each with its own MCP2518FD chip |
+| Interface | SPI0, using both native chip-selects (CE0 for CAN_0, CE1 for CAN_1) + GPIO25 (CAN_0 IRQ) / GPIO24 (CAN_1 IRQ) |
+| Per-channel connections | Screw terminals: `_H`, `_L`, `GND` |
+| Termination | A 3-way switch per channel: `OFF / 120R / ON` |
+| Extra | An onboard RTC (PCF85063) via two JST "Grove"-style connectors (`GND/5V/SDA/SCL`) — unrelated to CAN, a bonus, safe to ignore |
+| Power switch | Labelled **"Power to RPi: OFF / ON"** — see safety note below |
 
-### Why this over the alternatives
-- **PiCAN2/PiCAN3 HAT** (same MCP2515 chip, packaged as a HAT with a DB9
-  connector): easier physical assembly, no wiring, but 4–6x the cost and
-  less flexible GPIO/case layout. Reasonable upgrade later; not required to
-  start.
-- **USB-CAN adapters** (e.g. common USB-to-CAN dongles): avoid GPIO/SPI
-  wiring entirely, but add a second driver/permissions layer and are less
-  representative of an embedded automotive-style deployment, which is the
-  scenario this project is modeling.
-- **A Pi with native CAN silicon**: the Raspberry Pi 3B/3B+ used throughout
-  this project has no built-in CAN peripheral, so this isn't an option on
-  the current board regardless.
+### Already verified present in this project's exact kernel checkout — no kernel rebuild needed
+- Driver: `CONFIG_CAN_MCP251XFD=m`, already built (`mcp251xfd.ko.xz` already
+  sits in `module_output`)
+- The **exact matching overlay** already exists, pre-built:
+  `firmware/boot/overlays/seeed-can-fd-hat-v2.dtbo`
+- SocketCAN core already enabled: `CONFIG_CAN=m`, `CONFIG_CAN_RAW=m`,
+  `CONFIG_CAN_DEV=m`
 
-The MCP2515 module is the standard, best-documented choice for Pi + CAN
-projects, keeps the bill of materials near zero, and uses a driver already
-built into the kernel this project already builds — no separate kernel work
-needed to try it once the physical part is in hand.
+### Still needed (all safe — no TF-A/OP-TEE/boot-flow changes)
+- Copy the `overlays/` directory onto the boot partition (currently not
+  copied there)
+- Add `dtoverlay=seeed-can-fd-hat-v2` to `config.txt`
+- Enable `BR2_PACKAGE_CAN_UTILS` in Buildroot (gives you `candump`/`cansend`
+  for testing)
 
-## Wiring (Raspberry Pi 3B/3B+ 40-pin header)
+## Physical installation
 
-| MCP2515 module pin | Pi pin (physical) | Function |
-|---|---|---|
-| VCC | 5V or 3.3V (check board — most breakouts accept 5V and have an onboard regulator; confirm before connecting) | Power |
-| GND | GND (e.g. pin 6) | Ground |
-| CS | GPIO8 / CE0 (pin 24) | SPI chip select |
-| SO (MISO) | GPIO9 / MISO (pin 21) | SPI data in |
-| SI (MOSI) | GPIO10 / MOSI (pin 19) | SPI data out |
-| SCK | GPIO11 / SCLK (pin 23) | SPI clock |
-| INT | Any free GPIO, e.g. GPIO25 (pin 22) | Controller interrupt — **Linux GPIO IRQ, not a Secure World interrupt**; this is ordinary Normal-World kernel driver plumbing, unrelated to the EL3/TrustZone interrupt work that broke boot in the Phase A incident (see `KNOWLEDGE.md`) |
-| CANH / CANL | To the CAN bus / a second matching node for loopback testing | Bus lines |
+1. **Power off the Pi completely** — unplug it, don't just shut down Linux.
+2. **Check the "Power to RPi" switch before connecting anything.** This
+   shield can either draw power from the Pi, or feed its own power *to* the
+   Pi through the 40-pin header. Since the Pi already has its own power
+   supply in this project, **this switch should be OFF** — leaving it ON
+   with the Pi also independently powered risks two power sources fighting
+   on the same rail. If you're not certain which way is "off" on the
+   physical switch, check for a printed label/silkscreen marking near it,
+   or ask before powering on.
+3. Align the shield's 40-pin socket with the Pi's GPIO header — pin 1 on
+   the shield to pin 1 on the Pi (look for the square pad / marked corner
+   on both) — and press down firmly and evenly until fully seated.
+4. **Termination switches**: if you're bench-testing without a real second
+   CAN device, the simplest setup is to wire **CAN_0** and **CAN_1**
+   together directly (jumper `CAN_0_H` to `CAN_1_H`, and `CAN_0_L` to
+   `CAN_1_L`) — this turns the two channels on the same board into a
+   2-node bus you can test entirely on your desk. In that case, set
+   **both** channels' termination switches to `ON` or `120R` (they're the
+   two physical ends of that short bus). If you later connect to a real
+   external CAN bus instead, only terminate the two actual physical ends
+   of that bus, not both channels on this board.
+5. Power the Pi back on.
 
-A 120Ω termination resistor is needed at each physical end of the CAN bus
-(most breakout boards have a jumper for this — enable it only on the two end
-nodes of the bus).
+## Software bring-up (do this before or after physical install — order doesn't matter)
 
-## Kernel/Buildroot config needed once hardware is in hand
-
-Two Buildroot/kernel options to enable (not yet enabled — do this when the
-hardware physically arrives so it can be tested immediately, rather than
-guessing at config now):
-
-```text
-BR2_PACKAGE_CAN_UTILS=y           # Buildroot: candump/cansend/cangen tools
-CONFIG_CAN=y                       # Linux: SocketCAN core
-CONFIG_CAN_MCP251X=y               # Linux: this project's specific controller driver
-```
-
-Also add a device-tree overlay entry (or dtoverlay in `config.txt`, mirroring
-how Raspberry Pi OS enables it: `dtoverlay=mcp2515-can0,oscillator=8000000,interrupt=25`
-— oscillator speed depends on the exact breakout board's crystal, check its
-datasheet) so the kernel probes the controller at boot.
+1. Copy `firmware/boot/overlays/` (or at minimum `seeed-can-fd-hat-v2.dtbo`
+   and `mcp251xfd.dtbo`) into `out/boot/overlays/` as part of the boot file
+   assembly.
+2. Add to `build/rpi3/firmware/config.txt`:
+   ```text
+   dtoverlay=seeed-can-fd-hat-v2
+   ```
+3. Enable in the Buildroot config: `BR2_PACKAGE_CAN_UTILS=y`.
+4. Rebuild (`buildroot` → `update_bootfs` → `sdcard-image`), flash, boot.
+5. Verify the interfaces exist:
+   ```sh
+   ip link show
+   # expect to see can0 and can1
+   ```
+6. Bring the interfaces up (classic CAN, safe default bitrate):
+   ```sh
+   ip link set can0 up type can bitrate 500000
+   ip link set can1 up type can bitrate 500000
+   ```
+7. Test with the loopback wiring from step 4 above:
+   ```sh
+   candump can1 &
+   cansend can0 123#DEADBEEF
+   # candump on can1 should print the frame that was sent on can0
+   ```
+   If that works, the shield, driver, and wiring are all confirmed good —
+   completely independent of anything OP-TEE/secure-world related.
 
 ## How this plugs into the code already built and verified
 
-This is the key point: **no Secure World / TA change is needed**. Tonight's
-work already built and verified on real hardware:
-- `TA_SECURE_CAN_CMD_CLASSIFY_FRAME` — Secure World classifies a frame by
-  CAN ID (low ID = safety-critical = `SECURE`, matching real CAN
-  arbitration priority; high ID = `NORMAL`) before deciding whether it's
-  worth the cost of authenticating.
-- `TA_SECURE_CAN_CMD_PROCESS_FRAME` — for `SECURE`-classified frames,
-  Secure World authenticates a `struct secure_can_frame` (`can_id` + 8 data
-  bytes) with HMAC-SHA256.
-- `TA_SECURE_CAN_CMD_VERIFY_FRAME` — Secure World independently verifies a
-  claimed tag, constant-time, and correctly rejects tampered frames.
+**No Secure World / TA change is needed.** The already-verified pipeline
+(commits `63528cb`, `b312392`, `00ca1b8`) works on any frame in this shape,
+regardless of where it came from:
+- `TA_SECURE_CAN_CMD_CLASSIFY_FRAME` — classifies by CAN ID (low ID = safety-critical = `SECURE`)
+- `TA_SECURE_CAN_CMD_PROCESS_FRAME` — HMAC-SHA256 authenticates `SECURE` frames
+- `TA_SECURE_CAN_CMD_VERIFY_FRAME` — independently verifies a tag, rejects tampering
 
-Both already take exactly the wire format a real CAN frame has (ID + up to 8
-data bytes). The only change needed in `secure_can_demo/host/main.c` once
-real hardware exists is **where frames come from**:
+The only change needed in `secure_can_demo/host/main.c` is **where frames
+come from** — replace `fill_dummy_frame()`'s loop with a real SocketCAN
+read:
 
 ```c
-/* Replace fill_dummy_frame()'s loop with real SocketCAN reads: */
 int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
 struct sockaddr_can addr = { .can_family = AF_CAN,
                              .can_ifindex = if_nametoindex("can0") };
@@ -99,25 +117,21 @@ while (read(s, &cf, sizeof(cf)) > 0) {
         struct secure_can_frame frame = { .can_id = cf.can_id };
         memcpy(frame.data, cf.data, SECURE_CAN_FRAME_DATA_LEN);
         /* same CLASSIFY_FRAME / PROCESS_FRAME / VERIFY_FRAME calls as
-         * tonight, unchanged */
+         * already verified, unchanged */
 }
 ```
 
-Everything downstream of "a frame arrived" — the TA calls, the HMAC
-authentication, the tamper-rejection test — carries over unchanged. This is
-exactly why the Normal-World-simulated approach was worth building first: it
-already validated the part of the design that's hard to get right (Secure
-World crypto + a stack-size bug that hung the board, see `KNOWLEDGE.md`
-Incident 3), on a part of the design that's easy to swap later.
+You can then reuse the loopback wiring (step 4) as a live demo: run the
+updated `secure_can_demo` listening on `can0`, and `cansend can1 ...` from
+a second terminal to inject real CAN frames that get classified,
+authenticated, and verified for real.
 
-## Completion checklist for when hardware arrives
+## Completion checklist
 
-- [ ] MCP2515 module physically wired per the table above
-- [ ] `BR2_PACKAGE_CAN_UTILS`, `CONFIG_CAN`, `CONFIG_CAN_MCP251X` enabled and
-      rebuilt
-- [ ] Device-tree overlay added, `can0` interface appears (`ip link show`)
-- [ ] `candump can0` shows traffic from a second bus node or a loopback test
-- [ ] `secure_can_demo`'s host app updated to read `can0` instead of
-      `fill_dummy_frame()`, everything else unchanged
-- [ ] Re-run the same PASS/FAIL checks already verified tonight, now against
-      real bus traffic
+- [ ] Shield physically seated, power switch confirmed OFF
+- [ ] `overlays/` copied to boot partition, `dtoverlay=seeed-can-fd-hat-v2` added
+- [ ] `BR2_PACKAGE_CAN_UTILS` enabled, image rebuilt and flashed
+- [ ] `can0`/`can1` appear in `ip link show`
+- [ ] `candump`/`cansend` loopback test passes between the two channels
+- [ ] `secure_can_demo` host app updated to read `can0` instead of `fill_dummy_frame()`
+- [ ] Full classify → authenticate → verify pipeline re-run against real CAN traffic, same PASS criteria as the simulated version
