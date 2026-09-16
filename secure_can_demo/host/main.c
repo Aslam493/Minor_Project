@@ -45,6 +45,55 @@ static void print_frame_result(const struct secure_can_frame *frame,
 	puts("  [Linux forwards the authenticated frame]");
 }
 
+static int classify_frame(TEEC_Session *session,
+			  const struct secure_can_frame *frame,
+			  uint32_t *frame_class)
+{
+	TEEC_Operation operation;
+	TEEC_Result result;
+	uint32_t origin = 0;
+
+	memset(&operation, 0, sizeof(operation));
+	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
+						TEEC_VALUE_OUTPUT,
+						TEEC_NONE, TEEC_NONE);
+	operation.params[0].tmpref.buffer = (void *)frame;
+	operation.params[0].tmpref.size = sizeof(*frame);
+
+	result = TEEC_InvokeCommand(session, TA_SECURE_CAN_CMD_CLASSIFY_FRAME,
+				    &operation, &origin);
+	if (result != TEEC_SUCCESS)
+		return report_teec_error("CLASSIFY_FRAME", result, origin);
+
+	*frame_class = operation.params[1].value.a;
+	return 0;
+}
+
+static int authenticate_frame(TEEC_Session *session,
+			      const struct secure_can_frame *frame,
+			      uint8_t *tag)
+{
+	TEEC_Operation operation;
+	TEEC_Result result;
+	uint32_t origin = 0;
+
+	memset(&operation, 0, sizeof(operation));
+	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
+						 TEEC_MEMREF_TEMP_OUTPUT,
+						 TEEC_NONE, TEEC_NONE);
+	operation.params[0].tmpref.buffer = (void *)frame;
+	operation.params[0].tmpref.size = sizeof(*frame);
+	operation.params[1].tmpref.buffer = tag;
+	operation.params[1].tmpref.size = SECURE_CAN_FRAME_TAG_LEN;
+
+	result = TEEC_InvokeCommand(session, TA_SECURE_CAN_CMD_PROCESS_FRAME,
+				    &operation, &origin);
+	if (result != TEEC_SUCCESS)
+		return report_teec_error("PROCESS_FRAME", result, origin);
+
+	return 0;
+}
+
 static int verify_frame(TEEC_Session *session,
 			const struct secure_can_frame *frame,
 			const uint8_t *tag, int *accepted)
@@ -71,54 +120,64 @@ static int verify_frame(TEEC_Session *session,
 	return 0;
 }
 
-/* Linux alone decides when each simulated frame is "received" and sent in
- * for authentication; Secure World only reacts to calls Normal World makes,
- * it never runs on its own timer or interrupt.
+/* Linux alone decides when each simulated frame is "received" and sent in;
+ * Secure World only reacts to calls Normal World makes, it never runs on
+ * its own timer or interrupt. Every frame is classified first, and only
+ * frames Secure World marks SECURE pay the cost of full authentication —
+ * NORMAL frames are handled directly in Normal World, same as a real
+ * gateway wouldn't waste secure-world time on low-priority traffic.
  */
 static int run_can_frame_pipeline(TEEC_Session *session)
 {
-	struct secure_can_frame last_frame;
-	uint8_t last_tag[SECURE_CAN_FRAME_TAG_LEN];
+	struct secure_can_frame last_secure_frame;
+	uint8_t last_secure_tag[SECURE_CAN_FRAME_TAG_LEN];
 	unsigned int i;
+	int have_secure_frame = 0;
 	int accepted = 0;
 
 	puts("Linux (Normal World) starting simulated CAN message pipeline");
 
 	for (i = 0; i < SECURE_CAN_FRAME_COUNT; i++) {
 		struct secure_can_frame frame;
-		uint8_t tag[SECURE_CAN_FRAME_TAG_LEN];
-		TEEC_Operation operation;
-		TEEC_Result result;
-		uint32_t origin = 0;
+		uint32_t frame_class;
 
 		fill_dummy_frame(&frame, i);
 
-		memset(&operation, 0, sizeof(operation));
-		operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
-							 TEEC_MEMREF_TEMP_OUTPUT,
-							 TEEC_NONE, TEEC_NONE);
-		operation.params[0].tmpref.buffer = &frame;
-		operation.params[0].tmpref.size = sizeof(frame);
-		operation.params[1].tmpref.buffer = tag;
-		operation.params[1].tmpref.size = sizeof(tag);
+		if (classify_frame(session, &frame, &frame_class))
+			return 1;
 
-		result = TEEC_InvokeCommand(session,
-				TA_SECURE_CAN_CMD_PROCESS_FRAME, &operation,
-				&origin);
-		if (result != TEEC_SUCCESS)
-			return report_teec_error("PROCESS_FRAME", result,
-						 origin);
+		if (frame_class == SECURE_CAN_CLASS_SECURE) {
+			uint8_t tag[SECURE_CAN_FRAME_TAG_LEN];
 
-		print_frame_result(&frame, tag);
-		last_frame = frame;
-		memcpy(last_tag, tag, sizeof(last_tag));
+			printf("Linux: CAN id=0x%03" PRIx32
+			       " classified SECURE by Secure World, routing for authentication\n",
+			       frame.can_id);
+			if (authenticate_frame(session, &frame, tag))
+				return 1;
+
+			print_frame_result(&frame, tag);
+			last_secure_frame = frame;
+			memcpy(last_secure_tag, tag, sizeof(last_secure_tag));
+			have_secure_frame = 1;
+		} else {
+			printf("Linux: CAN id=0x%03" PRIx32
+			       " classified NORMAL by Secure World, handled directly in Normal World\n",
+			       frame.can_id);
+		}
+
 		sleep(SECURE_CAN_SEND_INTERVAL_SECONDS);
 	}
 
-	puts("PASS: Linux-controlled simulated CAN frames authenticated by Secure World");
+	puts("PASS: Linux-controlled simulated CAN frames classified and routed by Secure World");
 
-	puts("Linux: simulating receipt of the last frame, asking Secure World to verify it");
-	if (verify_frame(session, &last_frame, last_tag, &accepted))
+	if (!have_secure_frame) {
+		fprintf(stderr,
+			"FAIL: no frame was classified SECURE, nothing to verify\n");
+		return 1;
+	}
+
+	puts("Linux: simulating receipt of the last SECURE frame, asking Secure World to verify it");
+	if (verify_frame(session, &last_secure_frame, last_secure_tag, &accepted))
 		return 1;
 	if (!accepted) {
 		fprintf(stderr, "FAIL: Secure World rejected an authentic frame\n");
@@ -127,8 +186,8 @@ static int run_can_frame_pipeline(TEEC_Session *session)
 	puts("PASS: Secure World accepted the authentic frame");
 
 	puts("Linux: simulating a tampered frame on the bus (one data byte flipped)");
-	last_frame.data[0] ^= 0xff;
-	if (verify_frame(session, &last_frame, last_tag, &accepted))
+	last_secure_frame.data[0] ^= 0xff;
+	if (verify_frame(session, &last_secure_frame, last_secure_tag, &accepted))
 		return 1;
 	if (accepted) {
 		fprintf(stderr, "FAIL: Secure World accepted a tampered frame\n");

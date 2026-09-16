@@ -11,6 +11,7 @@
 #define TA_SECURE_CAN_CMD_PROCESS_CHALLENGE 0
 #define TA_SECURE_CAN_CMD_PROCESS_FRAME     1
 #define TA_SECURE_CAN_CMD_VERIFY_FRAME      2
+#define TA_SECURE_CAN_CMD_CLASSIFY_FRAME    3
 
 #define SECURE_CAN_CHALLENGE 0x12345678U
 #define SECURE_CAN_MASK      0xa5a5a5a5U
@@ -28,5 +29,16 @@ struct secure_can_frame {
 	uint32_t can_id;
 	uint8_t data[SECURE_CAN_FRAME_DATA_LEN];
 };
+
+/* Lower CAN IDs win bus arbitration, so real CAN systems already put
+ * safety-critical traffic (braking, steering) on low IDs and lower-priority
+ * traffic (telemetry, infotainment) on high ones. Secure World reuses that
+ * convention to classify each frame before deciding whether it needs full
+ * authentication or can be handled directly in Normal World.
+ */
+#define SECURE_CAN_CRITICAL_ID_MAX 0x102U
+
+#define SECURE_CAN_CLASS_NORMAL 0U
+#define SECURE_CAN_CLASS_SECURE 1U
 
 #endif

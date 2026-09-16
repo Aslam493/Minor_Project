@@ -72,10 +72,14 @@ datasheet) so the kernel probes the controller at boot.
 ## How this plugs into the code already built and verified
 
 This is the key point: **no Secure World / TA change is needed**. Tonight's
-work (commits `63528cb`, `b312392`) already built and verified on real
-hardware:
-- `TA_SECURE_CAN_CMD_PROCESS_FRAME` — Secure World authenticates a
-  `struct secure_can_frame` (`can_id` + 8 data bytes) with HMAC-SHA256.
+work already built and verified on real hardware:
+- `TA_SECURE_CAN_CMD_CLASSIFY_FRAME` — Secure World classifies a frame by
+  CAN ID (low ID = safety-critical = `SECURE`, matching real CAN
+  arbitration priority; high ID = `NORMAL`) before deciding whether it's
+  worth the cost of authenticating.
+- `TA_SECURE_CAN_CMD_PROCESS_FRAME` — for `SECURE`-classified frames,
+  Secure World authenticates a `struct secure_can_frame` (`can_id` + 8 data
+  bytes) with HMAC-SHA256.
 - `TA_SECURE_CAN_CMD_VERIFY_FRAME` — Secure World independently verifies a
   claimed tag, constant-time, and correctly rejects tampered frames.
 
@@ -94,7 +98,8 @@ struct can_frame cf;
 while (read(s, &cf, sizeof(cf)) > 0) {
         struct secure_can_frame frame = { .can_id = cf.can_id };
         memcpy(frame.data, cf.data, SECURE_CAN_FRAME_DATA_LEN);
-        /* same PROCESS_FRAME / VERIFY_FRAME calls as tonight, unchanged */
+        /* same CLASSIFY_FRAME / PROCESS_FRAME / VERIFY_FRAME calls as
+         * tonight, unchanged */
 }
 ```
 

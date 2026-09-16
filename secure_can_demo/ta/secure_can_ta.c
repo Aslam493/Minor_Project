@@ -152,6 +152,29 @@ static TEE_Result process_frame(uint32_t param_types, TEE_Param params[4])
 	return TEE_SUCCESS;
 }
 
+static TEE_Result classify_frame(uint32_t param_types, TEE_Param params[4])
+{
+	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+			TEE_PARAM_TYPE_VALUE_OUTPUT, TEE_PARAM_TYPE_NONE,
+			TEE_PARAM_TYPE_NONE);
+	struct secure_can_frame frame;
+
+	if (param_types != expected)
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (params[0].memref.size != sizeof(frame))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	memcpy(&frame, params[0].memref.buffer, sizeof(frame));
+
+	params[1].value.a = (frame.can_id <= SECURE_CAN_CRITICAL_ID_MAX) ?
+			    SECURE_CAN_CLASS_SECURE : SECURE_CAN_CLASS_NORMAL;
+
+	IMSG("Secure World classified CAN frame id=0x%03" PRIx32 " as %s",
+	     frame.can_id, params[1].value.a == SECURE_CAN_CLASS_SECURE ?
+	     "SECURE (route for authentication)" : "NORMAL (Normal World handles it)");
+	return TEE_SUCCESS;
+}
+
 /* Constant-time so a timing side channel can't help a Normal World attacker
  * guess a valid tag one byte at a time.
  */
@@ -215,6 +238,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void __unused *session_context,
 		return process_frame(param_types, params);
 	case TA_SECURE_CAN_CMD_VERIFY_FRAME:
 		return verify_frame(param_types, params);
+	case TA_SECURE_CAN_CMD_CLASSIFY_FRAME:
+		return classify_frame(param_types, params);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}

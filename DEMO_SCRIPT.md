@@ -55,12 +55,21 @@ once end-to-end before the real presentation.
      it decides when each message 'arrives' and feeds it to the secure
      world. This is a deliberate, documented design choice, not a
      shortcut — see `STEP11_CAN_HARDWARE_SPEC.md`."*
-   - 5x `CAN id=... -> Secure World tag=...` — *"Each simulated CAN frame
-     gets authenticated inside the secure world with HMAC-SHA256. The key
-     never leaves secure world — Linux never sees it."*
-   - `Linux: simulating receipt of the last frame, asking Secure World to
-     verify it` → `PASS: Secure World accepted the authentic frame` — *"This
-     is the receiver side: secure world independently re-checks the tag."*
+   - `CAN id=0x100/0x101/0x102 classified SECURE ... routing for
+     authentication` then a `tag=...` line for each — *"Real CAN buses give
+     lower IDs higher priority — that's exactly where safety-critical
+     traffic like braking or steering lives. Secure World classifies each
+     frame by ID first: low IDs are marked SECURE and get full HMAC-SHA256
+     authentication."*
+   - `CAN id=0x103/0x104 classified NORMAL ... handled directly in Normal
+     World` — *"Higher IDs — lower-priority traffic like telemetry — are
+     classified NORMAL and Secure World doesn't spend time authenticating
+     them. This is what a real secure gateway does: not every message
+     needs the expensive path."*
+   - `Linux: simulating receipt of the last SECURE frame, asking Secure
+     World to verify it` → `PASS: Secure World accepted the authentic
+     frame` — *"This is the receiver side: secure world independently
+     re-checks the tag."*
    - `Linux: simulating a tampered frame...` → `PASS: Secure World rejected
      the tampered frame` — **this is the line that matters most.** *"I
      flipped one data byte to simulate a tampered or forged CAN message,
