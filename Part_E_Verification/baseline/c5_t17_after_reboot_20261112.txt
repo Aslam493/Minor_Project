@@ -1,0 +1,5 @@
+  PASS  T17a   new boot_id 0xcc56b0e6 differs from the one before the reboot (0xb60b72e0); uptime 62 s
+  PASS  T17b   old consumer values (seq 2096) after the reboot -> UNISSUED (expected UNISSUED; STALE would also mean refused)
+  FAIL  T17c   refetch -> current request seq 62, answer LATE
+  PASS  T17d   first frame after the reboot -> RESYNC (expected RESYNC), traffic was not armed before=1
+SUMMARY: 3 PASS, 1 FAIL

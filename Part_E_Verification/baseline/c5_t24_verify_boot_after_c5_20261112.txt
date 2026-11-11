@@ -1,0 +1,4 @@
+  PASS  no SPI CRC errors from the CAN driver
+  SKIP  canmode not on the Pi (/tmp); bitrate and mode not read
+  SKIP  ta_roundtrip not on the Pi (/tmp); TA/PTA round trip not run
+verify_boot: 16 pass, 0 FAIL, 2 skipped

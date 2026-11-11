@@ -1,0 +1,5 @@
+T20 watch: boot_id 0xcc56b0e6, first status at Linux uptime 27.8 s, hb_state MISSED, ev_seq 0 (cmds 22/23 NOT used)
+  TIMEOUT detail 3 (consumer never started) seen at Linux uptime 52.5 s; its timestamp is 24.4 s after the first status read (= Linux time 52.2 s)
+  end: hb_state OPEN hb_seq 54 miss_count 53 flags 0x13
+  PASS  T20    CONSUMER_NEVER_STARTED reported (G = 60 s after the monitor's init, which is a few seconds before Linux uptime 0); none was visible at the first read (uptime 27.8 s)
+SUMMARY: 1 PASS, 0 FAIL

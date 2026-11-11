@@ -1,0 +1,2 @@
+hb_seq 100 reached: boot_id 0xcc56b0e6 nonce da0ee04df52127e5
+100 0xcc56b0e6 da0ee04df52127e5

@@ -1,0 +1,2 @@
+hb_seq 100 reached: boot_id 0x25071c4d nonce 3f90e4708c873b0e
+100 0x25071c4d 3f90e4708c873b0e

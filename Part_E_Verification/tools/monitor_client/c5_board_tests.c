@@ -319,8 +319,9 @@ static int mode_t17(const char *path)
 	PASSF(s.boot_id != ob, "T17a", "new boot_id 0x%08x differs from the one before the reboot (0x%08x); uptime %.0f s", s.boot_id, ob, uptime_s());
 	answer(oq, on, &v);
 	PASSF(v == 3 || v == 2, "T17b", "old consumer values (seq %u) after the reboot -> %s (expected UNISSUED; STALE would also mean refused)", oq, mon_verdict23_name(v));
-	RETRY(&C, mon_get_nonce(&C, &nonce, &seq, &st, &h), r); v2 = 99; if (!r && nonce) answer(seq, nonce, &v2);
-	PASSF(!r && v2 == 0, "T17c", "refetch -> current request seq %u, answer %s", seq, mon_verdict23_name(v2));
+	RETRY(&C, mon_get_nonce(&C, &nonce, &seq, &st, &h), r); v2 = 99; if (!r) { uint32_t cur = seq; r = wait_issue(cur, 3000, &seq, &nonce, &st) ? 1 : 0; }
+	if (!r && nonce) answer(seq, nonce, &v2);	/* a request fetched while old can be LATE; wait for a fresh one and answer at once */
+	PASSF(!r && v2 == 0, "T17c", "refetch -> freshly issued request seq %u, answer %s", seq, mon_verdict23_name(v2));
 	s = st0(); uint32_t first = s.last_counter;
 	v = frame(0x123, 7000, payload_for(7000), 0, &d);
 	PASSF(v == 2 && !(first && (s.flags & 0x04)), "T17d", "first frame after the reboot -> %s (expected RESYNC), traffic was not armed before=%d", mon_verdict17_name(v), !(s.flags & 0x04));
@@ -342,6 +343,8 @@ int main(int argc, char **argv)
 	if (mon_open(&C)) { fprintf(stderr, "cannot open the PTA session\n"); return 2; }
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--t20-watch") && i + 1 < argc) { int rc = mode_t20((unsigned)atoi(argv[i + 1])); printf("SUMMARY: %d PASS, %d FAIL\n", n_pass, n_fail); mon_close(&C); return rc || n_fail; }
+		if (!strcmp(argv[i], "--answer-fresh")) { uint32_t q, st, v = 99, cur; uint64_t n; struct mon_health h; TEEC_Result r; RETRY(&C, mon_get_nonce(&C, &n, &cur, &st, &h), r);
+			int w = wait_issue(cur, 3000, &q, &n, &st); if (!w) answer(q, n, &v); PASSF(!r && !w && v == 0, "T17c", "refetch -> freshly issued request seq %u, answer %s (rerun of T17c alone, same boot)", q, mon_verdict23_name(v)); mon_close(&C); return n_fail; }
 		if (!strcmp(argv[i], "--save") && i + 1 < argc) { int rc = mode_save(argv[i + 1]); mon_close(&C); return rc; }
 		if (!strcmp(argv[i], "--t17-check") && i + 1 < argc) { int rc = mode_t17(argv[i + 1]); printf("SUMMARY: %d PASS, %d FAIL\n", n_pass, n_fail); mon_close(&C); return rc || n_fail; }
 		if (!strcmp(argv[i], "--nonce-at") && i + 2 < argc) { int rc = mode_nonce_at((uint32_t)atoi(argv[i + 1]), argv[i + 2]); mon_close(&C); return rc; }
