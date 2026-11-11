@@ -335,6 +335,38 @@ static int mode_nonce_at(uint32_t target, const char *path)
 	printf("hb_seq %u reached: boot_id 0x%08x nonce %016" PRIx64 "\n", seq, s.boot_id, nonce); return 0;
 }
 
+/* ------------------------------------------------------------------ C6 negative tests for command 21 (idle lease), board */
+#define EV_LEASE_RENEWED 13
+#define EV_LEASE_REFUSED 14
+static uint32_t idle(uint32_t mode, uint32_t ms, uint32_t *rem, TEEC_Result *rr)
+{ uint32_t v = 99, r_ = 0; struct mon_health h; TEEC_Result r; RETRY(&C, mon_set_idle(&C, mode, ms, &v, &r_, &h), r); if (rr) *rr = r; if (rem) *rem = r_; return v; }
+static int mode_c6(void)
+{
+	uint32_t e0[MON_EVENT_TYPES], e1[MON_EVENT_TYPES], v, rem; TEEC_Result r; struct mon_status0 s;
+	printf("== C6 negative tests, command 21 (idle lease caps)\n");
+	hb_keep(); { uint32_t d; struct mon_status0 z = st0(); frame(0x123, z.last_counter + 1, payload_for(z.last_counter + 1), 0, &d); }
+	s = st0(); uint32_t uses0 = s.idle_uses; printf("start: idle_uses %u, flags 0x%02x\n", uses0, s.flags);
+	/* N1: bad parameter combinations are refused and change nothing */
+	{ TEEC_Result r1, r2, r3; idle(2, 100, NULL, &r1); idle(1, 0, NULL, &r2); idle(0, 100, NULL, &r3); s = st0();
+	  PASSF(r1 == TEEC_ERROR_BAD_PARAMETERS && r2 == TEEC_ERROR_BAD_PARAMETERS && r3 == TEEC_ERROR_BAD_PARAMETERS && s.idle_uses == uses0 && !(s.flags & 0x20),
+	        "N1", "mode 2 / on with 0 ms / off with 100 ms -> BAD_PARAMETERS (0x%x 0x%x 0x%x), idle_uses unchanged (%u), no lease", (unsigned)r1, (unsigned)r2, (unsigned)r3, s.idle_uses); }
+	/* N2: off when not active */
+	v = idle(0, 0, &rem, &r); PASSF(!r && v == 4, "N2", "off with no lease -> %s (expected NO_CHANGE)", mon_verdict21_name(v));
+	/* N3: oversize request is clamped to the cap, not honoured */
+	v = idle(1, 120000, &rem, &r); PASSF(!r && v == 0 && rem <= 60000 && rem > 59000, "N3", "request 120000 ms -> %s, remaining %u ms (clamped to the 60000 ms cap)", mon_verdict21_name(v), rem);
+	/* N4: renewal replaces, never adds */
+	{ uint32_t va = idle(1, 5000, &rem, &r); uint32_t vb = idle(1, 1000, &rem, &r); PASSF(!r && va == 1 && vb == 1 && rem <= 1000, "N4", "lease active, request 5000 then 1000 ms -> %s, %s, remaining %u ms (replaced, not 6000)", mon_verdict21_name(va), mon_verdict21_name(vb), rem); }
+	v = idle(0, 0, &rem, &r); PASSF(!r && v == 2, "N4b", "off with an active lease -> %s (expected RETURNED)", mon_verdict21_name(v));
+	/* N5: use cap per boot */
+	s = st0(); uses0 = s.idle_uses; snap(e0); { unsigned granted = 0, refused = 0; uint32_t last_v = 0;
+	  for (int i = 0; i < 20; i++) { v = idle(1, 100, &rem, &r); last_v = v; if (!r && (v == 0 || v == 1)) granted++; else if (!r && v == 3) refused++; idle(0, 0, NULL, NULL); }
+	  s = st0(); snap(e1);
+	  PASSF(uses0 + granted == 16 && refused == 20 - granted && s.idle_uses == 16 && last_v == 3 && dlt(e0, e1, EV_LEASE_REFUSED) == refused, "N5", "use cap: %u more uses granted (idle_uses %u -> %u, cap 16), %u requests REFUSED_CAP, LEASE_REFUSED +%u", granted, uses0, s.idle_uses, refused, dlt(e0, e1, EV_LEASE_REFUSED)); }
+	NOTE("N5", "the per-boot use cap is now exhausted: idle mode stays refused until the board is rebooted");
+	s = st0(); printf("end: flags 0x%02x idle_uses %u starved=%d\n", s.flags, s.idle_uses, !!(s.flags & 0x40));
+	printf("SUMMARY: %d PASS, %d FAIL, %d note\n", n_pass, n_fail, n_note); return n_fail ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
 	const char *kf = NULL; int no_t6 = 0;
@@ -343,6 +375,7 @@ int main(int argc, char **argv)
 	if (mon_open(&C)) { fprintf(stderr, "cannot open the PTA session\n"); return 2; }
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--t20-watch") && i + 1 < argc) { int rc = mode_t20((unsigned)atoi(argv[i + 1])); printf("SUMMARY: %d PASS, %d FAIL\n", n_pass, n_fail); mon_close(&C); return rc || n_fail; }
+		if (!strcmp(argv[i], "--c6-negative")) { int rc = mode_c6(); mon_close(&C); return rc; }
 		if (!strcmp(argv[i], "--answer-fresh")) { uint32_t q, st, v = 99, cur; uint64_t n; struct mon_health h; TEEC_Result r; RETRY(&C, mon_get_nonce(&C, &n, &cur, &st, &h), r);
 			int w = wait_issue(cur, 3000, &q, &n, &st); if (!w) answer(q, n, &v); PASSF(!r && !w && v == 0, "T17c", "refetch -> freshly issued request seq %u, answer %s (rerun of T17c alone, same boot)", q, mon_verdict23_name(v)); mon_close(&C); return n_fail; }
 		if (!strcmp(argv[i], "--save") && i + 1 < argc) { int rc = mode_save(argv[i + 1]); mon_close(&C); return rc; }
