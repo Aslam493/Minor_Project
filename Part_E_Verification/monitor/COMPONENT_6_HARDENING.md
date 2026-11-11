@@ -28,6 +28,9 @@ Note: an oversize request is clamped to 60 s, so a lease cannot be made longer t
 
 ## 3. Open items for C6
 1. **UART `ALIVE` line and non-blocking drain (O-12):** needs your decision, a Secure World source change, a rebuild and a card swap; verification needs the UART adapter connected (header pins 6/8/10). T23 (UART blocked) depends on it.
-2. **Carried from C5, undecided:** the `IDLE_EXPIRED` event (accept the deviation or add it) and **F27** rate-limiting of repeated TIMEOUT/TRAFFIC_RECOVERED events (seen in the F24 flood).
+2. **Carried from C5, undecided:** the `IDLE_EXPIRED` event (accept the deviation or add it) and F27, which turned out to be a misreading of mine: the limiter exists (COMPONENT_6_DESIGN.md section 1).
 3. F24 mitigation made permanent in the image build (the `test` account in `teeclnt`).
 4. Cmd 25/26 on a release image: add a board probe that confirms NOT_SUPPORTED (needs a raw-invoke tool; today static check only).
+
+## 4. Design for the remaining C6 work
+See `COMPONENT_6_DESIGN.md`: IDLE_EXPIRED as `MODE_CHANGED detail 2`, the F27 correction (no code change), and the UART `ALIVE` line behind a build flag that defaults to off. Awaiting approval; nothing built.

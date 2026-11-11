@@ -43,7 +43,7 @@ Tool: `tools/monitor_client/c5_board_tests.c` (cross-built `-Werror` clean, runs
 | T25 hardened profile refuses cmds 3/6/7/13/14 | **not re-run on the board** | covered by the C2 gate G4 (board). Not repeated: command 3 arms the FIQ if it were ever accepted, so a repeat adds risk without new information |
 
 ## 3. Findings
-- **F27 narrowed:** AUTH_FAIL events are rate-limited well (985 of 1000 suppressed), but `TIMEOUT`/`TRAFFIC_RECOVERED` pairs are not (seen in the F24 flood). Rate-limiting those is the open design item.
+- **F27 (corrected 2026-11-12):** all non-pinned events are limited to one per second per class (AUTH_FAIL: 985 of 1000 suppressed). `TIMEOUT`/`TRAFFIC_RECOVERED` pairs are limited the same way; the ring wrapped in the F24 flood only because about 2-4 entries per second went into a 40-slot ring nobody acknowledged. No code change needed (COMPONENT_6_DESIGN.md section 1).
 - **T21 wording:** the plan expects `IDLE_EXPIRED`; the implemented design reports expiry as the following traffic TIMEOUT. Needs a decision: accept the deviation or add the event.
 - **Test accuracy:** T7 gave 296.5 ms for a 300 ms deadline; the measurement starts after the frame call returns, so a few ms of call latency is inside the figure.
 
@@ -54,4 +54,4 @@ Tool: `tools/monitor_client/c5_board_tests.c` (cross-built `-Werror` clean, runs
 
 ## 5. Gate and open items
 Plan gate: Mode-F tests T1-T25 subset plus T5b, T11a-c, T18e, heartbeat half of T18i; stall of 3H gives one MISS, one issue, no MON_STARVED.
-**Status: COMPLETE WITH LIMITS for software-injected frames (board, hardened profile).** Open: T23 (UART), T18b (20 reboots), T5b (chip-B path, Component 7), T4b/T11a/T11b/T18e (host-harness only), T25 (C2 evidence, not repeated), no CAN-bus traffic evidence, the IDLE_EXPIRED decision, F27 event rate-limiting, `mon_catchup()` (behaviour covered, name absent).
+**Status: COMPLETE WITH LIMITS for software-injected frames (board, hardened profile).** Open: T23 (UART), T18b (20 reboots), T5b (chip-B path, Component 7), T4b/T11a/T11b/T18e (host-harness only), T25 (C2 evidence, not repeated), no CAN-bus traffic evidence, the IDLE_EXPIRED decision (proposal: `MODE_CHANGED detail 2`, see COMPONENT_6_DESIGN.md), `mon_catchup()` (behaviour covered, name absent).
