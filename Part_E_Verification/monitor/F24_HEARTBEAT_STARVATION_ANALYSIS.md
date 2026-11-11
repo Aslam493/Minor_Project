@@ -71,3 +71,15 @@ Secure World health in every run: `init_ok=1`, **`starved=0`, `pta_lock_timeouts
 - C5/C6: when a TRAFFIC timeout and PTA contention coincide, the report should say "possible PTA contention" rather than "no traffic": the existing contention counters (`skip_total`, BUSY) are the signal.
 - Config: remove the `test` account from `teeclnt` on a production image; run the real consumer with a real-time priority so Linux CPU starvation does not add to it.
 - Open design option (needs separate review): allow concurrent entry for cmds 22/23 only.
+
+## 9. Config mitigation applied on the Pi (2026-11-12)
+- `scripts/harden_teeclnt.sh <ip>` removes the stock `test` account from group `teeclnt` (edits one line of `/etc/group` on the Pi's rootfs; original saved as `/etc/group.pre-f24` on the Pi; `--restore` puts it back). Log: `baseline/f24_harden_teeclnt_20261112.txt`.
+- Result: before, user `test` COULD open `/dev/tee0`; after, `teeclnt:x:104:` is empty, **user `test` is denied, root still works**, `verify_boot.sh` 16 pass / 0 FAIL, tee-supplicant running (it uses `/dev/teepriv0`, group `tee`, unaffected).
+- First attempt failed and changed nothing: BusyBox `delgroup` only deletes a whole group. Replaced by a `sed` edit of the member list (script fixed, rerun above).
+- **Persistence:** the change lives on the Pi's rootfs (ext4 on the card), so it survives reboots but **not a reflash**: the stock `optee_client_ext` Buildroot package (shared by every platform in this tree) recreates `test` in `teeclnt` on each image build. Making it permanent in the image needs an rpi3-only post-build step; NOT done (would touch the shared package or the build scripts).
+- What this closes: the unprivileged route to F24. What remains: **root can still do F24** (and can already stop the heartbeat by killing the responder), and any future account added to `teeclnt`.
+
+## 10. F24 status
+- Confirmed, quantified (section 8): **open as a documented limit** of a detection-only design on a Pi 3.
+- Mitigated: unprivileged access removed on the running Pi (section 9). Not yet permanent in the image build.
+- NOT done, needs approval because it changes approved Secure World code and needs a rebuild plus a card swap: event rate-limiting / coalescing for F27 (repeated TIMEOUT and TRAFFIC_RECOVERED events overflowing the ordinary ring), and a "possible PTA contention" hint on traffic timeouts.

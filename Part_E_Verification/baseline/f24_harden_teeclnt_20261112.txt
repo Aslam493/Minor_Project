@@ -1,0 +1,6 @@
+before: teeclnt:x:104:test
+  user test: CAN open /dev/tee0
+after:  teeclnt:x:104:
+  user test: denied (PASS)
+  root: can open /dev/tee0 (PASS)
+teeclnt:x:104:test
