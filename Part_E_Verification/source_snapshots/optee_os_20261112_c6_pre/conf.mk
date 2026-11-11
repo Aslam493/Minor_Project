@@ -1,0 +1,54 @@
+include core/arch/arm/cpu/cortex-armv8-0.mk
+
+$(call force,CFG_TEE_CORE_NB_CORE,4)
+
+CFG_SHMEM_START ?= 0x08000000
+CFG_SHMEM_SIZE ?= 0x00400000
+CFG_TZDRAM_START ?= 0x10100000
+CFG_TZDRAM_SIZE ?= 0x00F00000
+CFG_TEE_RAM_VA_SIZE ?= 0x00700000
+
+$(call force,CFG_8250_UART,y)
+$(call force,CFG_SECURE_TIME_SOURCE_CNTPCT,y)
+$(call force,CFG_WITH_ARM_TRUSTED_FW,y)
+
+CFG_NUM_THREADS ?= 4
+CFG_CRYPTO_WITH_CE ?= n
+
+CFG_TEE_CORE_EMBED_INTERNAL_TESTS ?= y
+CFG_WITH_STACK_CANARIES ?= y
+CFG_WITH_STATS ?= y
+
+# Phase 1 of the project's Secure Peripheral Ownership work (roadmap
+# Step 14): a pseudo-TA proving OP-TEE core can talk to the CAN chip
+# directly over real SPI0, independent of Linux's own drivers.
+CFG_RPI3_CAN_SPI_POC_PTA ?= y
+
+# Secure CAN Monitor (Component 2): OFF by default, so a default build is unchanged. It needs the PTA above.
+# CFG_RPI3_CAN_MONITOR_DEBUG (default n, build time only) selects the debug profile of the legacy-command policy.
+CFG_RPI3_CAN_MONITOR ?= n
+CFG_RPI3_CAN_MONITOR_DEBUG ?= n
+# CFG_RPI3_CAN_MONITOR_TEST_STATS (default n): TEST BUILDS ONLY. Adds lock-hold-time stamps, Core 1 attempt-interval statistics, a Core 1 lock-hold
+# request (check X9) and two test-only PTA commands (24 read, 25 control). Never use it for a release image.
+CFG_RPI3_CAN_MONITOR_TEST_STATS ?= n
+ifeq ($(CFG_RPI3_CAN_MONITOR_TEST_STATS),y)
+ifneq ($(CFG_RPI3_CAN_MONITOR),y)
+$(error CFG_RPI3_CAN_MONITOR_TEST_STATS=y requires CFG_RPI3_CAN_MONITOR=y)
+endif
+endif
+ifeq ($(CFG_RPI3_CAN_MONITOR),y)
+ifneq ($(CFG_RPI3_CAN_SPI_POC_PTA),y)
+$(error CFG_RPI3_CAN_MONITOR=y requires CFG_RPI3_CAN_SPI_POC_PTA=y)
+endif
+endif
+
+arm32-platform-cflags += -Wno-error=cast-align
+arm64-platform-cflags += -Wno-error=cast-align
+
+$(call force,CFG_CRYPTO_SHA256_ARM32_CE,n)
+$(call force,CFG_CRYPTO_SHA256_ARM64_CE,n)
+$(call force,CFG_CRYPTO_SHA1_ARM32_CE,n)
+$(call force,CFG_CRYPTO_SHA1_ARM64_CE,n)
+$(call force,CFG_CRYPTO_AES_ARM64_CE,n)
+
+CFG_CORE_WORKAROUND_ARM_TLBI ?= n

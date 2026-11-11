@@ -192,7 +192,9 @@ static void t_eval(void)
 	begin("G5 lease expiry returns to EXPECTED, restarts the window, no stale timeout"); setup(); frozen(5000000000ull); t = M.now;
 	e = take(); l = rpi3_mon_l(); rpi3_mon_traffic_refresh(l, t); l->idle_until_ticks = t + 5 * RPI3_MON_T_TRAFFIC_TICKS;
 	rpi3_mon_evaluate(l, t + 2 * RPI3_MON_T_TRAFFIC_TICKS); CHECK(!l->tr_timeout_raised);
-	rpi3_mon_evaluate(l, t + 5 * RPI3_MON_T_TRAFFIC_TICKS + 10); CHECK(l->idle_until_ticks == 0 && !l->tr_timeout_raised && l->tr_last_valid_ticks == t + 5 * RPI3_MON_T_TRAFFIC_TICKS + 10 && l->ev_count[RPI3_MON_EV_MODE_CHANGED] == 1); put(e); end();
+	rpi3_mon_evaluate(l, t + 5 * RPI3_MON_T_TRAFFIC_TICKS + 10); CHECK(l->idle_until_ticks == 0 && !l->tr_timeout_raised && l->tr_last_valid_ticks == t + 5 * RPI3_MON_T_TRAFFIC_TICKS + 10 && l->ev_count[RPI3_MON_EV_MODE_CHANGED] == 1);
+	/* C6: the expiry is distinguishable from an explicit return: MODE_CHANGED detail 2 = lease expired */
+	{ const struct rpi3_mon_event *x = &l->ordinary[(l->ordinary_head + RPI3_MON_ORDINARY_SLOTS - 1) % RPI3_MON_ORDINARY_SLOTS]; CHECK(x->type == RPI3_MON_EV_MODE_CHANGED && x->detail == 2); } put(e); end();
 	begin("EV6/V12 heartbeat: k misses after the grace period, never-started, no catch-up burst, no wrap"); setup(); frozen(9000000000000ull); t = M.now;
 	rpi3_mon.init_ticks = t - RPI3_MON_G_TICKS - RPI3_MON_TICKS_PER_SEC;						/* the boot grace has passed */
 	e = take(); l = rpi3_mon_l(); l->hb_last_ok_ticks = 1;								/* it has been answered at least once */
@@ -345,7 +347,10 @@ static void t_c21(void)
 	until = rpi3_mon.l.idle_until_ticks; CHECK(rpi3_mon_cmd21(1, 500, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V21_RENEWED && ob == 500 && rpi3_mon.l.idle_until_ticks < until && rpi3_mon.l.idle_uses == 2);
 	CHECK(rpi3_mon_cmd21(1, 120000, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V21_RENEWED && ob == RPI3_MON_IDLE_MAX_MS);					/* clamped */
 	rpi3_mon.l.tr_armed = true; rpi3_mon.l.tr_timeout_raised = true; rpi3_mon.l.tr_last_valid_ticks = 1; CHECK(rpi3_mon_cmd21(1, 1000, &oa, &ob, &h) == RPI3_MON_R_OK && rpi3_mon.l.tr_timeout_raised);
+	rpi3_mon.l.diag_have[RPI3_MON_EV_MODE_CHANGED] = 0;	/* time is frozen: clear the 1-per-second class limiter so the return event is recorded */
 	rpi3_mon.l.tr_timeout_raised = false; rpi3_mon.l.tr_last_valid_ticks = 1; CHECK(rpi3_mon_cmd21(0, 0, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V21_RETURNED && ob == 0 && rpi3_mon.l.idle_until_ticks == 0 && rpi3_mon.l.tr_last_valid_ticks == M.now && rpi3_mon.l.idle_uses == 4);
+	/* C6: an explicit return stays detail 0 (distinct from the expiry detail 2) */
+	{ const struct rpi3_mon_event *x = &rpi3_mon.l.ordinary[(rpi3_mon.l.ordinary_head + RPI3_MON_ORDINARY_SLOTS - 1) % RPI3_MON_ORDINARY_SLOTS]; CHECK(x->type == RPI3_MON_EV_MODE_CHANGED && x->detail == 0); }
 	rpi3_mon.l.idle_until_ticks = M.now - 5; CHECK(rpi3_mon_cmd21(1, 1000, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V21_GRANTED);					/* an expired lease is a grant, not a renewal */
 	rpi3_mon.l.hb_state = RPI3_MON_HB_OPEN; rpi3_mon.l.hb_issue_ticks = M.now - 2 * RPI3_MON_D_REQ_TICKS; CHECK(rpi3_mon_cmd21(1, 1000, &oa, &ob, &h) == RPI3_MON_R_OK && rpi3_mon.l.hb_state == RPI3_MON_HB_MISSED);	/* heartbeat still evaluated */
 	for (i = 0; i < 30; i++) (void)rpi3_mon_cmd21(1, 1000, &oa, &ob, &h);

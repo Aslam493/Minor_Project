@@ -100,7 +100,8 @@ d=$(diff "$SNAP2/files/core/pta/sub.mk" core/pta/sub.mk | grep -c '^<'); a=$(dif
 chk "BOUNDARY core/pta/sub.mk only gained the one glue line" $([ "$d" = 0 ] && [ "$a" = 1 ] && echo 1 || echo 0)
 d=$(diff "$SNAP2/files/core/arch/arm/plat-rpi3/conf.mk" core/arch/arm/plat-rpi3/conf.mk | grep -c '^<')
 chk "BOUNDARY conf.mk only has additions (no line removed or changed)" $([ "$d" = 0 ] && echo 1 || echo 0)
-u=$(git status --short | grep '^??' | awk '{print $2}' | sort | tr '\n' ' ')
+# since 2026-11-12 the monitor files are committed: take the files ADDED since the original base commit (a7ccc63e4) plus any still untracked
+u=$( { git diff --diff-filter=A --name-only a7ccc63e4 HEAD; git status --short | grep '^??' | awk '{print $2}'; } | sort -u | tr '\n' ' ')
 chk "BOUNDARY untracked files are exactly the 5 new monitor files and rpi3_can_server.c" $([ "$u" = "core/arch/arm/plat-rpi3/rpi3_can_monitor.c core/arch/arm/plat-rpi3/rpi3_can_monitor.h core/arch/arm/plat-rpi3/rpi3_can_monitor_keys.h core/arch/arm/plat-rpi3/rpi3_can_monitor_plat.h core/arch/arm/plat-rpi3/rpi3_can_server.c core/pta/rpi3_can_monitor_pta.c " ] && echo 1 || echo 0)
 # ---- object code (H1): needs a Monitor-ON disassembly; set ON_DIS=<objdump -d of tee.elf> (skipped, and said so, when unset)
 if [ -n "${ON_DIS:-}" ] && [ -f "$ON_DIS" ]; then

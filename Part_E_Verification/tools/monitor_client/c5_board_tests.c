@@ -32,6 +32,7 @@
 #define EV_RESYNC 8
 #define EV_TRAFFIC_REC 9
 #define EV_HB_REC 10
+#define EV_MODE_CHANGED 11
 #define EV_LEASE_GRANTED 12
 #define EV_BAD_NONCE 20
 #define EV_STALE 21
@@ -265,7 +266,8 @@ static void phase_idle(uint32_t *c)
 	PASSF(dlt(e0, e1, EV_TIMEOUT) == 0, "T21b", "silence for 1.5 s inside the lease: no traffic TIMEOUT (+%u)", dlt(e0, e1, EV_TIMEOUT));
 	for (int i = 0; i < 20; i++) { msleep(100); hb_keep(); } snap(e1); s = st0(); struct mon_event ev; int f = find_ev(evs, EV_TIMEOUT, 1, &ev);
 	PASSF(dlt(e0, e1, EV_TIMEOUT) == 1 && f && !(s.flags & 0x20), "T21c", "after the lease expired (2 s): TIMEOUT(traffic) +%u, lease flag cleared=%d", dlt(e0, e1, EV_TIMEOUT), !(s.flags & 0x20));
-	NOTE("T21", "events seen during T21: LEASE_GRANTED +%u; a separate IDLE_EXPIRED event type does not exist in this build (types: LEASE_GRANTED/RENEWED/REFUSED, MODE_CHANGED)", dlt(e0, e1, EV_LEASE_GRANTED));
+	{ struct mon_event me; int ex = find_ev(evs, EV_MODE_CHANGED, 2, &me);
+	  PASSF(ex, "T21d", "lease expiry is reported as MODE_CHANGED detail 2 (IDLE_EXPIRED, C6 image); LEASE_GRANTED +%u. On an older image the expiry shows detail 0 and this check FAILS", dlt(e0, e1, EV_LEASE_GRANTED)); }
 	d = frame(0x123, *c + 1, payload_for(*c + 1), 0, NULL); (*c)++; NOTE("T21", "recover with next frame -> %s", mon_verdict17_name(d));
 }
 static void phase_flood(void)
