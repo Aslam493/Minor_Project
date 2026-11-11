@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&display=swap');
+* { box-sizing:border-box; margin:0; padding:0; font-family:Arial, sans-serif; }
+body { width:1400px; height:788px; background:#FFFFFF; position:relative; }
+.kicker { position:absolute; top:26px; left:36px; font-size:13px; font-weight:700; color:#2A78D6; letter-spacing:2px; }
+.rule { position:absolute; top:54px; left:36px; width:1000px; height:2px; background:#0B1F3A; }
+.logo { position:absolute; top:20px; right:30px; width:48px; height:48px; border-radius:50%; background:#eee; border:1px solid #ccc; }
+.title { position:absolute; top:64px; left:36px; font-size:27px; font-weight:700; color:#0B1F3A; }
+.subtitle { position:absolute; top:104px; left:36px; font-size:13px; color:#5B6270; }
+.groupLabel { position:absolute; font-size:10px; font-weight:700; letter-spacing:1.5px; }
+.zone { position:absolute; left:36px; width:1080px; border-radius:10px; }
+.zoneSecure { background:#EAF7EE; border:1px solid #B9E4C4; }
+.zoneNormal { background:#EAF2FD; border:1px solid #B9D3F5; }
+.row { position:absolute; left:56px; width:1040px; height:58px; background:#FFFFFF; border:1px solid #E3E5EA; border-radius:6px; }
+.num { position:absolute; width:32px; height:32px; border-radius:50%; color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; }
+.rtitle { position:absolute; font-size:12.5px; font-weight:700; color:#0B1F3A; }
+.rdesc { position:absolute; font-size:9.5px; color:#5B6270; }
+.tag { position:absolute; border-radius:4px; font-size:8px; font-weight:700; padding:4px 10px; text-align:center; }
+.arrow { position:absolute; left:70px; font-size:16px; font-weight:700; color:#1E8E3E; }
+.note { position:absolute; left:36px; width:1080px; font-size:10.5px; font-style:italic; color:#5B6270; }
+</style></head>
+<body>
+  <div class="kicker">AFTER BOOT</div>
+  <div class="rule"></div>
+  <div class="logo"></div>
+  <div class="title">After Boot, What We Actually Do</div>
+  <div class="subtitle">Once the boot chain finishes, this is the runtime loop that runs continuously on Core1.</div>
+
+  <div class="groupLabel" style="top:143px; left:56px; color:#1E8E3E;">SECURE WORLD (CORE1) — AUTOMATIC FIQ PATH</div>
+  <div class="zone zoneSecure" style="top:163px; height:280px;"></div>
+
+  <!-- row 1 -->
+  <div class="row" style="top:175px;">
+    <div class="num" style="left:14px; top:13px; background:#1E8E3E;">1</div>
+    <div class="rtitle" style="left:60px; top:9px;">Core1 stays in Secure World</div>
+    <div class="rdesc" style="left:60px; top:30px;">rpi3_can_server_loop() runs continuously inside OP-TEE on Core1 - it never returns to Linux.</div>
+    <div class="tag" style="left:900px; top:14px; background:#E6F4EA; color:#1E8E3E;">HARDWARE-PROVEN</div>
+  </div>
+  <div class="arrow" style="top:233px;">↓</div>
+
+  <!-- row 2 -->
+  <div class="row" style="top:243px;">
+    <div class="num" style="left:14px; top:13px; background:#1E8E3E;">2</div>
+    <div class="rtitle" style="left:60px; top:9px;">A CAN frame arrives</div>
+    <div class="rdesc" style="left:60px; top:30px;">MCP2518FD (SPI0) → GPIO25 → BCM2837 interrupt routing → Secure FIQ, delivered straight to Core1.</div>
+    <div class="tag" style="left:900px; top:14px; background:#E6F4EA; color:#1E8E3E;">HARDWARE-PROVEN</div>
+  </div>
+  <div class="arrow" style="top:301px;">↓</div>
+
+  <!-- row 3 -->
+  <div class="row" style="top:311px;">
+    <div class="num" style="left:14px; top:13px; background:#1E8E3E;">3</div>
+    <div class="rtitle" style="left:60px; top:9px;">Core1 validates the frame</div>
+    <div class="rdesc" style="left:60px; top:30px;">CAN ID check, replay/counter check, and timestamp check all run on the real captured frame.</div>
+    <div class="tag" style="left:900px; top:14px; background:#E6F4EA; color:#1E8E3E;">HARDWARE-PROVEN</div>
+  </div>
+  <div class="arrow" style="top:369px; color:#B8560E;">↓</div>
+
+  <!-- row 4 -->
+  <div class="row" style="top:379px;">
+    <div class="num" style="left:14px; top:13px; background:#B8560E;">4</div>
+    <div class="rtitle" style="left:60px; top:9px;">Core1 makes the Accept / Drop decision</div>
+    <div class="rdesc" style="left:60px; top:30px;">HMAC authentication is part of the design but is currently blocked - the demo skips this stage.</div>
+    <div class="tag" style="left:920px; top:14px; background:#FDECD9; color:#B8560E;">BLOCKED</div>
+  </div>
+
+  <div class="groupLabel" style="top:462px; left:56px; color:#2A78D6;">NORMAL WORLD (CORE0 / CORE2 / CORE3) — RUNS IN PARALLEL</div>
+  <div class="zone zoneNormal" style="top:482px; height:145px;"></div>
+
+  <!-- row 5 -->
+  <div class="row" style="top:494px;">
+    <div class="num" style="left:14px; top:13px; background:#2A78D6;">5</div>
+    <div class="rtitle" style="left:60px; top:9px;">Linux keeps running on Core0, Core2, Core3</div>
+    <div class="rdesc" style="left:60px; top:30px;">The whole time, Linux carries on normally - it never binds a CAN driver and never sees this happen.</div>
+    <div class="tag" style="left:900px; top:14px; background:#E6F4EA; color:#1E8E3E;">HARDWARE-PROVEN</div>
+  </div>
+
+  <!-- row 6 -->
+  <div class="row" style="top:562px;">
+    <div class="num" style="left:14px; top:13px; background:#8A8F98;">6</div>
+    <div class="rtitle" style="left:60px; top:9px;">Userspace can separately probe OP-TEE</div>
+    <div class="rdesc" style="left:60px; top:30px;">spi_poc_test / secure_can_demo issue their own SMC calls - a control path, separate from the FIQ loop.</div>
+    <div class="tag" style="left:900px; top:14px; background:#EAF2FD; color:#1B4FA8;">IMPLEMENTED</div>
+  </div>
+
+  <div class="note" style="top:648px;">This loop runs continuously and automatically - independent of whatever Linux is doing on the other cores.</div>
+</body></html>

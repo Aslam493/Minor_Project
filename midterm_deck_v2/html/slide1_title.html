@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap');
+* { box-sizing:border-box; margin:0; padding:0; font-family:'IBM Plex Sans', Arial, sans-serif; }
+body { width:1536px; height:900px; background:radial-gradient(circle at 20% 20%, #14315C 0%, #0B1F3A 55%, #071328 100%); position:relative; overflow:hidden; }
+.grid { position:absolute; inset:0; background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size:64px 64px; }
+.glow { position:absolute; width:700px; height:700px; border-radius:50%; background:radial-gradient(circle, rgba(42,120,214,0.25), transparent 70%); top:-250px; right:-200px; }
+.logo-badge { position:absolute; top:40px; right:48px; width:84px; height:84px; border-radius:50%; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; }
+.logo-badge img { width:66px; height:66px; object-fit:contain; }
+.kicker { position:absolute; top:64px; left:80px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:16px; letter-spacing:4px; color:#5FA8FF; }
+.title { position:absolute; top:390px; left:80px; right:120px; font-size:58px; font-weight:800; color:#FFFFFF; line-height:1.18; }
+.title .accent { color:#5FA8FF; }
+.subtitle { position:absolute; top:560px; left:80px; right:160px; font-size:23px; color:#B9C4D6; font-weight:500; line-height:1.5; }
+.divider { position:absolute; top:648px; left:80px; width:120px; height:4px; background:#5FA8FF; border-radius:2px; }
+.byline { position:absolute; bottom:110px; left:80px; font-size:20px; color:#EAF0FA; font-weight:600; }
+.byline .role { display:block; font-size:16px; color:#8FA3C0; font-weight:500; margin-top:6px; }
+.tag { position:absolute; top:96px; left:80px; }
+.footerbar { position:absolute; bottom:44px; left:80px; right:80px; display:flex; justify-content:space-between; font-size:13px; color:#6D7D96; border-top:1px solid rgba(255,255,255,0.12); padding-top:14px; }
+</style></head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <div class="logo-badge"><img src="IIT_Delhi_logo.png"></div>
+  <div class="kicker">MINOR PROJECT &middot; MIDTERM PRESENTATION</div>
+  <div class="title">Secure CAN Gateway using ARM <span class="accent">TrustZone</span> and OP-TEE</div>
+  <div class="divider"></div>
+  <div class="subtitle">Secure CAN Ownership, Validation and Event Logging on Raspberry Pi 3</div>
+  <div class="byline">Aslam<span class="role">Supervisor: Prof. Kolin Paul &middot; Indian Institute of Technology Delhi</span></div>
+  <div class="footerbar"><span>Secure CAN Event Processing and Logging</span><span>1 / 6</span></div>
+</body></html>

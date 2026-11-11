@@ -1,0 +1,49 @@
+### 1
+Good morning, everyone. My name is Aslam, and this is my minor project, supervised by Professor Kolin Paul at IIT Delhi. The project is called Secure CAN Gateway using ARM TrustZone and OP-TEE. I am working on a Raspberry Pi 3, and the goal is to keep the security-critical CAN checks inside TrustZone's Secure World, out of Linux's reach.
+
+### 2
+Let me start with the problem. A CAN frame carries no cryptographic proof of who sent it, so any node on the bus can send anything. That leads to three trust questions.
+First, can we trust the message itself? On a plain CAN frame, no.
+Second, can we trust the decision made about the message? If Linux validates the packet and Linux is compromised, an attacker can change that decision.
+Third, can we trust the record we keep afterwards? If the log is stored where a compromised system can reach it, it can be modified or erased.
+So the research gap is this. Security-critical CAN events need trustworthy processing and trustworthy records, even when the Normal World may be compromised.
+
+### 3
+Here is how this is handled today. There are three broad approaches.
+The first is software-only logging. Validation and logging happen in the same operating system, so if that system is compromised, nothing protects the result.
+The second is an external hardware security module or logger. It isolates security well, but it needs extra hardware, wiring and cost.
+The third is my approach: TrustZone with OP-TEE, using the on-chip Secure World, so there is no extra silicon.
+I want to be honest about where it stands. The ID, replay and timestamp checks are hardware-proven. HMAC authentication is currently blocked, and tamper-evident logging is not built yet. So my question is whether one dedicated core inside TrustZone can deliver trusted validation and logging, even when the Normal World is compromised.
+
+### 4
+This slide shows the proposed design. A frame comes from the CAN bus into the MCP2518FD controller. The controller raises an interrupt, which reaches Core1 as a Secure FIQ. Core1 receives the frame and validates it: CAN ID, counter and timestamp, and HMAC as part of the design.
+Then there is a decision. If the packet is critical, it is stored in secure flash inside the Secure World. If it is non-critical, it is forwarded to the Normal World, where Linux processes it as usual.
+I need to be clear that this is the proposed design. Receiving and validating frames in the Secure World is working on real hardware. Storing to flash and forwarding to Linux are planned and not yet implemented. HMAC is also still blocked.
+
+### 5
+This slide explains how Core1 ends up in the Secure World. On power-on, the GPU loads its boot files, and then loads my armstub, which contains Trusted Firmware-A's first stage, BL1, together with the FIP package. Trusted Firmware-A runs BL1, BL2 and BL31. BL31 is the EL3 secure monitor. It launches BL32, which is OP-TEE in the Secure World, and BL33, which is U-Boot in the Normal World. U-Boot then loads the device tree and the Linux kernel.
+The important part is what happens during Linux boot. Linux tries to bring up CPU1. That request is intercepted in EL3, and a function called opteed enter secure server if core1 diverts CPU1 into OP-TEE. From then on, CPU1 runs my CAN server loop and never returns to Linux. Linux simply reports CPU1 as offline, and CPU0, CPU2 and CPU3 keep running Linux.
+At the bottom is the interrupt path. The CAN controller signals on GPIO25, and BCM2837 interrupt routing delivers it as a Secure FIQ directly to CPU1.
+
+### 6
+Now let me show what happens after boot, when a CAN frame arrives. The MCP2518FD receives the frame and signals GPIO25. That becomes a Secure FIQ on Core1. Core1 reads the frame from the controller over SPI and copies it into a secure buffer.
+Then comes secure validation, running in the Core1 secure loop. There are three checks: the CAN ID, the counter and replay check, and the timestamp check. All three are hardware-proven on real captured frames. The frame is then accepted or dropped.
+The HMAC-SHA256 step is my current blocker, and secure logging is the next stage after that.
+While all this runs, Linux continues normally on CPU0, CPU2 and CPU3.
+
+### 7
+This slide shows exactly where I stand. There are seven milestones. Three are hardware-proven: boot and core pinning, secure CAN ownership, and the ID, replay and timestamp checks. One is blocked, which is HMAC authentication. Three are not started: rate and flood detection, tamper-evident logging, and the final demo with metrics.
+The table gives the evidence for each stage. I want to point out two limits. The timestamp check was only tested for freshness continuity, and I have not demonstrated rejecting a stale frame. The ID check currently allows a single ID, hex one two three.
+For HMAC, the root cause is still unresolved. My stack and allocator idea is only a hypothesis, not a diagnosis. The Next Steps box at the bottom lists what I will do about it.
+
+### 8
+For the final presentation, I will deliver five things.
+One, resolve the HMAC problem, or clearly document its root cause.
+Two, measure and reduce the latency of the validation pipeline.
+Three, store validated packets in flash memory. The Raspberry Pi 3 has no R P M B, so I will also have to design the storage boundary carefully.
+Four, add rate and flood detection against denial-of-service on the bus.
+Five, an end-to-end hardware demonstration with real measurements.
+I am not promising anything beyond this list.
+
+### 9
+Thank you for your time. I would be happy to take any questions.

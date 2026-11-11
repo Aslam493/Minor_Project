@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+.diagram { position:absolute; top:180px; left:40px; right:40px; height:520px; display:flex; gap:0; }
+.ecucol { width:150px; display:flex; flex-direction:column; justify-content:center; gap:14px; }
+.ecu { background:#F4F5F7; border:1px solid #D8DAE0; border-radius:10px; padding:10px; text-align:center; font-size:12px; font-weight:700; color:#22262E; }
+.canline { width:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; font-weight:700; color:#5B6270; }
+.canline .line { width:2px; flex:1; background:#C9CCD3; }
+.worldbox { flex:1; border-radius:16px; padding:18px 20px; position:relative; }
+.normal { background:#EFF1F4; border:1.5px solid #D8DAE0; margin-right:8px; }
+.secure { background:#EAF7EE; border:1.5px solid #B9E4C4; margin-left:8px; }
+.wtitle { font-size:16px; font-weight:700; color:#0B1F3A; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.boundary { width:2px; background:repeating-linear-gradient(#0B1F3A 0 6px, transparent 6px 12px); align-self:stretch; margin:0 4px; }
+.stagebox { background:#fff; border-radius:10px; padding:10px 12px; margin-bottom:10px; border:1px solid #E3E5EA; }
+.stagebox .st { font-size:12.5px; font-weight:700; color:#22262E; }
+.stagebox .sd { font-size:10.8px; color:#5B6270; margin-top:2px; }
+.tag { display:inline-block; font-size:9.5px; font-weight:700; border-radius:5px; padding:2px 6px; margin-left:6px; }
+.tag.done { background:#E6F4EA; color:#1E8E3E; }
+.tag.blocked { background:#FDECD9; color:#B8560E; }
+.tag.todo { background:#EDEEF0; color:#8A8F98; }
+.objective { position:absolute; left:40px; right:40px; bottom:56px; height:76px; background:#EAF2FD; border:1.5px solid #B9D3F5; border-radius:14px; display:flex; align-items:center; padding:0 26px; gap:16px; }
+.objective b { color:#1B4FA8; }
+</style></head>
+<body>
+  <div class="kicker">OUR APPROACH</div>
+  <div class="runhead">SECURE CAN EVENT PROCESSING AND LOGGING</div>
+  <div class="rule"></div>
+  <div class="logo-badge"><img src="IIT_Delhi_logo.png"></div>
+  <div class="title">A Core Dedicated to <span class="accent">Secure Validation</span></div>
+  <div class="subtitle">Core1 runs inside TrustZone alongside Linux on the other cores - here's what each side actually does.</div>
+
+  <div class="diagram">
+    <div class="ecucol">
+      <div class="ecu">ECU 1<br>(Engine)</div>
+      <div class="ecu">ECU 2<br>(Brake)</div>
+      <div class="ecu">ECU n<br>(Other)</div>
+    </div>
+    <div class="canline"><span>CAN</span><div class="line"></div><span>Bus</span></div>
+
+    <div class="worldbox normal">
+      <div class="wtitle">&#128039; Normal World (Cores 0/2/3)</div>
+      <div class="stagebox"><div class="st">Linux + applications</div><div class="sd">Non-critical processing (diagnostics, UI, telematics)</div></div>
+      <div class="stagebox"><div class="st">No CAN driver bound</div><div class="sd">SPI0 + GPIO25 are owned by Secure World, not Linux</div></div>
+      <div class="stagebox" style="border:1.5px dashed #C9A3A3; background:#FBEEEE;"><div class="st">Potentially compromised</div><div class="sd">Threat model assumes this side can be attacked</div></div>
+    </div>
+
+    <div class="boundary"></div>
+
+    <div class="worldbox secure">
+      <div class="wtitle">&#128274; Secure World (Core1, OP-TEE)</div>
+      <div class="stagebox"><div class="st">CAN ID check <span class="tag done">HARDWARE-PROVEN</span></div><div class="sd">Single allowed ID 0x123</div></div>
+      <div class="stagebox"><div class="st">Replay / timestamp check <span class="tag done">HARDWARE-PROVEN</span></div><div class="sd">Counter + freshness-continuity, on real frames</div></div>
+      <div class="stagebox"><div class="st">HMAC authentication <span class="tag blocked">BLOCKED</span></div><div class="sd">Unresolved Secure World runtime issue</div></div>
+      <div class="stagebox"><div class="st">Tamper-evident logging <span class="tag todo">NOT STARTED</span></div><div class="sd">RPi3 has no RPMB - storage design still open</div></div>
+    </div>
+  </div>
+
+  <div class="objective">
+    <div style="font-size:24px;">&#127919;</div>
+    <div style="font-size:15.5px; color:#1B2B4A;"><b>Objective:</b> validate CAN events in an isolated core even when the Normal World is compromised - <b>without</b> claiming full isolation or a production-ready system.</div>
+  </div>
+
+  <div class="footer"><span>Secure CAN Event Processing and Logging</span><span>4 / 6</span></div>
+</body></html>

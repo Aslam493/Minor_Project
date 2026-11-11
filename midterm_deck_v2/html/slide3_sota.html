@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+.cards { position:absolute; top:186px; left:40px; right:40px; bottom:150px; display:flex; gap:20px; }
+.card { flex:1; border-radius:16px; padding:20px 22px; display:flex; flex-direction:column; gap:12px; }
+.card.grey { background:#F4F5F7; border:1px solid #E3E5EA; }
+.card.blue { background:#EAF2FD; border:1px solid #CFE2F8; }
+.card.green { background:#EAF7EE; border:1px solid #CBE9D4; }
+.num { width:36px; height:36px; border-radius:50%; color:#fff; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
+.chead { display:flex; align-items:center; gap:12px; }
+.ctitle { font-size:18px; font-weight:700; color:#0B1F3A; }
+.cdesc { font-size:13px; color:#5B6270; margin-top:-4px; }
+.diagrow { display:flex; align-items:center; justify-content:center; gap:8px; margin:6px 0; }
+.chip { background:#fff; border:1.5px solid #C9CCD3; border-radius:8px; padding:8px 10px; font-size:11.5px; font-weight:700; text-align:center; color:#22262E; }
+.arrow { color:#9AA0AE; font-size:16px; }
+.pointlist { display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+.pt { display:flex; gap:8px; font-size:12.3px; color:#33363D; line-height:1.4; }
+.pt.good::before { content:"\2713"; color:#1E8E3E; font-weight:700; }
+.pt.bad::before { content:"\2717"; color:#C0392B; font-weight:700; }
+.protects { margin-top:auto; background:#fff; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:600; color:#22262E; border:1px solid #E3E5EA; }
+.gap { position:absolute; left:40px; right:40px; bottom:56px; height:78px; background:#FDECEC; border:1.5px solid #E8A6A0; border-radius:14px; display:flex; align-items:center; padding:0 26px; gap:18px; }
+.gap b { color:#B8352B; }
+.gapicon { font-size:26px; }
+</style></head>
+<body>
+  <div class="kicker">STATE OF THE ART</div>
+  <div class="runhead">SECURE CAN EVENT PROCESSING AND LOGGING</div>
+  <div class="rule"></div>
+  <div class="logo-badge"><img src="IIT_Delhi_logo.png"></div>
+  <div class="title">How Is Trustworthy CAN Handling Done <span class="accent">Today?</span></div>
+  <div class="subtitle">Different approaches protect different parts of the system, but real trade-offs remain.</div>
+
+  <div class="cards">
+    <div class="card grey">
+      <div class="chead"><div class="num" style="background:#8A8F98;">01</div><div><div class="ctitle">Software-Only Logging</div><div class="cdesc">Validation and logging in the same OS</div></div></div>
+      <div class="diagrow"><div class="chip">CAN<br>Packet</div><div class="arrow">&rarr;</div><div class="chip">Validate +<br>Log (Linux)</div><div class="arrow">&rarr;</div><div class="chip">Log File</div></div>
+      <div class="pointlist">
+        <div class="pt good">Simple, no extra hardware</div>
+        <div class="pt bad">Vulnerable if OS is compromised</div>
+        <div class="pt bad">No hardware isolation</div>
+      </div>
+      <div class="protects">Protects: None (software-dependent)</div>
+    </div>
+
+    <div class="card blue">
+      <div class="chead"><div class="num" style="background:#2A78D6;">02</div><div><div class="ctitle">External HSM / Logger</div><div class="cdesc">Security moved to separate hardware</div></div></div>
+      <div class="diagrow"><div class="chip">CAN<br>Packet</div><div class="arrow">&rarr;</div><div class="chip">External<br>HSM / ECU</div><div class="arrow">&rarr;</div><div class="chip">Log</div></div>
+      <div class="pointlist">
+        <div class="pt good">Isolates security from main ECU</div>
+        <div class="pt bad">Extra hardware, wiring and cost</div>
+        <div class="pt bad">Added system complexity</div>
+      </div>
+      <div class="protects">Protects: Security record (extra hardware)</div>
+    </div>
+
+    <div class="card green">
+      <div class="chead"><div class="num" style="background:#1E8E3E;">03</div><div><div class="ctitle">TrustZone + OP-TEE (Ours)</div><div class="cdesc">Secure-World-owned validation on-chip</div></div></div>
+      <div class="diagrow"><div class="chip">CAN<br>Packet</div><div class="arrow">&rarr;</div><div class="chip">Secure World<br>(Core1)</div><div class="arrow">&rarr;</div><div class="chip">Accept /<br>Drop</div></div>
+      <div class="pointlist">
+        <div class="pt good">No extra silicon - uses on-chip TrustZone</div>
+        <div class="pt good">ID / replay / timestamp checks hardware-proven</div>
+        <div class="pt bad">HMAC authentication currently blocked</div>
+        <div class="pt bad">Tamper-evident logging not yet implemented</div>
+      </div>
+      <div class="protects">Protects: Validation decision (logging planned, not built)</div>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div class="gapicon">&#127919;</div>
+    <div><b>RESEARCH GAP:</b> Can a single dedicated core running inside TrustZone deliver <b>trusted, scalable CAN validation and tamper-evident logging</b>, without dedicated security hardware, even when the Normal World is compromised?</div>
+  </div>
+
+  <div class="footer"><span>Secure CAN Event Processing and Logging</span><span>3 / 6</span></div>
+</body></html>
