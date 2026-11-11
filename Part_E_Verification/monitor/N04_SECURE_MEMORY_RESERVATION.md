@@ -1,6 +1,6 @@
 # N-04: Linux does not reserve OP-TEE's secure memory
 
-Date: 2026-11-06. Status: **analysis complete, candidate fix prepared and checked offline, NOTHING installed, nothing written to the Pi or its card.**
+Date: 2026-11-06. Status: **RESOLVED 2026-11-12: candidate installed on the 8 GB spare card and verified on the Pi (section 12); durable build rule added.** (Original text below describes the state of 2026-11-06.)
 All Pi-side steps were read-only (one temporary read-only mount of the boot partition, released each time).
 
 ## 1. The problem, with the evidence
@@ -105,3 +105,11 @@ That the kernel and U-Boot accept the candidate (never booted); that OP-TEE phys
 | A warning while compiling the overlay | `dtc` assumed 2-cell addressing for a standalone overlay | checked the merged tree: 0 warnings, and the parent has 1-cell addressing |
 | `fsck.fat` errors after the rehearsal | looked like damage | ran it on the untouched original: same message, so it pre-exists (a FAT/partition size mismatch) |
 | Whether a one-file change is enough | U-Boot rewrites several things | diffed the files: it rewrites five items, none of them a reservation |
+
+## 12. Installed and verified on hardware (2026-11-12, user approved: 'Install now, I'm at the Pi')
+- Preflight: Pi's boot-partition DTB sha256 = `6b90c3e0...0d3826` (the original); live `/proc/iomem` showed no reservation of 0x10000000-0x10ffffff. Copy of the Pi's file saved as `n04/pi_dtb_before_install_20261112.dtb` (same hash). Candidate checked against `n04/SHA256SUMS` and re-hashed on the Pi (`e8ac38fa...744ccd`) before writing.
+- Install (SSH, 8 GB spare only; 32 GB original card not touched): boot partition remounted rw, one file copied, `sync`, read back `e8ac38fa...` (34,713 B), unmounted; `armstub8.bin` (`775ce384...`) unchanged. Then reboot; Pi back on SSH in ~45 s.
+- After reboot: `verify_boot.sh` **16 pass / 0 FAIL / 2 skipped** (same as before); `/proc/iomem` **`10000000-10ffffff : reserved`** and System RAM now starts at `11000000`; `/proc/device-tree/reserved-memory/optee_secure@10000000` exists with `reg = 0x10000000 0x01000000` and `no-map`; kernel log: `OF: reserved mem: 0x10000000..0x10ffffff (16384 KiB) nomap non-reusable optee_secure@10000000`; no oops/BUG; MemTotal 880880 kB. Monitor after reboot: `init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 ev_lost=0`, Core 1 polling (heartbeat hb_seq rising, no responder so misses accumulate as before).
+- Durable fix: `optee_full/build/rpi3.mk` (`RPI3_OPTEE_RESERVE_DTBO`, third argument of the Model B `fdtoverlay`), files `br-ext/board/rpi3/optee-reserve.{dts,dtbo}`. Offline reproduction with the build's own tools (`linux/scripts/dtc`): raw `bcm2710-rpi-3-b.dtb` + Seeed overlay + `optee-reserve.dtbo` in one `fdtoverlay` call = 34,713 B, **0 differing lines** (sorted decompile) vs the DTB running on the Pi; the `.dtbo` rebuilt from the `.dts` is byte-identical to the committed one. **The full image build (`update_bootfs`) has NOT been run**; the rule is verified by reproducing its command, not by a build.
+- Not changed by this fix: no TZASC on the Pi 3, so a deliberate write by a compromised kernel or DMA device is still possible; this only stops Linux's allocator and kernel mapping from using the range. kpageflags page count was not re-read (the /proc/iomem and kernel log evidence is direct).
+- Rollback if ever needed: copy `SD_Card_Backups/pre-S0-sep20/boot-files/bcm2710-rpi-3-b.dtb` (or `n04/pi_dtb_before_install_20261112.dtb`) back over the boot-partition file, hash `6b90c3e0...`.
