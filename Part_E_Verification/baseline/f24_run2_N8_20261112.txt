@@ -1,0 +1,40 @@
+# F24 run: N=8 flooders, soak 60s, 2026-11-12T01:37:08+05:30
+## before
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 21635991775 core1_poll_age_ticks 2477 poll_count 40420069653
+  skip_count 0 skip_total 72 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 2796 hb_seq 1109 hb_state OPEN hb_miss_count 11 idle_uses 0
+  traffic_age_ticks 220392195 hb_last_ok_age_ticks 236595480 lease_remaining_ticks 0
+  ev_seq 20 ev_ack 0 ev_lost 0 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=72
+ 00:18:28 up 18 min,  load average: 1.86, 0.63, 0.22
+flooders started: 8, alive after 3 s: 8
+ 00:18:32 up 18 min,  load average: 2.35, 0.76, 0.26
+## soak (heartbeat responder + software frame sender, period 100 ms)
+soak: 60 s, period 100 ms, 599 ticks
+frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 59 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 80831 p99 691424 max 830998
+frame submit latency (us): p50 22772 p99 331029 max 553235
+end state: flags 0x07 last_counter 3395 hb_state OPEN miss_count 0 | pta_lock_timeouts +0 skip_total +37 starved 0
+soak_exit=0
+flooders still alive at end of soak: 8
+flooders stopped
+ 00:19:37 up 19 min,  load average: 6.68, 2.35, 0.85
+## after
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 22964317262 core1_poll_age_ticks 5213 poll_count 42939819507
+  skip_count 0 skip_total 109 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 3395 hb_seq 1178 hb_state MISSED hb_miss_count 4 idle_uses 0
+  traffic_age_ticks 68958872 hb_last_ok_age_ticks 85858986 lease_remaining_ticks 0
+  ev_seq 60 ev_ack 0 ev_lost 16 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=109
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352987026
+seq 4 TIMEOUT              counter 0 detail 1 ticks 17888343302
+seq 5 TIMEOUT              counter 0 detail 2 ticks 17931879899
+seq 9 TIMEOUT              counter 0 detail 1 ticks 19300854431
+seq 21 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 21745850774
+  returned 5, more=1, ev_lost=16
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=109
+[    0.000000] printk: debug: ignoring loglevel setting.
+[    7.794799] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0
