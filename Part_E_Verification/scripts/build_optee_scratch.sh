@@ -8,7 +8,7 @@ set -e
 OUT="${1:?usage: $0 <output-dir> [extra make vars]}"; shift || true
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 T="$ROOT/optee_full/toolchains"
-mkdir -p "$OUT"
+mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"	# absolute: make -C optee_os would otherwise put a relative O= inside the source tree
 exec make -j"$(nproc)" -C "$ROOT/optee_full/optee_os" O="$OUT" \
   CFG_USER_TA_TARGETS=ta_arm64 CFG_ARM64_core=y PLATFORM=rpi3 \
   CROSS_COMPILE="$T/aarch64/bin/aarch64-linux-gnu-" CROSS_COMPILE_core="$T/aarch64/bin/aarch64-linux-gnu-" \
