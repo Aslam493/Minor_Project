@@ -109,6 +109,14 @@ static int find_ev(uint32_t from, unsigned type, int detail, struct mon_event *o
 	return found;
 }
 
+/* the earliest event the ring can still return (pinned events survive eviction) */
+static int first_ev(struct mon_event *out)
+{
+	struct mon_event ev[MON_EVENT_MAX]; uint32_t cnt = 0, lost = 0; int more = 0; struct mon_health h; TEEC_Result r;
+	RETRY(&C, mon_get_events(&C, 1, 1, ev, &cnt, &more, &lost, &h), r);
+	if (r || !cnt) return 0;
+	*out = ev[0]; return 1;
+}
 /* ------------------------------------------------------------------ frames */
 static void phase_frames(void)
 {
@@ -262,14 +270,14 @@ static void phase_idle(uint32_t *c)
 }
 static void phase_flood(void)
 {
-	struct mon_status0 s0, s1; struct mon_status1 a, b; unsigned long af = 0, other = 0; struct mon_event first;
+	struct mon_status0 s0, s1; struct mon_status1 a, b; unsigned long af = 0, other = 0; struct mon_event first, again;
 	printf("== log flood (T22)\n");
 	hb_keep(); s0 = st0(); a = st1();
-	int have_first0 = find_ev(0, EV_TIMEOUT, -1, &first);
+	int have_first0 = first_ev(&first);
 	for (int i = 0; i < 1000; i++) { uint32_t v = frame(0x123, 1, payload_for(1), 1, NULL); if (v == 4) af++; else other++; if (i % 100 == 99) hb_keep(); }
-	s1 = st0(); b = st1(); struct mon_event again; int have_first1 = find_ev(0, EV_TIMEOUT, -1, &again);
+	s1 = st0(); b = st1(); int have_first1 = first_ev(&again);
 	uint32_t recorded = s1.ev_seq - s0.ev_seq, counted = b.ev_count[EV_AUTH_FAIL] - a.ev_count[EV_AUTH_FAIL];
-	PASSF(af == 1000 && other == 0 && have_first0 && have_first1 && first.seq == again.seq && !(s1.flags & 0x40), "T22", "1000 bad-tag frames: %lu AUTH_FAIL verdicts, earliest pinned event (seq %u) still readable=%d, not starved", af, again.seq, have_first1);
+	PASSF(af == 1000 && other == 0 && have_first0 && have_first1 && first.seq == again.seq && !(s1.flags & 0x40), "T22", "1000 bad-tag frames: %lu AUTH_FAIL verdicts, earliest pinned event (seq %u, type %s) before and after, still readable=%d, not starved", af, again.seq, mon_event_name(again.type), have_first1);
 	NOTE("T22", "AUTH_FAIL counted %u, events written to the ring %u (ev_seq %u -> %u), ev_lost %u -> %u, pinned_used %u -> %u; suppressed (counted but not written) = %u; UART flood not testable (no UART)", counted, recorded, s0.ev_seq, s1.ev_seq, s0.ev_lost, s1.ev_lost, s0.pinned_used, s1.pinned_used, counted > recorded ? counted - recorded : 0);
 }
 static void phase_t6(uint32_t c)
