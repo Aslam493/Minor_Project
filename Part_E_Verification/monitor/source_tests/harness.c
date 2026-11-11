@@ -662,11 +662,71 @@ static void t_stall(void)
 	end();
 }
 
+
+#ifdef CFG_RPI3_CAN_MONITOR_UART
+/* ---- C6: UART ALIVE line. The harness drives the real Core 1 attempt (which takes the snapshot inside its lock) and the real service. */
+static void uart_reset(int mode) { memset(&MU, 0, sizeof MU); MU.map_result = 0x3f215040u; MU.mode = mode; }
+static void uart_drain_all(void) { for (int i = 0; i < 100; i++) rpi3_mon_uart_service(); }
+static const char *uart_text(void) { static char b[4097]; unsigned n = MU.puts < 4096 ? MU.puts : 4096; memcpy(b, MU.out, n); b[n] = 0; return b; }
+static void t_uart(void)
+{
+	uint64_t t; uint32_t e; struct rpi3_mon_lstate *l;
+
+	begin("U1 ALIVE line text (exact fields), written only through the mock UART"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	rpi3_mon_store_u64(&rpi3_mon.health.last_poll_ticks, t - 19200);	/* 1000 us ago */
+	rpi3_mon_core1_attempt(); rpi3_mon_uart_service(); uart_drain_all();
+	CHECK(strncmp(uart_text(), "ALIVE n=1 poll_age_us=1000 ev=0 lost=0 hb=OPEN miss=0 tr=--- drop=0\r\n", 70) == 0);
+	if (strncmp(uart_text(), "ALIVE n=1 poll_age_us=1000 ev=0 lost=0 hb=OPEN miss=0 tr=--- drop=0\r\n", 70)) printf("     got: %s", uart_text());
+	CHECK(MU.puts == strlen("ALIVE n=1 poll_age_us=1000 ev=0 lost=0 hb=OPEN miss=0 tr=--- drop=0\r\n")); end();
+
+	begin("U2 never blocks: transmitter never ready -> no byte written, 1,000,000 service calls return, text stays queued"); uart_reset(1); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull);
+	rpi3_mon_core1_attempt(); for (int i = 0; i < 1000000; i++) rpi3_mon_uart_service();
+	CHECK(MU.puts == 0 && MU.lsr_reads >= 1 && MU.lsr_reads <= 1000000); end();
+
+	begin("U3 bounded burst: at most 8 bytes per service call, whole line comes out intact"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull);
+	rpi3_mon_core1_attempt(); rpi3_mon_uart_service(); CHECK(MU.puts == 8); rpi3_mon_uart_service(); CHECK(MU.puts == 16);
+	uart_drain_all(); CHECK(MU.puts > 16 && strstr(uart_text(), "ALIVE n=1 ") == uart_text() && strstr(uart_text(), "\r\n") != NULL); end();
+
+	begin("U4 room limits the burst: mini-UART style FIFO (room 3) -> exactly 3 bytes, no spin"); uart_reset(2); MU.room = 3; setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull);
+	rpi3_mon_core1_attempt(); rpi3_mon_uart_service(); CHECK(MU.puts == 3 && MU.room == 0); rpi3_mon_uart_service(); CHECK(MU.puts == 3); end();
+
+	begin("U5 once per second: no second snapshot inside the second; second line n=2 after it"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	rpi3_mon_core1_attempt(); uart_drain_all(); unsigned n1 = MU.puts;
+	M.now = t + RPI3_MON_TICKS_PER_SEC - 1; rpi3_mon_core1_attempt(); uart_drain_all(); CHECK(MU.puts == n1);
+	M.now = t + RPI3_MON_TICKS_PER_SEC; rpi3_mon_core1_attempt(); uart_drain_all(); CHECK(MU.puts > n1 && strstr(uart_text() + n1, "ALIVE n=2 ") == uart_text() + n1); end();
+
+	begin("U6 a line not yet drained: the next second is skipped and counted (drop=1 in the following line)"); uart_reset(1); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	rpi3_mon_core1_attempt(); rpi3_mon_uart_service();			/* line formatted, transmitter never ready: stays queued */
+	M.now = t + RPI3_MON_TICKS_PER_SEC; rpi3_mon_core1_attempt();	/* dropped */
+	MU.mode = 0; uart_drain_all(); M.now = t + 2 * RPI3_MON_TICKS_PER_SEC; rpi3_mon_core1_attempt(); uart_drain_all();
+	CHECK(strstr(uart_text(), "ALIVE n=2 ") != NULL && strstr(uart_text(), "drop=1") != NULL); end();
+
+	begin("U7 events: at most 3 per line, oldest first, none repeated, then the rest the next second"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	e = take(); l = rpi3_mon_l(); rpi3_mon_ev_append(l, RPI3_MON_EV_AUTH_FAIL, 1, 0, t); rpi3_mon_ev_append(l, RPI3_MON_EV_REPLAY, 2, 0, t); rpi3_mon_ev_append(l, RPI3_MON_EV_TIMEOUT, 0, 1, t);
+	rpi3_mon_ev_append(l, RPI3_MON_EV_ALTERED, 0, 7, t); rpi3_mon_ev_append(l, RPI3_MON_EV_UNACCOUNTED, 0, 9, t); put(e);
+	rpi3_mon_core1_attempt(); uart_drain_all();
+	CHECK(strstr(uart_text(), "EV seq=1 AUTH_FAIL d=0\r\n") && strstr(uart_text(), "EV seq=2 REPLAY d=0\r\n") && strstr(uart_text(), "EV seq=3 TIMEOUT d=1\r\n") && !strstr(uart_text(), "EV seq=4"));
+	unsigned n2 = MU.puts; M.now = t + RPI3_MON_TICKS_PER_SEC; rpi3_mon_core1_attempt(); uart_drain_all();
+	CHECK(strstr(uart_text() + n2, "EV seq=4 ALTERED d=7\r\n") && strstr(uart_text() + n2, "EV seq=5 UNACCOUNTED d=9\r\n") && !strstr(uart_text() + n2, "EV seq=3") && strstr(uart_text() + n2, " ev=5 ")); end();
+
+	begin("U8 no mapping: the feature stays off, no byte, monitor state untouched"); uart_reset(0); MU.map_result = 0; setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull);
+	rpi3_mon_core1_attempt(); for (int i = 0; i < 100; i++) rpi3_mon_uart_service();
+	e = take(); l = rpi3_mon_l(); CHECK(MU.puts == 0 && MU.lsr_reads == 0 && rpi3_mon_init_ok() && l->hb_state == RPI3_MON_HB_OPEN); put(e); end();
+
+	begin("U9 the snapshot is taken inside the lock hold and changes no monitor state"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	rpi3_mon_core1_attempt();
+	e = take(); l = rpi3_mon_l(); CHECK(l->ev_seq == 0 && l->hb_miss_count == 0 && l->hb_seq == 1); put(e); CHECK(M.violations == 0); end();
+}
+#endif
+
 int main(void)
 {
 	printf("Real-source host harness: rpi3_can_monitor.c + the PTA glue with a mock platform (NOT a board test)\n");
 	t_vectors(); t_init(); t_layout(); t_locks(); t_health(); t_events(); t_eval(); t_c17(); t_c18(); t_c19(); t_c20(); t_c21(); t_c22(); t_c23();
 	t_glue(); t_glue_cmds(); t_core1(); t_stall();
+#ifdef CFG_RPI3_CAN_MONITOR_UART
+	t_uart();
+#endif
 #ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
 	t_tstats();
 #endif

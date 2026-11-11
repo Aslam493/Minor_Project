@@ -102,4 +102,15 @@ extern uint8_t mock_tmp_stack[4096];
 #define MON_PLAT_LOCK_HELD_CHECK()	mock_lock_held_check()
 #define MON_PLAT_INIT_EXTRA()		mock_init_extra()
 #define MON_PLAT_PROFILE_DEBUG		(mock_profile_debug)
+
+#ifdef CFG_RPI3_CAN_MONITOR_UART
+/* Mock mini UART: map_result 0 = no mapping (feature off). mode 0 = always ready, 1 = never ready, 2 = ready while 'room' > 0 (put uses one). */
+struct mock_uart { uintptr_t map_result; int mode; unsigned room; unsigned lsr_reads; unsigned puts; unsigned char out[4096]; };
+extern struct mock_uart MU;
+bool mock_uart_ready(void);
+void mock_uart_put(unsigned c);
+#define MON_PLAT_UART_MAP()		(MU.map_result)
+#define MON_PLAT_UART_TX_READY(b)	mock_uart_ready()
+#define MON_PLAT_UART_PUT(b, c)		mock_uart_put(c)
+#endif
 #endif

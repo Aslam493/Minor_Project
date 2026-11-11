@@ -15,7 +15,7 @@ chk(){ if [ "$2" = 1 ]; then ok "$1"; else bad "$1"; fi; }
 strip(){ python3 "$HERE/strip_comments.py" "$1"; }
 # body of one function (from its signature line to the closing brace at column 0)
 fbody(){ strip "$C" | awk -v n="$1" '$0 ~ ("^[A-Za-z_].*[ \t*]" n "\\(") {f=1} f{print} f&&/^}/{exit}'; }
-CRIT="rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1"
+CRIT="rpi3_mon_uart_snapshot rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1"
 ALLSRC="$( (strip "$C"; strip "$H"; strip "$PL"; strip "$G") )"
 
 echo "static_checks: final monitor code (stages 1-6)"
@@ -38,7 +38,8 @@ chk "Y1 Core 1 attempt uses cpu_spin_unlock (no mask restore) and never MASK/UNM
 # ---- critical section helpers: no calls that could be slow, blocking or allocate
 bad_c=0; for f in $CRIT; do n=$(fbody "$f" | grep -cE '\b(memcpy|memcmp|memset|memmove|malloc|calloc|realloc|free|printf|IMSG|DMSG|EMSG|FMSG|trace_printf|crypto_[a-z_]+|mobj_[a-z_]+|tee_[a-z_]+|MON_PLAT_(MAC|RNG|PANIC|EMSG|MASK|UNMASK|TRYLOCK|UNLOCK))\b'); [ "$n" = 0 ] || { echo "     $f: $n forbidden token(s)"; bad_c=1; }; done
 chk "H2/CS1/CS2 critical-section helpers contain no memcpy/memset/heap/printing/crypto/lock calls" $([ "$bad_c" = 0 ] && echo 1 || echo 0)
-chk "H2 the only memset in the logic file is in rpi3_mon_init" $([ "$(strip "$C" | grep -c '\bmemset\b')" = 1 ] && fbody rpi3_mon_init | grep -q '\bmemset\b' && echo 1 || echo 0)
+# memset: one in rpi3_mon_init, and (UART build only, C6) one in rpi3_mon_uart_init: both init time on the primary core, never inside a hold
+chk "H2 the only memsets in the logic file are in rpi3_mon_init and rpi3_mon_uart_init (init time, not in any hold)" $([ "$(strip "$C" | grep -c '\bmemset\b')" = 2 ] && fbody rpi3_mon_init | grep -q '\bmemset\b' && fbody rpi3_mon_uart_init | grep -q '\bmemset\b' && echo 1 || echo 0)
 cr=0; for f in $CRIT; do fbody "$f" | grep -qE 'for \(|while \(' && cr=1; done
 chk "H1 informational: loops exist in critical helpers (bounded by constants; checked by the host timing tests)" 1
 # ---- HMAC / crypto isolation (F27)
@@ -114,5 +115,11 @@ if [ -n "${ON_DIS:-}" ] && [ -f "$ON_DIS" ]; then
 else
   echo "  SKIPPED  H1 object-code checks (set ON_DIS to the Monitor-ON tee.elf disassembly)"
 fi
+# ---- C6 UART ALIVE line (CFG_RPI3_CAN_MONITOR_UART): rules of COMPONENT_6_DESIGN.md section 3
+chk "UART1 exactly one UART write site, inside rpi3_mon_uart_service, in a loop guarded by TX_READY and bounded by RPI3_MON_UART_BURST" $([ "$(strip "$C" | grep -c 'MON_PLAT_UART_PUT')" = 1 ] && fbody rpi3_mon_uart_service | grep -q 'MON_PLAT_UART_PUT' && fbody rpi3_mon_uart_service | grep -E 'while' | grep -q 'MON_PLAT_UART_TX_READY' && fbody rpi3_mon_uart_service | grep -E 'while' | grep -q 'RPI3_MON_UART_BURST' && echo 1 || echo 0)
+chk "UART2 UART mapping only in rpi3_mon_uart_init; readiness only in rpi3_mon_uart_service (never in a hold)" $([ "$(strip "$C" | grep -c 'MON_PLAT_UART_MAP')" = 1 ] && fbody rpi3_mon_uart_init | grep -q 'MON_PLAT_UART_MAP' && [ "$(strip "$C" | grep -c 'MON_PLAT_UART_TX_READY')" = 1 ] && fbody rpi3_mon_uart_service | grep -q 'MON_PLAT_UART_TX_READY' && echo 1 || echo 0)
+chk "UART3 the service takes no lock, makes no trace/heap/crypto call, and only the snapshot (a critical-section helper) runs in the hold" $(fbody rpi3_mon_uart_service | grep -qE '\b(MON_PLAT_(TRYLOCK|UNLOCK|MASK_ALL|UNMASK|MAC|RNG|PANIC|EMSG)|memcpy|memset|malloc|free|printf|IMSG|DMSG|EMSG|crypto_[a-z_]+)\b' && echo 0 || echo 1)
+chk "UART4 the snapshot is called only from the Core 1 lock attempt, the service only from the Core 1 pass (header)" $([ "$(strip "$C" | grep -c 'RPI3_MON_UART_SNAPSHOT')" = 1 ] && fbody rpi3_mon_core1_attempt | grep -q 'RPI3_MON_UART_SNAPSHOT' && [ "$(grep -c 'RPI3_MON_UART_SERVICE()' "$H" 2>/dev/null)" -ge 1 ] && echo 1 || echo 0)
+chk "UART5 flag off: every UART hook expands to nothing (no reference left in an off build)" $([ "$(grep -A2 '^#else' "$H" 2>/dev/null | grep -c '((void)0)')" -ge 1 ] && echo 1 || echo 0)
 echo "static_checks: $pass pass, $fail FAIL"
 [ "$fail" -eq 0 ]

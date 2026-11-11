@@ -109,3 +109,9 @@ TEE_Result mock_mac_final(void *ctx, uint8_t *o, size_t ol)
 	if (mock_mac_final_hook) mock_mac_final_hook();
 	return TEE_SUCCESS;
 }
+
+#ifdef CFG_RPI3_CAN_MONITOR_UART
+struct mock_uart MU;
+bool mock_uart_ready(void) { MU.lsr_reads++; return MU.mode == 0 || (MU.mode == 2 && MU.room > 0); }
+void mock_uart_put(unsigned c) { if (MU.puts < sizeof MU.out) MU.out[MU.puts] = (unsigned char)c; MU.puts++; if (MU.mode == 2 && MU.room) MU.room--; }
+#endif
