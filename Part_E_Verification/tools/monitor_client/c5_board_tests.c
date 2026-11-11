@@ -2,7 +2,7 @@
  * c5_board_tests: Mode-F acceptance tests T1..T22 (plan section 10) that can run on the real board through the
  * documented PTA commands 17..23 only. Software class: frames are INJECTED through the PTA, never on the CAN bus.
  *
- *   usage: c5_board_tests --key-file F [--no-t6]
+ *   usage: c5_board_tests --key-file F [--no-t6 | --t20-watch SECS | --save FILE | --t17-check FILE | --nonce-at SEQ FILE]
  *
  * Writes to the monitor's own state (counters, answers, one idle lease, events). Never touches the CAN chip, the
  * SD card, the FIQ or any legacy command. Phase order matters (T6 last: it leaves last_counter = 0xFFFFFFFF, so the
@@ -293,12 +293,59 @@ static int load_key(const char *path)
 { char b[256]; FILE *f = fopen(path, "rb"); size_t n; if (!f) return -1; n = fread(b, 1, sizeof b - 1, f); fclose(f); b[n] = 0; if (n < 64) return -1;
   for (int i = 0; i < 32; i++) { unsigned x; if (sscanf(b + 2 * i, "%2x", &x) != 1) return -1; KEY[i] = (uint8_t)x; } return 0; }
 
+/* ------------------------------------------------------------------ boot-level modes (T17, T18, T20) */
+static double uptime_s(void) { double u = 0; FILE *f = fopen("/proc/uptime", "r"); if (f) { if (fscanf(f, "%lf", &u) != 1) u = 0; fclose(f); } return u; }
+/* T20: watch the boot grace WITHOUT calling commands 22/23 (status and events only) */
+static int mode_t20(unsigned secs)
+{
+	struct mon_status0 s = st0(); double u0 = uptime_s(); uint64_t n0 = s.now_ticks; struct mon_event ev; int found = 0;
+	printf("T20 watch: boot_id 0x%08x, first status at Linux uptime %.1f s, hb_state %s, ev_seq %u (cmds 22/23 NOT used)\n", s.boot_id, u0, mon_hbstate_name(s.hb_state), s.ev_seq);
+	for (uint64_t t0 = now_ms(); now_ms() - t0 < (uint64_t)secs * 1000 && !found; msleep(500)) {
+		if (find_ev(0, EV_TIMEOUT, 3, &ev)) { found = 1; double rel = ((double)ev.ticks - (double)n0) / (TICKS_MS * 1000.0);
+			printf("  TIMEOUT detail 3 (consumer never started) seen at Linux uptime %.1f s; its timestamp is %.1f s after the first status read (= Linux time %.1f s)\n", uptime_s(), rel, u0 + rel); }
+	}
+	s = st0(); printf("  end: hb_state %s hb_seq %u miss_count %u flags 0x%02x\n", mon_hbstate_name(s.hb_state), s.hb_seq, s.hb_miss_count, s.flags);
+	PASSF(found, "T20", "CONSUMER_NEVER_STARTED reported (G = 60 s after the monitor's init, which is a few seconds before Linux uptime 0); none was visible at the first read (uptime %.1f s)", u0);
+	return 0;
+}
+static int mode_save(const char *path)
+{ uint64_t n; uint32_t q, st; struct mon_health h; TEEC_Result r; struct mon_status0 s = st0(); RETRY(&C, mon_get_nonce(&C, &n, &q, &st, &h), r); if (r) return 1;
+  FILE *f = fopen(path, "w"); if (!f) return 1; fprintf(f, "%u %u %" PRIu64 "\n", s.boot_id, q, n); fclose(f); printf("saved boot_id 0x%08x, request seq %u, nonce %016" PRIx64 "\n", s.boot_id, q, n); return 0; }
+static int mode_t17(const char *path)
+{
+	unsigned ob, oq; uint64_t on; uint32_t v, v2, d; uint64_t nonce; uint32_t seq, st; struct mon_health h; TEEC_Result r;
+	FILE *f = fopen(path, "r"); if (!f || fscanf(f, "%u %u %" SCNu64, &ob, &oq, &on) != 3) { fprintf(stderr, "cannot read %s\n", path); return 2; } fclose(f);
+	struct mon_status0 s = st0();
+	PASSF(s.boot_id != ob, "T17a", "new boot_id 0x%08x differs from the one before the reboot (0x%08x); uptime %.0f s", s.boot_id, ob, uptime_s());
+	answer(oq, on, &v);
+	PASSF(v == 3 || v == 2, "T17b", "old consumer values (seq %u) after the reboot -> %s (expected UNISSUED; STALE would also mean refused)", oq, mon_verdict23_name(v));
+	RETRY(&C, mon_get_nonce(&C, &nonce, &seq, &st, &h), r); v2 = 99; if (!r && nonce) answer(seq, nonce, &v2);
+	PASSF(!r && v2 == 0, "T17c", "refetch -> current request seq %u, answer %s", seq, mon_verdict23_name(v2));
+	s = st0(); uint32_t first = s.last_counter;
+	v = frame(0x123, 7000, payload_for(7000), 0, &d);
+	PASSF(v == 2 && !(first && (s.flags & 0x04)), "T17d", "first frame after the reboot -> %s (expected RESYNC), traffic was not armed before=%d", mon_verdict17_name(v), !(s.flags & 0x04));
+	return 0;
+}
+static int mode_nonce_at(uint32_t target, const char *path)
+{
+	uint64_t nonce; uint32_t seq = 0, st; struct mon_health h; TEEC_Result r; uint64_t t0 = now_ms(); uint32_t first = 0;
+	for (;;) { RETRY(&C, mon_get_nonce(&C, &nonce, &seq, &st, &h), r); if (!r && !first) first = seq; if (!r && seq == target) break; if (!r && seq > target) { printf("seq %u already past %u\n", seq, target); return 1; } if (now_ms() - t0 > (uint64_t)(target + 60) * 1000) { printf("timeout waiting for seq %u (at %u)\n", target, seq); return 1; } if (nonce && (st == 1 || st == 3) && seq != last_answered) { uint32_t v; answer(seq, nonce, &v); } msleep(200); }
+	struct mon_status0 s = st0(); FILE *f = fopen(path, "w"); if (!f) return 1; fprintf(f, "%u 0x%08x %016" PRIx64 "\n", seq, s.boot_id, nonce); fclose(f);
+	printf("hb_seq %u reached: boot_id 0x%08x nonce %016" PRIx64 "\n", seq, s.boot_id, nonce); return 0;
+}
+
 int main(int argc, char **argv)
 {
 	const char *kf = NULL; int no_t6 = 0;
 	for (int i = 1; i < argc; i++) { if (!strcmp(argv[i], "--key-file") && i + 1 < argc) kf = argv[++i]; else if (!strcmp(argv[i], "--no-t6")) no_t6 = 1; }
 	if (!kf || load_key(kf)) { fprintf(stderr, "usage: %s --key-file HEXFILE [--no-t6]\n", argv[0]); return 2; }
 	if (mon_open(&C)) { fprintf(stderr, "cannot open the PTA session\n"); return 2; }
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--t20-watch") && i + 1 < argc) { int rc = mode_t20((unsigned)atoi(argv[i + 1])); printf("SUMMARY: %d PASS, %d FAIL\n", n_pass, n_fail); mon_close(&C); return rc || n_fail; }
+		if (!strcmp(argv[i], "--save") && i + 1 < argc) { int rc = mode_save(argv[i + 1]); mon_close(&C); return rc; }
+		if (!strcmp(argv[i], "--t17-check") && i + 1 < argc) { int rc = mode_t17(argv[i + 1]); printf("SUMMARY: %d PASS, %d FAIL\n", n_pass, n_fail); mon_close(&C); return rc || n_fail; }
+		if (!strcmp(argv[i], "--nonce-at") && i + 2 < argc) { int rc = mode_nonce_at((uint32_t)atoi(argv[i + 1]), argv[i + 2]); mon_close(&C); return rc; }
+	}
 	struct mon_status0 s = st0(); printf("c5_board_tests: boot_id 0x%08x, flags 0x%02x, last_counter %u, hb_state %s, ev_seq %u, idle_uses %u\n", s.boot_id, s.flags, s.last_counter, mon_hbstate_name(s.hb_state), s.ev_seq, s.idle_uses);
 	phase_frames();
 	phase_heartbeat();
