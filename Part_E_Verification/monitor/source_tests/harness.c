@@ -713,6 +713,15 @@ static void t_uart(void)
 	rpi3_mon_core1_attempt(); for (int i = 0; i < 100; i++) rpi3_mon_uart_service();
 	e = take(); l = rpi3_mon_l(); CHECK(MU.puts == 0 && MU.lsr_reads == 0 && rpi3_mon_init_ok() && l->hb_state == RPI3_MON_HB_OPEN); put(e); end();
 
+	begin("U10 decimal output edge values: 0, 10, 100, 1000000000, 4294967295 (no array, most significant digit first)");
+	{ const uint32_t vals[5] = { 0u, 10u, 100u, 1000000000u, 4294967295u }; int allok = 1;
+	  for (int i = 0; i < 5; i++) { char want[64], want2[64]; uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull);
+	    e = take(); l = rpi3_mon_l(); l->ev_lost = vals[i]; l->hb_miss_count = vals[4 - i]; put(e);
+	    rpi3_mon_core1_attempt(); uart_drain_all();
+	    snprintf(want, sizeof want, " lost=%u ", vals[i]); snprintf(want2, sizeof want2, " miss=%u ", vals[4 - i]);
+	    if (!strstr(uart_text(), want) || !strstr(uart_text(), want2)) { allok = 0; printf("     value %u: got %s", vals[i], uart_text()); } }
+	  CHECK(allok); } end();
+
 	begin("U9 the snapshot is taken inside the lock hold and changes no monitor state"); uart_reset(0); setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
 	rpi3_mon_core1_attempt();
 	e = take(); l = rpi3_mon_l(); CHECK(l->ev_seq == 0 && l->hb_miss_count == 0 && l->hb_seq == 1); put(e); CHECK(M.violations == 0); end();
