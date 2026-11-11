@@ -1,0 +1,8 @@
+ok   HMAC: client SHA-256/HMAC equals RFC 4231 case 2, the independent Python tag and the Secure World mock for many sizes
+ok   COMMANDS: status, frames, events, ack through the client against the real glue and logic
+ok   COMMANDS: idle lease, nonce and answer
+ok   BUSY and error returns: BUSY is reported with the health pair; outputs dropped on error leave a zero pair; the client never reads past a broken contract
+ok   CLI end to end (commands status, frame, events, ack, idle, nonce, answer) against the real glue and logic
+ok   RACE: a new challenge between the two steps of the nonce fetch gives a zero nonce; the client must retry (design K7), never submit the zero nonce
+ok   SOAK: software sender + heartbeat responder in one session: all frames accepted with the right key, anomalies flagged with a wrong key, key required
+client integration: 106 checks, 0 failed

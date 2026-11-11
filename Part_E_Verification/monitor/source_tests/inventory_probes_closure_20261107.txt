@@ -1,0 +1,32 @@
+== V4: atomic_inc32 machine code (ON tee.elf)
+000000001018e434 <atomic_inc32>:
+    1018e434:	ldaxr	w1, [x0]
+    1018e438:	add	w1, w1, #0x1
+    1018e43c:	stxr	w2, w1, [x0]
+    1018e440:	cmp	w2, #0x0
+    1018e444:	b.ne	1018e434 <atomic_inc32>  // b.any
+    1018e448:	mov	w0, w1
+    1018e44c:	ret
+== V4: only increment site of the counter
+197:	MON_PLAT_INC32(&rpi3_mon_pta_lock_timeouts);
+== V8: any command that resets/clears the counter (RESET/clear)
+/home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3/rpi3_can_monitor.c:461:	p.pta_lock_timeouts = 0;
+== V13: assignments to mode (struct member .mode =)
+129:	rpi3_mon.l.mode = RPI3_MON_MODE_F;		
+478:	p.mode = l->mode;
+== Y9: Core 1 pass counter in the server loop
+405:	uint32_t mon_pass = 0;
+418:			rpi3_mon_core1_pass(mon_pass++);	
+== V1 static asserts naming the counter/lock/G7 lines
+48:_Static_assert(RPI3_MON_BUDGET_TICKS == 1 * RPI3_MON_TICKS_PER_MS, "the approved initial PTA lock budget is 1 ms");
+67:_Static_assert((unsigned int)RPI3_MON_EV_EVIDENCE_END == RPI3_MON_EV_N_EVIDENCE, "EV1: six evidence classes");
+68:_Static_assert((unsigned int)RPI3_MON_EV_COUNT == 25U, "EV1: 25 event types");
+143:_Static_assert(sizeof(long) == 8, "G7: 64-bit words");
+144:_Static_assert(_Alignof(uint64_t) == 8, "G7: natural 64-bit alignment");
+145:_Static_assert(offsetof(struct rpi3_mon_state, health) % RPI3_MON_CACHE_LINE == 0, "G7 starts on a cache line");
+146:_Static_assert(sizeof(struct rpi3_mon_health) % RPI3_MON_CACHE_LINE == 0, "G7 is padded to whole cache lines");
+149:_Static_assert(offsetof(struct rpi3_mon_state, lockline) % RPI3_MON_CACHE_LINE == 0 &&
+== H5: copy sizes
+75:_Static_assert(5 * sizeof(struct rpi3_mon_event) <= 128, "Q2: five records fit the 128-byte copy limit (CS3, H5)");
+239:_Static_assert(sizeof(struct rpi3_mon_proj0) == 128 && _Alignof(struct rpi3_mon_proj0) == 8, "N5: page 0 is 128 bytes, 8-aligned");
+246:_Static_assert(sizeof(struct rpi3_mon_proj1) == 128 && offsetof(struct rpi3_mon_proj1, ev_count) == 0x08 &&

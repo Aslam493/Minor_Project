@@ -1,0 +1,26 @@
+function                        instrumented   non-hook calls in order
+rpi3_mon_hold                    yes           rpi3_mon_wait_init -> rpi3_mon_acquire
+rpi3_mon_wait_init               yes           -
+rpi3_mon_acquire                 yes           thread_mask_exceptions -> cpu_spin_trylock -> thread_unmask_exceptions -> atomic_inc32
+cpu_spin_trylock                 yes           thread_get_exceptions -> __cpu_spin_trylock -> spinlock_count_incr -> thread_get_exceptions -> __cpu_spin_trylock -> spinlock_count_incr
+spinlock_count_incr              yes           thread_get_core_local
+rpi3_mon_release                 yes           cpu_spin_unlock_xrestore
+cpu_spin_unlock_xrestore         yes           cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions -> cpu_spin_unlock -> thread_unmask_exceptions
+cpu_spin_unlock                  yes           thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr -> thread_get_exceptions -> __cpu_spin_unlock -> spinlock_count_decr
+spinlock_count_decr              yes           thread_get_core_local
+rpi3_mon_core1_attempt           yes           cpu_spin_trylock -> rpi3_mon_evaluate.constprop.0 -> rpi3_mon_ev_append.constprop.0 -> rpi3_mon_ev_append.constprop.0 -> rpi3_mon_ev_append.constprop.0 -> cpu_spin_unlock
+thread_mask_exceptions           no            thread_get_exceptions -> thread_set_exceptions
+thread_unmask_exceptions         no            -
+thread_get_exceptions            no            -
+thread_set_exceptions            no            have_spinlock
+atomic_inc32                     no            -
+have_spinlock                    no            thread_get_exceptions -> thread_get_core_local
+thread_get_core_local            no            get_core_pos
+__cpu_spin_trylock               no            -
+__cpu_spin_unlock                no            -
+rpi3_mon_evaluate.constprop.0    no            rpi3_mon_ev_append.constprop.0 -> rpi3_mon_ev_append.constprop.0
+rpi3_mon_ev_append.constprop.0   no            -
+
+PTA lock cycle instrumented entries: 7 of 7 ; with rpi3_mon_hold and rpi3_mon_wait_init: 9
+Core 1 successful attempt: lock entries 4 ; with rpi3_mon_core1_attempt: 5
+Core 1 failed attempt: lock entries 1 ; with rpi3_mon_core1_attempt: 2

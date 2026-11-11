@@ -1,0 +1,25 @@
+== profile (flags 0x13 = hardened) ==
+page 0: version 1 length 128 boot_id 0x0b23cde1 flags 0x13 mode 0
+== test commands refused (stack, cadence) ==
+not a test-statistics build (0xffff000a)
+== Core 1 alive ==
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+== V14 ==
+SHORT_BUFFER (page 0, 64-byte buffer) result 0xffff0010 (origin 4) | memref size now 128 (was 64) | 
+BAD_PARAMETERS (page 5)            result 0xffff0006 (origin 4) | memref size now 128 (was 128) | he
+SUCCESS control (page 0, 128 bytes) result 0x00000000 (origin 4) | memref size now 128 (was 128) | h
+== V2 ==
+V2 atomic test: 3 threads x 2000000 increments, expected 6000000, got 6000000: PASS (no lost increments)
+== latency 5000 ==
+calls 5000 | BUSY 0 | other errors 0 | total 19.48 s | mean 3896 us | rate 257 calls/s
+latency us: min 3459 p50 3877 p90 3897 p99 4330 p99.9 4844 max 5520
+monitor counters during the run: skip_total 1 -> 107, pta_lock_timeouts 0 -> 0
+== soak 120 s ==
+soak: 120 s, period 100 ms, 1199 ticks
+frame verdicts: ACCEPTED 1198 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 120 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 76 p99 79 max 82
+frame submit latency (us): p50 8892 p99 9729 max 10330
+end state: flags 0x07 last_counter 2198 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +71 starved 0
+ls: /tmp/kf: No such file or directory
+ 00:03:48 up 3 min,  load average: 0.10, 0.13, 0.05

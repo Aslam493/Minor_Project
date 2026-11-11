@@ -1,0 +1,49 @@
+root rpi3_can_server_loop: worst-case direct-call depth 2000 bytes of a 4096-byte tmp stack (headroom 2096, required margin 2048) -> OK
+deepest path:
+  rpi3_can_server_loop                         frame   64
+  rpi3_mon_core1_attempt                       frame   48
+  __cyg_profile_func_enter                     frame   32
+  __cyg_profile_func_enter.part.0              frame   16
+  _assert_trap                                 frame   48
+  __cyg_profile_func_enter.constprop.0         frame   32
+  check_stack_limits                           frame   64
+  __do_panic                                   frame   96
+  print_kernel_stack                           frame   96
+  print_stack_arm64                            frame   64
+  trace_printf                                 frame  192
+  trace_vprintf                                frame  432
+  print_core_id                                frame   64
+  snprintk                                     frame  192
+  vsnprintk                                    frame   96
+  __vsnprintf                                  frame  128
+  kprintf                                      frame  224
+  uuid2str                                     frame  112
+reachable functions: 72; with indirect calls (blr/br): ['console_flush', 'console_putc', 'kprintf']; dynamic sp adjustment: none; recursion: ['__cyg_profile_func_enter', '__cyg_profile_func_enter.constprop.0', '__cyg_profile_func_enter.part.0', '__do_panic', '__stack_chk_fail', '_assert_trap', 'snprintk']
+largest frames in the reachable set:
+  trace_vprintf                                 432
+  kprintf                                       224
+  snprintk                                      192
+  trace_printf                                  192
+  __vsnprintf                                   128
+  uuid2str                                      112
+
+NORMAL path (fatal-path functions excluded): 640 bytes, headroom 3456, margin 2048 -> OK
+deepest normal path:
+  rpi3_can_server_loop                         frame   64
+  rpi3_mon_core1_attempt                       frame   48
+  cpu_spin_trylock                             frame   48
+  spinlock_count_incr                          frame   32
+  __cyg_profile_func_enter                     frame   32
+  check_stack_limits                           frame   64
+  get_stack_limits                             frame   64
+  stack_end_va_to_top_soft                     frame   32
+  stack_end_va_to_top_hard                     frame   32
+  stack_size_to_alloc_size                     frame   32
+  __cyg_profile_func_enter.constprop.0         frame   32
+  get_stackcheck_recursion_flag                frame   32
+  thread_mask_exceptions                       frame   32
+  thread_set_exceptions                        frame   32
+  have_spinlock                                frame   16
+  thread_get_core_local                        frame   16
+  get_core_local                               frame   32
+recursion in the normal path: ['check_stack_limits']

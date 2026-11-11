@@ -1,0 +1,110 @@
+# Functional tests on the Pi (10.237.27.215), hardened monitor candidate, SSH only, no flash, 2026-11-08
+== state before:  last_counter 0 hb_seq 2161 hb_state OPEN hb_miss_count 2160 idle_uses 0
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0
+== H1: act as the heartbeat responder for 8 s (answer each open challenge)
+hb_seq 2161 answered: ON_TIME (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=74063
+hb_seq 2162 answered: ON_TIME (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=74065
+hb_seq 2163 answered: ON_TIME (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=74067
+hb_seq 2164 answered: ON_TIME (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=74069
+hb_seq 2165 answered: LATE (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=74071
+hb_seq 2166 answered: LATE (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=74072
+hb_seq 2167 answered: LATE (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=74075
+hb_seq 2168 answered: LATE (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=74077
+== state after answering: 
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0
+  last_counter 0 hb_seq 2169 hb_state MISSED hb_miss_count 5 idle_uses 0
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1353094157
+seq 2 LEGACY_CMD_REFUSED   counter 0 detail 13 ticks 2649936130
+seq 3 LEGACY_CMD_REFUSED   counter 0 detail 13 ticks 3448874030
+seq 4 LEGACY_CMD_REFUSED   counter 0 detail 0 ticks 3471407715
+seq 5 HEARTBEAT_RECOVERED  counter 2161 detail 0 ticks 41829051600
+  returned 5, more=1, ev_lost=0
+seq 6 LATE_ANSWER          counter 2165 detail 0 ticks 41909897686
+seq 7 LATE_ANSWER          counter 2166 detail 0 ticks 41930249252
+seq 8 TIMEOUT              counter 0 detail 2 ticks 41947439328
+seq 9 LATE_ANSWER          counter 2167 detail 0 ticks 41950451401
+seq 10 LATE_ANSWER          counter 2168 detail 0 ticks 41970651469
+  returned 5, more=0, ev_lost=0
+== H2: stop answering for 4 s: misses accumulate again
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0
+  last_counter 0 hb_seq 2173 hb_state MISSED hb_miss_count 9 idle_uses 0
+
+## Responder polling every 200 ms for 12 s
+answers: ON_TIME 13 | LATE 1 | nothing to answer 41 | other 0
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x03 mode 0
+  last_counter 0 hb_seq 2203 hb_state OPEN hb_miss_count 0 idle_uses 0
+  TIMEOUT              2
+  HEARTBEAT_RECOVERED  2
+  LATE_ANSWER          5
+
+## Frame verdicts and the traffic deadline (software-built frames, prototype K_frame supplied at run time from a 0600 file in RAM, deleted afterwards)
+first frame (counter 100)         verdict RESYNC (detail 0)
+next (101)                        verdict ACCEPTED (detail 0)
+gap (105)                         verdict GAP (detail 3)
+older (90)                        verdict REPLAY (detail 0)
+same frame again (105)            verdict DUPLICATE (detail 0)
+same counter, other payload (105) verdict CONFLICT (detail 0)
+bad tag (106)                     verdict AUTH_FAIL (detail 0)
+wrong CAN id (0x124)              verdict MALFORMED (detail 3)
+-- flags now (0x04 = traffic armed): flags 0x17
+-- traffic deadline: send nothing for 1.5 s (T = 300 ms)
+flags after silence (0x08 = traffic timeout raised): flags 0x1f
+frame after the silence (108)     verdict GAP (detail 2)
+flags after recovery: flags 0x17
+-- page 1 counters:
+page 1: version 1 length 128 verdict totals frame 9 heartbeat 22 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               3
+  TIMEOUT              4
+  MALFORMED            1
+  COUNTER_GAP          2
+  COUNTER_RESYNC       1
+  TRAFFIC_RECOVERED    1
+  HEARTBEAT_RECOVERED  2
+ls: /tmp/kf: No such file or directory
+uptime 2582.55s
+soak: 60 s, period 100 ms, 599 ticks
+frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 60 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 75 p99 78 max 80
+frame submit latency (us): p50 8598 p99 9924 max 11552
+end state: flags 0x07 last_counter 707 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +758 starved 0
+exit 0
+
+## Soak 600 s (software-injected frames every 100 ms + heartbeat responder, one session, normal hardened image)
+soak: 600 s, period 100 ms, 5999 ticks
+frame verdicts: ACCEPTED 5999 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 599 LATE 0 other 1
+send lateness vs absolute deadline (us): p50 76 p99 97 max 10238
+frame submit latency (us): p50 9300 p99 10108 max 22589
+end state: flags 0x07 last_counter 6706 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +7726 starved 0
+exit 0
+ls: /tmp/kf: No such file or directory
+uptime 3264.57s
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x1f mode 0
+  ev_seq 34 ev_ack 0 ev_lost 0 pinned_used 8
+page 1: version 1 length 128 verdict totals frame 6607 heartbeat 683 crosscheck 0
+  AUTH_FAIL            1
+  TIMEOUT              9
+  MALFORMED            1
+  COUNTER_GAP          2
+43382858901
+2
+
+## Soak 180 s with the FIXED client (zero-nonce retry), same setup
+soak: 180 s, period 100 ms, 1799 ticks
+frame verdicts: ACCEPTED 1799 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 180 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 76 p99 78 max 85
+frame submit latency (us): p50 8942 p99 9443 max 10930
+end state: flags 0x07 last_counter 8505 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +2316 starved 0
+exit 0
+ls: /tmp/kf: No such file or directory

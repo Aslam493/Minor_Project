@@ -1,0 +1,14 @@
+reset: 0x00000000
+calls 100000 | BUSY 0 | other errors 0 | total 390.13 s | mean 3901 us | rate 256 calls/s
+latency us: min 3454 p50 3880 p90 3899 p99 4297 p99.9 4680 max 6047
+monitor counters during the run: skip_total 1 -> 44352, pta_lock_timeouts 0 -> 0
+---
+holds: count 18183178 | mean 0.15 us | max 121 ticks = 6.30 us | max by PTA 6.30 us | max by Core 1 0.21 us
+hold histogram (ticks, floor log2 buckets; 19.2 ticks = 1 us):
+     2^1  .. 2^next    18083150 holds
+     2^2  .. 2^next          28 holds
+     2^6  .. 2^next      100000 holds
+p99 hold <= 0.21 us (upper edge of the bucket holding the 99th percentile; coarse, factor 2)
+Core 1 attempt interval: count 18127529 | min 13.96 us | mean 21.53 us | max 27.40 us
+exhausted PTA waits: 0 | last: 0.00 us waited, 0 attempts (none yet)
+Core 1 hold requests done: 0 (pending 0 ticks) | cadence: 256 passes per lock attempt

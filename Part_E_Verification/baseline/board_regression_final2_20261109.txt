@@ -1,0 +1,25 @@
+== test commands must be refused (hardened) ==
+not a test-statistics build (0xffff000a)
+w7 armed: 0xffff000a (0 = Core 1 will panic at its next lock attempt, within about 1 ms)
+== Core 1 alive after the refusals ==
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+== V14 ==
+SHORT_BUFFER (page 0, 64-byte buffer) result 0xffff0010 (origin 4) | memref size now 128 (was 64) | health pai
+BAD_PARAMETERS (page 5)            result 0xffff0006 (origin 4) | memref size now 128 (was 128) | health pair 
+SUCCESS control (page 0, 128 bytes) result 0x00000000 (origin 4) | memref size now 128 (was 128) | health pair
+== V2 ==
+V2 atomic test: 3 threads x 2000000 increments, expected 6000000, got 6000000: PASS (no lost increments)
+== latency 5000 ==
+calls 5000 | BUSY 0 | other errors 0 | total 19.42 s | mean 3884 us | rate 257 calls/s
+latency us: min 3458 p50 3875 p90 3890 p99 4300 p99.9 5088 max 5499
+monitor counters during the run: skip_total 0 -> 139, pta_lock_timeouts 0 -> 0
+== soak 120 s ==
+soak: 120 s, period 100 ms, 1199 ticks
+frame verdicts: ACCEPTED 1198 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 120 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 75 p99 79 max 102
+frame submit latency (us): p50 8938 p99 9432 max 10684
+end state: flags 0x07 last_counter 2198 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +66 starved 0
+ls: /tmp/kf: No such file or directory
+ 00:03:45 up 3 min,  load average: 0.06, 0.09, 0.03

@@ -1,0 +1,16 @@
+W1 result 0x00000000 (0 = both cores answered; 0xffff3001 = Core 1 did not answer in 100 ms)  lock VA 0x00000000101b6fc0
+  PTA core  PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+  Core 1    PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+W1 verdict: PASS (lock memory is Normal, cacheable, inner-shareable on both cores; MMU and D-cache on)
+
+W1 result 0x00000000 (0 = both cores answered; 0xffff3001 = Core 1 did not answer in 100 ms)  lock VA 0x00000000101b6fc0
+  PTA core  PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+  Core 1    PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+W1 verdict: PASS (lock memory is Normal, cacheable, inner-shareable on both cores; MMU and D-cache on)
+
+W1 result 0x00000000 (0 = both cores answered; 0xffff3001 = Core 1 did not answer in 100 ms)  lock VA 0x00000000101b6fc0
+  PTA core  PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+  Core 1    PAR_EL1 0xff000000101b6980: F=0 (0 = translated) ATTR=0xff SH=3 PA page 0x101b6000 | SCTLR_EL1 0x30d8180d (M=1 C=1) | MAIR_EL1 0x00000000ff00ff04 -> Normal memory, cacheable, inner shareable: OK
+W1 verdict: PASS (lock memory is Normal, cacheable, inner-shareable on both cores; MMU and D-cache on)
+
+ 00:01:30 up 1 min,  load average: 0.33, 0.13, 0.04

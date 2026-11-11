@@ -1,0 +1,81 @@
+reachable functions from rpi3_can_server_loop: 72
+   __cpu_spin_lock
+   __cpu_spin_trylock
+   __cpu_spin_unlock
+   __cyg_profile_func_enter
+   __cyg_profile_func_enter.constprop.0
+   __cyg_profile_func_enter.part.0
+   __cyg_profile_func_exit
+   __do_panic
+   __get_core_pos
+   __stack_chk_fail
+   __vsnprintf
+   _assert_break
+   _assert_log
+   _assert_trap
+   check_stack_limits
+   console_flush
+   console_putc
+   copy_in_reg
+   cpu_idle
+   cpu_mmu_enabled
+   cpu_spin_lock_no_dldetect
+   cpu_spin_trylock
+   cpu_spin_unlock
+   ftrace_map_lr
+   get_core_local
+   get_core_pos
+   get_core_pos_mpidr
+   get_stack_limits
+   get_stackcheck_recursion_flag
+   have_spinlock
+   kprintf
+   memchr
+   memcpy
+   memtag_strip_tag_vaddr
+   pauth_strip_pac
+   plat_trace_ext_puts
+   print_core_id
+   print_guest_id
+   print_kernel_stack
+   print_stack_arm64
+   print_stack_limits
+   print_thread_id
+   release_trace_contention
+   rpi3_can_server_loop
+   rpi3_mon_core1_attempt
+   rpi3_mon_core1_entry_check
+   rpi3_mon_ev_append.constprop.0
+   rpi3_mon_evaluate.constprop.0
+   rpi3_mon_init_ok
+   snprintk
+   spinlock_count_decr
+   spinlock_count_incr
+   stack_end_va_to_top_hard
+   stack_end_va_to_top_soft
+   stack_size_to_alloc_size
+   strlen
+   thread_get_core_local
+   thread_get_exceptions
+   thread_get_id_may_fail
+   thread_mask_exceptions
+   thread_set_exceptions
+   thread_unmask_exceptions
+   trace_ext_get_core_id
+   trace_ext_get_thread_id
+   trace_ext_puts
+   trace_level_to_string
+   trace_printf
+   trace_vprintf
+   unwind_stack_arm64
+   uuid2str
+   vsnprintk
+   wait_if_trace_contended
+indirect calls inside the reachable set:
+   console_flush : 1011cd44:	d63f0020 	blr	x1
+   console_putc : 1011cc58:	d63f0060 	blr	x3
+   console_putc : 1011cc6c:	d63f0040 	blr	x2
+   kprintf : 1018c224:	d61f0000 	br	x0
+   kprintf : 1018c288:	d61f0000 	br	x0
+FORBIDDEN reachable: ['trace_printf']
+   path: trace_printf <- __do_panic <- rpi3_mon_core1_entry_check <- rpi3_can_server_loop

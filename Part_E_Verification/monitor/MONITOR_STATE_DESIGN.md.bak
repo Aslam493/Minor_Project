@@ -1,0 +1,342 @@
+# MONITOR_STATE_DESIGN.md (Component 2, Subcomponent 2.1)
+
+Status: **v2 DRAFT for approval. No source was edited.** Started 2026-11-06.
+Scope of 2.1: decide what state the Secure World monitor holds, who owns each item, how it is accessed and what it may never expose, before any code is written.
+
+## 0. Decisions recorded (2026-11-06, from the user)
+
+| # | Decision | Effect |
+|---|---|---|
+| A | **Prefix `rpi3_mon_`** for every new file-scope monitor identifier | no clash with existing code (14 planned names had 0 hits; the only `mon_` identifiers in OP-TEE are struct members of unrelated 32-bit monitor-mode code) |
+| B | **No chip A variable is reused** | the monitor has its own counter state and its own MAC contexts (table in section 2) |
+| C | **N-04 install deferred**; keep the original DTB unchanged; copy the verified backups to an external drive before any SD-card write; arrange a UART adapter if possible | the state lives in memory that Linux's allocator does not know about (limit L-N04 below); recorded as a known limitation until the fix is installed |
+
+### Review outcome (2026-11-06)
+
+| Item | Outcome |
+|---|---|
+| Struct or separate variables (3.1) | **Approved: one instance `rpi3_mon`.** Note on the example given in review: the frame counter on the wire is a `u32` and `hb_seq` is a `u32` in the plan, so `ctr.last_counter` and `heartbeat.hb_seq` stay 32-bit (a 64-bit field would be harmless but would break the 44-byte canonical form comparison if copied from it) |
+| G1, G3, G4 | approved |
+| G2 | approved **with conditions**: keys immutable (`static const`, in read-only data); each MAC context has exactly one owner and is never shared across contexts |
+| G5 | approved **with conditions**: define exactly what the idle lease means and every timeout transition |
+| G6 | approved **with conditions**: define nonce lifetime, replay handling and sequence rollover |
+| G8 | approved **with conditions**: define ring overflow and what replaces a pinned event |
+| **G7** | **APPROVED (2026-11-06), as specified in section 4a (G7 v3)** |
+| **G9** | **pending**: a seqlock needs correct atomic accesses and ordering for the words it protects; to be handled after G7 |
+| N-04 install | deferred; no SD-card changes |
+
+The conditions on G2, G5, G6, G8 become the content of the next design step (interfaces and transitions); they are listed here so they are not lost.
+
+Still open: D1 (FIQ policy, blocks Component 3, not 2.1).
+
+## 1. What already exists (read-only search, 2026-11-06)
+
+`rg` is not installed and a whole-tree search returns 1,007 lines, almost all from the crypto libraries. The project's own hits are in three files.
+
+| Existing variable | Where | Decision |
+|---|---|---|
+| `secure_last_counter` | `rpi3_can_fiq.c:221`, plain `u32`, strictly-greater rule, counter 0 rejected | **not reused** (A and B). The monitor's counter policy is deliberately different (plan R2) |
+| `can0_frame_state` | `:93`, `volatile u32` | **not shared**; chip A handshake, dormant in the Monitor profile (R13) |
+| `can0_frame_dropped_count`, `can0_last_validation_*`, `can0_last_frame_*`, `can0_last_fifo_*`, `can0_last_rxif_mask`, `can0_last_int_reg`, `can0_last_bdiag1`, `can0_last_tx_fail_point`, `can0_fiq_count`, `can0_tbc_epoch` | `rpi3_can_fiq.c` | **not shared**; chip A debug and capture state. Chip timestamps come from the chip's own 40 MHz counter and are never compared with a secure-timer tick |
+| `can0_hmac_ctx` | `:312`, one `void *` used by Core 1 and by PTA cmd 7 (N-02) | **not shared**; two new contexts |
+| `rpi3_can_server_heartbeat` | `rpi3_can_server.c:355`, `volatile u64` | **left untouched and not used by the monitor**; it stays visible only through cmd 12. The monitor keeps its own `poll_count` and `last_poll_ticks` |
+| nonce, monitor status, any secure-timer read | none | all new. `CFG_SECURE_TIME_SOURCE_CNTPCT=y` is forced in `conf.mk` and the inline `barrier_read_counter_timer()` exists (`arm.h:144`), but no project code reads the timer, and `CNTPCT` on Core 1 is untested (Component 4 prerequisite) |
+
+## 2. Where the state lives and what that guarantees
+
+- Static storage in a new OP-TEE core file (planned: `core/arch/arm/plat-rpi3/rpi3_can_monitor.c`), in TEE RAM.
+- Touched by two kinds of context that no existing mechanism orders: **PTA handlers** (any core; OP-TEE serialises them against each other with its busy flag) and **Core 1's loop** (outside that mechanism, running on a 4096-byte tmp stack with FIQ policy still undecided). One lock, `rpi3_mon_lock`, is therefore required (1.3, 1.4).
+- "Persistent" means it survives between calls. **It is lost at every reboot by design** (`boot_id` changes, the counter state re-synchronises, and the replay window after a reboot is a documented limit). Nothing here is anti-rollback.
+- **Limit L-N04:** Linux's allocator treats `0x10000000-0x10FFFFFF` as free memory, because the device tree it runs with reserves a different range (`N04_SECURE_MEMORY_RESERVATION.md`). Until the fix is installed, monitor state integrity against a Linux allocation is not guaranteed, even without any attacker. No claim of state integrity may be made in the report before then.
+- **Limit L-TZ:** the Pi 3 has no TZASC; even with N-04 fixed, a compromised kernel or a DMA device can read or write this memory. `/dev/mem` refuses RAM reads on this kernel, but that is a kernel setting. State must never be described as confidential or tamper-proof against Linux.
+- Memory cost is small: about 2 KB for the Mode F state and its event ring, about 5 KB more for the Mode D2 record ring (Component 7), all in `.bss`. **None of it is on a stack**, which matters because Core 1's tmp stack is shared with the FIQ frame (O-01).
+
+## 3. Conventions
+
+### 3.1 One struct or separate variables (new point for confirmation)
+
+Proposal: **one file-scope instance of one struct**, `static struct rpi3_mon_state rpi3_mon;`, so the only file-scope identifier is `rpi3_mon` plus the lock and the constants (all prefixed `rpi3_mon_`), and members use short names (`rpi3_mon.ctr_f.last_counter`). Reasons: one place to take a snapshot for cmd 20, one place to apply alignment and cache-line grouping (section 5), a `_Static_assert` on its size, and no namespace growth. If you prefer separate variables literally named `rpi3_mon_last_counter`, `rpi3_mon_last_nonce`, `rpi3_mon_poll_count` and so on, the content of the table does not change, only the spelling.
+
+### 3.2 Notation in the table
+
+- **Writer**: who may write. **Lock**: `L` = only under `rpi3_mon_lock`; `1W` = single writer, lock-free (see section 5); `C` = constant after init.
+- **Phase**: the component that first needs it (C2 foundation, C3 Core 1 hook, C5 heartbeat and deadline, C6 hardening, C7 Mode D2).
+
+## 4. The state table
+
+### G1. Identity and configuration (set once)
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `boot_id` | u32 | init | C | C5 | uniqueness tag (not a secret): low 32 bits of `HMAC(K_hb, init_ticks64 ‖ prng16)` (R17); its uniqueness across boots is tested, not assumed |
+| `init_ticks` | u64 | init | C | C5 | secure-timer value at init; `boot_ticks` for the grace period |
+| `mode` | u8 {F, D2} | init, one-way latch | L | C2 | mutually exclusive per boot; changes logged (R10) |
+| `profile` | u8 flags | init | C | C2 | Step 2 / Monitor profile, hardened or debug |
+| parameters (T, R, H, D_req, k, G, grace, ring sizes) | constants | build | C | C4 | from the generated `mon_params.h`; provisional until measured; `_Static_assert` on the invariants |
+
+### G2. Authentication material
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `rpi3_mon_key_frame[32]` | const bytes | build | C | C2 | `K_frame`: sender and Secure World only. Compiled constant (no HUK on the Pi 3); readable by root Linux from the boot partition (R12) |
+| `rpi3_mon_key_hb[32]` | const bytes | build | C | C5 | `K_hb`: Secure World only |
+| `rpi3_mon_key_test[32]` | const bytes | build | C | C2 | `K_test`: Linux test tools only; never used by the Monitor profile for real decisions |
+| `mac_pta` | `void *` | init | C | C2 | HMAC context for PTA handlers. PTA calls are serialised by OP-TEE, so one context is safe for the PTA side; **used only outside `rpi3_mon_lock`** |
+| `mac_core1` | `void *` | init | C | C2 | HMAC context for Core 1 (Mode D2 chip B validation). **Never shared with `mac_pta` or with `can0_hmac_ctx`** |
+
+### G3. Frame validation (one instance per mode, same layout)
+
+`struct rpi3_mon_ctr` is declared once and instantiated twice (`ctr_f`, later `ctr_d2`) so that Mode F and Mode D2 never share counter state. `rpi3_mon_counter_step(ctr, ...)` is the only writer.
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `have_last` | bool | PTA handler (cmd 17) | L | C2 | false until the first authenticated frame: that frame is RESYNC, including counter 0 (R2) |
+| `last_counter` | u32 | same | L | C2 | **separate from `secure_last_counter`**. Compared only with direct unsigned comparisons in the order of R2 (no `delta` variable) |
+| `last_frame44[44]` | bytes | same | L | C2 | canonical authenticated bytes (`can_id`, counter, payload, tag), to tell DUPLICATE from CONFLICT. Padding bytes 40-47 are never stored or compared |
+| `last_accept_ticks` | u64 | same | L | C5 | refreshes the traffic deadline |
+
+Rule: the counter state is updated **only after** format, stream and HMAC checks have passed. A frame with a bad tag never reaches the counter rules and never advances `last_counter`.
+
+### G4. Verdicts and exact counters (three verdicts, never merged: plan R4b)
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `ev_count[N_EVENT_TYPES]` | u32 array | PTA handler, Core 1 | L | C2 | **exact** per-class counters, kept even when the event ring overflows or rate-limits |
+| `verdict_frame` | `{last_type, last_ticks, total}` | PTA handler | L | C2 | latest frame-level finding (MALFORMED, INVALID_AUTHENTICATION, REPLAY, GAP, RESYNC, DUPLICATE, CONFLICT) |
+| `verdict_hb` | same | PTA handler, Core 1 | L | C5 | heartbeat finding (MISS, LATE, TIMEOUT, RECOVERED, BAD_NONCE, STALE ...) |
+| `verdict_xcheck` | same | Core 1 | L | C7 | report cross-check finding (ALTERED, UNACCOUNTED, FABRICATED, B_MISS ...); unused in Mode F |
+
+There is deliberately **no combined "monitor status"** field. Command 20 returns the three verdicts side by side. A good heartbeat never hides a frame or cross-check finding.
+
+### G5. Traffic deadline and idle mode
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `tr_armed` | bool | PTA handler | L | C5 | arms on the first valid frame (R3) |
+| `tr_last_valid_ticks` | u64 | PTA handler | L | C5 | refreshed by accept, GAP and RESYNC only; REPLAY, DUPLICATE, CONFLICT, MALFORMED and AUTH_FAIL do not refresh it |
+| `tr_timeout_raised` | bool | Core 1, PTA catch-up | L | C5 | raised once, cleared by recovery |
+| `idle_until_ticks`, `idle_uses` | u64, u32 | PTA handler (cmd 21) | L | C6 | leased and capped per boot; every use is an event (R3, R10) |
+| `last_eval_ticks` | u64 | Core 1, on each successful lock attempt | L | C3 | **evaluation heartbeat** (rule O-3): proves Core 1 actually got the lock and evaluated deadlines, unlike `last_poll_ticks` |
+
+### G6. Heartbeat (Component 5)
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `hb_seq` | u32 | Core 1 | L | C5 | 0 at boot, first request is 1, never decremented; no wrap (stops at `0xFFFFFFFF`) |
+| `hb_issue_ticks` | u64 | Core 1 | L | C5 | **the "nonce timestamp"** |
+| `hb_nonce`, `hb_nonce_valid` | u64, bool | PTA handler (lazy) | L | C5 | **derived, not a stored random**: first 8 bytes of `HMAC(K_hb, boot_id ‖ hb_seq ‖ issue_ticks)`. Computed outside the lock (copy, unlock, HMAC, lock, store only if `hb_seq` is unchanged). **Not a secret**: cmd 22 hands it to Linux by design |
+| `hb_state` | enum {NONE, OPEN, ANSWERED, MISSED, LATE_ANSWERED} | Core 1, PTA handler | L | C5 | one outstanding request at a time; every transition is guarded by its current value so a miss is logged exactly once (R21) |
+| `hb_last_ok_ticks` | u64 | PTA handler | L | C5 | **the "last response time"**: last on-time answer; a late answer does not reset it |
+| `hb_miss_count`, `hb_timeout_raised` | u32, bool | Core 1, PTA catch-up | L | C5 | k consecutive misses after the boot grace G (R17, O-10) |
+| `hb_next_issue` | u64 | Core 1 | L | C5 | `issue_ticks + H`; never a catch-up burst (O-11) |
+
+### G7. Health (v2, SUPERSEDED by the proposal in section 4a; kept for the record)
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `poll_count` | u64 | Core 1 only | 1W | C3 | the monitor's own pass counter (not the existing heartbeat). 8-byte aligned, so another core reads a consistent value |
+| `last_poll_ticks` | u64 | Core 1 only | 1W | C3 | "health is progress": its age is `CORE1_POLL_STALL`. Reading the timer each pass costs time; whether to update every pass or every N passes is a Component 4 decision |
+| `skip_count`, `skip_total` | u32, u32 | Core 1 only | 1W | C3 | consecutive and total failed `trylock`; `MON_STARVED` after K (R8) |
+| `starved` | bool | Core 1 | 1W | C3 | |
+
+### G8. Event log
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `ev_ring[64]` | 24-byte entries `{seq u32, type u16, flags u16, ticks u64, counter u32, detail u32}` | PTA handler, Core 1 | L | C2 | **evidence classes only** (AUTH_FAIL, REPLAY, TIMEOUT, ALTERED, UNACCOUNTED, CHIPB_FAULT): first-N per class pinned, never freed by an acknowledgement, overflow marker (O-07) |
+| `mis_count[]`, `mis_bucket` | u32 array, token bucket | PTA handler | L | C2 | **API-misuse classes** (BAD_NONCE, STALE, DUPLICATE_*, UNISSUED, REPORT_MALFORMED ...) collapse into exact counters plus at most one event per second, so a caller with no key cannot fill the evidence ring (O-07) |
+| `ev_seq`, `ev_ack`, `ev_lost` | u32 | writers; `ev_ack` by cmd 19 | L | C2 | pinned entries are exempt from `ev_ack`; `ev_lost` counts suppressed entries |
+
+### G9. Synchronisation (v2, SUPERSEDED by the proposal in section 4b)
+
+| Member | Type | Writer | Lock | Phase | Purpose and rule |
+|---|---|---|---|---|---|
+| `rpi3_mon_lock` | `unsigned int` (OP-TEE spinlock) | n/a | n/a | C2 | **one** lock for all of G1 to G6, G8, with no lock ordering. Hold rules: only field reads, writes, comparisons and a fixed-size (24-byte) append; **no HMAC, no UART, no copy of a caller buffer, no allocation, no call that can sleep** (R21). The clock is read inside the lock |
+| `snap_seq` | u32 | writers | L | C2 | seqlock counter so cmd 20 can read a consistent snapshot without taking the lock |
+
+### G10. Mode D2 only (Component 7, not part of the first cut)
+
+`rep[W]` (deadline outcome, receipt and evaluated flag per request), report staging slots (one per `hb_seq mod W`), the 128-record chip B ring, the rejected-frame ring, `ctr_d2`. Layout to be designed in Component 7.
+
+## 4a. G7 v3 (APPROVED 2026-11-06; replaces v2)
+
+Review questions and the evidence for each (everything below was read or compiled without touching the repository or the Pi, except where marked):
+
+| Question | Answer | Evidence and confidence |
+|---|---|---|
+| Is an aligned 64-bit access atomic on this platform? | **Yes**: on ARMv8-A (AArch64) a naturally aligned 64-bit `LDR`/`STR` to Normal memory is single-copy atomic | architecture rule (ARM ARM, "Atomicity in the Arm architecture"), **not tested on this board**. The build is AArch64 (`CFG_ARM64_core=y`, checked in 1.5), and the generated code is a single `ldr x` / `str x` (below). On an ARM32 build this would **not** hold, so the design adds a compile-time guard |
+| Is alignment or `volatile` enough? | **No, not by themselves** | probe compiled with the project's GCC 14.3 at `-O2 -mgeneral-regs-only`: a *plain* read in a loop became `ldr; cbnz; b .` (the value is loaded once and the loop never reloads: a reader on another core would never see an update). The `volatile` and the `__atomic_*_n(..., __ATOMIC_RELAXED)` versions reload every iteration. For the **writer**, plain, volatile and relaxed-atomic code are identical (`ldr / add / str`) |
+| Does the compiler provide suitable atomic operations? | **Yes for loads and stores; avoid read-modify-write** | `__atomic_load_n`/`__atomic_store_n` with `__ATOMIC_RELAXED` compile to one `ldr`/`str` (re-checked with OP-TEE's exact compile flags, not only my approximate ones). **OP-TEE's `atomic.h` has helpers only for 32-bit and smaller types, none for 64-bit**, so two local wrappers are needed (rule 2). *Correction:* an earlier version of this row said `__atomic_fetch_add` on 8 bytes calls a libgcc helper; that was true only for the default flags. OP-TEE builds with `-mno-outline-atomics`, so it becomes an inline `ldxr / add / stxr` loop. The single-writer design still needs no read-modify-write |
+| Can the PTA read a consistent snapshot? | **Each word, yes. The pair, no (by design)** | two separate 64-bit words can come from two different passes. This is acceptable because the stall decision uses `last_poll_ticks` alone and `poll_count` is diagnostic only. If a consistent pair were ever needed, it must be read under the lock or under a validated seqlock |
+| Are cache visibility and ordering sufficient? | **Yes for this use, by hardware coherence** | OP-TEE maps cached normal memory as **Write-Back, Inner Shareable** (`ATTR_IWBWA_OWBWA_NTR_INDEX \| ISH`, `core_mmu_lpae.c:497-499`) with `TCR` set to inner-shareable write-back walks (`:1254-1256`), through the same `boot_mmu_config` (`TCR`, `MAIR`) on every core (`enable_mmu`, `entry_a64.S`); TF-A's Cortex-A53 reset function sets the **SMP bit** (`CPUECTLR_EL1.SMPEN`, `cortex_a53.S:283-288`) on each core's reset path, which a coherent inner-shareable cache requires; OP-TEE sets `SCTLR.M` and `SCTLR.C` (`entry_a64.S:751,768`). So a store by Core 1 becomes visible to other cores without cache maintenance. **Static reading, not measured on Core 1** (this answers the static part of open question F9 of 1.4) |
+| Is a barrier needed? | **No** | G7 guards no other data (nothing is "published after" it), so relaxed ordering is enough; a barrier would only add cost. Anything that does publish data after a flag needs release/acquire (`stlr`/`ldar`) and does not belong in G7 |
+
+### G7 v3 specification
+
+All of G7 lives in one struct, `struct rpi3_mon_health`, a member of `rpi3_mon`, **aligned to 64 bytes and padded to a multiple of 64 bytes**, so that it shares no cache line with lock-protected members (the Cortex-A53 data cache line is 64 bytes: Cortex-A53 manual, not read from this board).
+
+| Member | Type | Written by | Read by | Access | Rule |
+|---|---|---|---|---|---|
+| `poll_count` | `uint64_t` | Core 1 only | PTA (cmd 20) | relaxed atomic load, then relaxed atomic store of `value + 1` (**not** an atomic add) | diagnostic only; no decision uses it |
+| `last_poll_ticks` | `uint64_t` | Core 1 only | PTA, Core 1 | relaxed atomic store of the secure-timer value | the only input to `CORE1_POLL_STALL`; the reader computes `age = now - last_poll_ticks` with **its own** `CNTPCT` read |
+| `skip_count` | `uint32_t` | Core 1 only | PTA | `atomic_store_u32` / `atomic_load_u32` (existing OP-TEE helpers) | consecutive failed `trylock`; set to 0 on success |
+| `skip_total` | `uint32_t` | Core 1 only | PTA | same | wraps; diagnostic |
+| `starved` | `uint32_t` (0 or 1, not `bool`) | Core 1 only | PTA | same | set when `skip_count >= K`, cleared on success |
+
+Rules:
+1. **One writer.** Only Core 1's loop writes G7. The PTA never does, and **`MON_RESET` does not reset G7** (health counters are cleared only at boot). This resolves a conflict found in review: a debug reset that clears them would be a second writer.
+2. **Accessors only, forced inline (amendment ACCEPTED 2026-11-06).** Every access goes through `rpi3_mon_load_u64()` / `rpi3_mon_store_u64()`, declared **`static inline __attribute__((always_inline)) __nostackcheck`** over `__atomic_load_n` / `__atomic_store_n` with `__ATOMIC_RELAXED`, or through the existing 32-bit helpers. A plain `x = h->poll_count` is a review failure (the probe shows why). **Why the attributes are mandatory:** OP-TEE compiles with `-Os -finstrument-functions -mstrict-align -mno-outline-atomics -fpie`; with a plain `static inline` GCC emitted real calls to the wrappers, and each wrapper was itself instrumented, which would have added about two hook calls (roughly 5 us) per counter update, more than twice the 2.4 us pass. With the attributes the accesses compile to a single `ldr` / `str` with no call. The function that contains the accessors (the Core 1 hook) must also be `__nostackcheck`, and the update sits in the loop body, so a pass gains no hook call.
+3. **No atomic read-modify-write** anywhere in the monitor's lock-free paths.
+4. **Compile-time guards**, so a future change cannot silently lose the guarantee: `#ifndef ARM64` -> `#error`; `_Static_assert(sizeof(long) == 8)`; `_Static_assert(_Alignof(uint64_t) == 8)`; `_Static_assert(offsetof(struct rpi3_mon_state, health) % 64 == 0)`; `_Static_assert(sizeof(struct rpi3_mon_health) % 64 == 0)`; `_Static_assert(offsetof(struct rpi3_mon_health, poll_count) % 8 == 0)` and the same for `last_poll_ticks`.
+5. **Update cadence (proposal; the final value is a Component 4 measurement):** `poll_count` every pass (3 instructions); `last_poll_ticks` every 256th pass (about 0.6 ms at the measured 2.435 us per pass), which is far finer than any deadline (H is about 500 ms). The cost of `barrier_read_counter_timer()` (`isb; mrs cntpct_el0`) per read is not measured yet.
+6. **Code placement:** the G7 update is written **inline** in the loop body (or in a `__nostackcheck` static inline), never as a separate instrumented function, because each instrumented call costs about a whole loop pass (1.4, F8).
+7. **Timer prerequisite:** `last_poll_ticks` depends on `CNTPCT` being valid and consistent on Core 1; it is untested and is a Component 4 prerequisite. Until it is shown, G7's stall detection is a design, not a verified feature.
+8. **Memory ordering:** relaxed. A reader may see a value some tens of nanoseconds old (coherence latency, not measured) but never a torn or invented value.
+9. **Initialisation:** G7 is zeroed at monitor init, which runs on the primary core during boot, before Core 1 is diverted (Linux brings Core 1 up about 5 s into boot), so there is no concurrent writer at that moment.
+
+### G7 torn-read verification (2026-11-06)
+
+Three independent routes, because none is enough alone:
+
+| Route | Result |
+|---|---|
+| **Architecture rule** (Arm ARM DDI0487, B2.8.2; read from the search-result text, not the full page) | single-register loads and stores are single-copy atomic when **all the bytes lie inside one 16-byte-aligned block** and the memory is **Normal, Inner and Outer Write-Back Cacheable, Shareable**. An 8-byte-aligned doubleword never crosses a 16-byte boundary, so it qualifies **on shareable write-back memory only** (outside that, only single bytes are guaranteed). OP-TEE maps its cached RAM as exactly that (section 4a), so the rule applies. |
+| **Layout guard under OP-TEE's exact flags** | the structure as designed (`health` aligned and padded to 64 bytes, `u64` members at multiples of 8) compiles with all the guards of rule 4; a deliberately broken layout (a `u32` first, packed) is **rejected** (the alignment asserts fire); an ARM32 compiler hits the `#error`. So a future edit cannot silently break the rule |
+| **Direct hardware test** (`tools/torn_read`, raw numbers in `torn_read_results.txt`): a writer on one core flips a 64-bit location between 0 and all-ones, a reader on another core loads it as fast as it can, and any other value is a torn read | **aligned 64-bit relaxed atomics: 0 torn in 568.6 million reads and 1.2 billion writes**, across four core pairs, with the reader seeing both patterns (about 79 million zeros, 62 million ones). The **controls prove the detector works**: two separate 32-bit stores tore 43,161 times in 15.5 million reads; a 64-bit access straddling a cache line tore in 4.97 million of 7.3 million reads; a misaligned access staying inside one 16-byte block did not tear, as the rule predicts |
+
+What this does and does not establish:
+- Zero torn reads in this test is **evidence, not proof**; the proof is the architecture rule, and the test shows the rule holds on this SoC and that the test would have caught a violation.
+- The test ran in **Linux user memory on cores 0, 2 and 3**. It could not run on Core 1 (Secure World) or in Secure World memory. The architecture rule depends only on the memory attributes, which are the same (static reading); a test on Core 1 itself needs code running there (Component 3, S2a).
+- **Placement rule (new):** the guarantee exists only for Normal, Write-Back, Shareable memory. G7 must therefore live in the ordinary data of the core image (`.bss`/`.data`, cached, inner shareable). It must **never** be moved to a Device, non-cacheable or non-shareable mapping (for example a future "dedicated uncached monitor region"); if the placement ever changes, G7 must be re-reviewed. A compile-time assert cannot check memory attributes, so this is a review rule.
+
+### G7 ordering review (2026-11-06)
+
+Question: must any other monitor state be observed in a particular order relative to the G7 counters? Answer: **no. No G7 value publishes other data, so relaxed ordering is correct.**
+
+| G7 value | Used by | Ordering requirement |
+|---|---|---|
+| `poll_count` | cmd 20 projection (diagnostic) | none |
+| `last_poll_ticks` | PTA computes an age; a `CORE1_POLL_STALL` event is appended **under the lock** | none for memory; one timestamp hazard (rule O-1 below) |
+| `skip_count`, `starved` | a hint that a PTA handler should run the deadline catch-up | none: a stale hint causes a needless or one-call-late catch-up, and every catch-up transition is guarded by its current value under the lock, so events still happen exactly once |
+| the pair `poll_count` / `last_poll_ticks` | nobody uses them together | none |
+| initialisation | zeroed on the primary core before Core 1 is diverted; the memory is also zero from load | none |
+
+Rules that come out of the review (mandatory for every reader and writer of G7):
+
+| # | Rule | Why |
+|---|---|---|
+| O-1 | **Saturating age.** A reader loads `last_poll_ticks` **first**, then reads its own clock (`barrier_read_counter_timer()`), and computes `age = (now >= t) ? now - t : 0`. A bare `now - t` is forbidden. | Core 1 may update `last_poll_ticks` just after the reader took `now`; the unsigned subtraction would then wrap to a huge age and report a false `CORE1_POLL_STALL` for a healthy core. This is the plan's O-18 rule extended to G7 |
+| O-2 | **No G7 value may be used as the condition for reading lock-protected state without taking the lock.** | G7 publishes nothing; treating it as a "data ready" flag would need release/acquire ordering that G7 deliberately does not have. Component 3 code review item |
+| O-3 | **`last_poll_ticks` means "Core 1 is spinning", not "Core 1 is evaluating deadlines".** Core 1 updates it every 256th pass whether or not its lock attempt succeeded. A starved Core 1 would look healthy. The evaluation heartbeat is a separate member, **`last_eval_ticks` (u64, lock-protected, written by Core 1 on each *successful* lock attempt)**, added to the deadline design (G5/G6). Fresh `last_poll_ticks` with stale `last_eval_ticks` = alive but starved; both stale = stalled. | otherwise a hostile PTA caller could starve the lock while the health words keep advancing |
+
+Still open for G7: (a) the ordering result above is a **design-level** review; it is re-checked against the real code in Component 3 (rules O-1 to O-3 become review items); (b) `CNTPCT` working consistently on Core 1 needs code running on Core 1 (Component 4 prerequisite). Everything else about G7 is closed.
+
+Not covered by G7 (and why): anything that needs two or more words to be seen together (use the lock), anything that guards other data (needs release/acquire), anything with more than one writer (needs the lock or an atomic read-modify-write, which is not allowed here).
+
+## 4b. G9 v3 (PROPOSED, replaces v2; pending approval)
+
+### What the review found
+
+| Question | Finding | Evidence |
+|---|---|---|
+| Does a sequence counter make lock-free reads safe? | **No.** Written naively it does not even survive the compiler | probe (GCC 14.3, `-O2`, AArch64): in the naive version GCC merged `seq++ ... seq++` into one `add #2; str` (the odd "write in progress" value is **never stored**) and moved the data stores before it; the naive reader **dropped the second read of `seq`**, so it validates nothing. The correct C11 form needs relaxed atomics for every shared word plus fences: the writer compiled to `str` (odd), `dmb ish`, data stores, `stlr` (even); the reader to `ldar`, data loads, `dmb ishld`, re-read |
+| Is OP-TEE's lock a real acquire/release lock? | **Yes** | `spin_lock_a64.S`: lock and trylock use `ldaxr` then `stxr`; unlock is `stlr wzr`. They are out-of-line assembly, so the compiler must treat them as opaque calls: they also act as a compiler barrier. Therefore **plain loads and stores to a member are correct inside the critical section**, provided *every* access to that member (reads too) is under the lock |
+| Are exclusive accesses valid on this memory? | **Yes** | the data is mapped Normal, Write-Back, Inner Shareable on every core (section 4a evidence); this is the memory type exclusives need. OP-TEE's own console lock uses the same primitives |
+| Is a seqlock needed in Component 2? | **No** | the readers are only PTA handlers (cmd 18 and 20). OP-TEE serialises calls into this PTA (single instance, no `TA_FLAG_CONCURRENT`; measured, below), so at most one PTA handler contends with Core 1 for the lock. A PTA call took at least **0.86 ms** in the best contended case and **2.84 ms** alone, while the lock is held for microseconds, so the share of time a PTA handler holds the lock is about 1 percent or less (estimate; to be measured in Components 4 and 5). The seqlock would add subtle memory-ordering code to remove a contention that is already small |
+| What does taking the lock cost on this debug build? | **about two instrumented calls per lock and unlock** | of the functions on the path, `spinlock_count_incr` and `spinlock_count_decr` run the stack-check hook; `thread_get_exceptions`, `have_spinlock`, `thread_get_core_local`, `get_core_pos`, `thread_mask_exceptions` and the lock assembly do not (`__nostackcheck`). With about 2.4 us per instrumented call (1.4, F8) that is **about 5 us per lock cycle, more than a whole Core 1 pass** |
+
+### G9 v3 specification
+
+G9 consists of **one member**, `rpi3_mon_lock` (an OP-TEE spinlock, `unsigned int`, 4-byte aligned). **`snap_seq` and the seqlock are removed from Component 2.**
+
+| # | Rule |
+|---|---|
+| L1 | Every member marked `L` is read and written **only** under `rpi3_mon_lock`. Inside the critical section, plain loads and stores are correct. |
+| L2 | G7 is the **only** lock-free group, and only through the approved atomic accessors. No other member is read without the lock, so the two access styles never mix on one member. |
+| L3 | PTA handlers take the lock with `cpu_spin_lock_xsave()`; Core 1 takes it with a single `cpu_spin_trylock()` per attempt, **never a retry loop**, and skips on failure (`skip_count`, G7). |
+| L4 | **Core 1 attempts the lock at most once per 256 passes** (about 0.62 ms at 600 MHz; the same cadence as `last_poll_ticks`), not every pass: a lock cycle costs more than a pass. At that cadence the lock overhead is about 1 percent, and a skipped attempt delays a deadline check by well under a millisecond, far below T (50 ms) and H (500 ms). |
+| L5 | Inside the lock: field reads and writes, comparisons, one fixed-size (24-byte) append, and a copy of at most 128 bytes into a local buffer. Written as `static inline` or `__nostackcheck` helpers, so **no instrumented call** is made inside (except the lock wrappers' own). No printing, no HMAC, no caller-buffer copy, no allocation, no call that can sleep. |
+| L6 | Copy-out is two-step: under the lock copy into a **local buffer on the PTA thread stack** (never Core 1's tmp stack), unlock, then copy to the caller's memory. **cmd 18 returns at most 16 entries per call** (the plan said up to 64; 16 x 24 B = 384 B keeps the hold short; a caller loops). cmd 20 copies one fixed projection of at most 128 bytes. |
+| L7 | Every exit path unlocks (single-exit structure). A handler never returns to Normal World holding the lock (OP-TEE's debug assertion `assert_have_no_spinlock` would trip). |
+| L8 | One lock, no nesting, no lock ordering. |
+| L9 | FIQ handling follows decision D1 (rule R-A6). The FIQ handler never takes the lock. |
+| L10 | Correctness **does not depend on OP-TEE serialising PTA calls**: PTA handlers still take the lock. The serialisation only keeps contention low. |
+| L11 | **Deferred to Component 7** (the chip B record ring, where Core 1 is a high-rate single writer): a seqlock, with these recorded conditions: every shared word accessed through relaxed-atomic accessors; writer `store seq odd; release fence (dmb ish); data stores; store-release seq even`; reader `load-acquire seq; if odd retry; data loads; acquire fence (dmb ishld); re-read seq; compare`; exactly one writer at a time; bounded retries then BUSY; and a unit test against the **naive** version to show the compiler difference. |
+
+### Preliminary measurements behind this (`pta_latency_preliminary.txt`; idle board, not the Component 4 matrix)
+
+| Run | Result |
+|---|---|
+| One caller alone | 311 to 329 calls/s; per call min **2.84 ms**, p50 2.87 to 3.29 ms, p99 3.29 to 3.72 ms, max up to 6.1 ms |
+| Three callers at once (cores 0, 2, 3) | aggregate **466 calls/s**; fastest call **0.857 ms**, p50 about 0.87 ms, but **p90 about 23 ms, p99 66 to 76 ms, max 123 to 131 ms** (calls queue behind each other) |
+| Environment | CPU governor `powersave`, **all CPUs at 600 MHz** (max 1200 MHz), cluster-wide |
+
+Consequences recorded (new items F22 to F26):
+
+| # | Finding | Where it matters |
+|---|---|---|
+| F22 | A Linux to PTA call takes about 3 ms when alone (mostly the stack-check hook: a call traverses on the order of a thousand instrumented functions at about 2.4 us each; **an inference**, not measured) | Component 4: L99.9 for the heartbeat timing; the build setting `CFG_CORE_DEBUG_CHECK_STACKS=y` is the largest single cost |
+| F23 | **Unexplained:** the fastest call under contention (0.857 ms) is 3.3 times faster than the lone-caller minimum (2.84 ms) with the clock constant at 600 MHz | Component 4 must explain this before any latency number is used for a deadline |
+| F24 | **Any process that can open `/dev/tee0` can delay every other PTA caller by 100 ms or more** just by calling the PTA in a loop (measured: 3 callers, max 131 ms). A hostile Linux can therefore make the legitimate consumer's heartbeat answer late without touching the consumer | Components 5 and 6: false `HEARTBEAT_MISS` or `HEARTBEAT_LATE` is an availability attack the monitor cannot prevent; Secure World's own clock still records when each call arrived, so the late answer is visible and attributable, but the report must say so |
+| F25 | CPU frequency is Linux-controlled and cluster-wide (`powersave` = 600 MHz now). Every Core 1 timing (2.435 us per pass = about 1,460 cycles) depends on it; a root user can change it | record the frequency with every timing; the secure timer (`CNTPCT`, 19.2 MHz) is independent of it; the earlier puzzle about the high cycle count per pass (1.4, F9) is partly explained |
+| F26 | The lock cycle costs about two instrumented calls (about 5 us); most low-level helpers are `__nostackcheck` | rule L4; the monitor's hot helpers should use `__nostackcheck` where they need no stack-limit check |
+
+## 5. Access rules (what the lock and the memory rules mean)
+
+| # | Rule | Reason (from Component 1) |
+|---|---|---|
+| R-A1 | Every write to an `L` member is under `rpi3_mon_lock`. | no lock exists anywhere today (1.4, C1) |
+| R-A2 | PTA handlers take it with `cpu_spin_lock_xsave`; Core 1 with a **bounded** `cpu_spin_trylock` and skips the pass on failure. | the spinlock is unfair and `xsave` masks every exception while spinning (1.4, C10, C11) |
+| R-A3 | Critical sections stay tiny and constant-time. | a PTA caller spinning with exceptions masked cannot take any interrupt on its core |
+| R-A4 | The clock is read **inside** the lock; one helper `expired(now, t0, limit)` (strict `>`, with `now >= t0`) is used everywhere. | exactly-once events and a single boundary (R21, O-18) |
+| R-A5 | HMAC, UART and caller-buffer copies happen **outside** the lock. | R21 |
+| R-A6 | **FIQ rule (depends on D1).** If D1 = (b), FIQ is masked for the whole Core 1 loop and nothing more is needed. If D1 = (a), Core 1 wraps trylock, critical section and unlock in `thread_mask_exceptions(THREAD_EXCP_NATIVE_INTR)`. The FIQ handler never takes the lock. | O-01 and O-06 (1.4) |
+| R-A7 | `1W` members have exactly one writer, are naturally aligned (8 bytes for u64) and live on **their own cache line, apart from the lock-protected members**. Readers accept a value that may be one pass old but is never torn. | Core 1 writes them about 410,000 times a second; sharing a line with lock-protected data would make the PTA path and Core 1 slow each other |
+| R-A8 | Caller buffers are copied once, with byte reads, into a local buffer, and only the copy is validated. Core 1's tmp stack is not used for any such buffer (the PTA thread stack is). | the PTA receives a pointer into live Normal World memory (1.3); Core 1's stack is shared with the FIQ frame (1.4) |
+| R-A9 | Frames are validated against the **44-byte canonical form** only; a bad tag never moves counter state. | R2 |
+| R-A10 | Reads for cmd 20 use the snapshot counter; the result is a fixed projection, never the struct. | below |
+
+## 6. What may leave the Secure World
+
+| Item | May be returned to a caller? |
+|---|---|
+| `K_frame`, `K_hb`, `K_test`, `mac_pta`, `mac_core1` | **never**, in any form |
+| raw bytes of the state struct | **never** (no dump command, no debug "read memory") |
+| `hb_nonce` | **yes, by design**, through cmd 22 (it is not a secret) |
+| event records, counters, verdict summaries, `hb_state`, `hb_seq`, ages, health | yes, as a fixed 128-byte projection (cmd 20) and 24-byte records (cmd 18) |
+| `last_frame44` | no (it contains authentication tags of frames already seen; not needed by a caller) |
+
+## 7. Mapping of the six items first proposed
+
+| Proposed | Becomes | Why it changed |
+|---|---|---|
+| `last_counter` | `ctr_f.have_last`, `ctr_f.last_counter`, `ctr_f.last_frame44` | first frame, duplicate and conflict need more than one number |
+| `last_nonce` | `boot_id`, `hb_seq`, `hb_issue_ticks`, `hb_nonce`, `hb_nonce_valid` | the nonce is derived from the others, and Secure World re-derives it to check an answer |
+| `nonce_timestamp` | `hb_issue_ticks` | same value |
+| `last_response_time` | `hb_last_ok_ticks` (plus `hb_miss_count`, `hb_timeout_raised`) | a late answer must not reset the miss count |
+| `monitor_status` | **no single field**: `hb_state`, the three verdicts, `mode`, health members, counters | the plan requires three independent verdicts, never merged (R4b) |
+| `mon_lock` | `rpi3_mon_lock` (+ `snap_seq`) | as proposed |
+
+## 8. Dependencies and risks that touch this design
+
+| Item | Effect on the state design |
+|---|---|
+| **D1** (FIQ policy) | decides R-A6; blocks Component 3, not this subcomponent |
+| **N-04** (deferred) | limit L-N04 above; the report must say state integrity against Linux's allocator is not guaranteed until it is installed |
+| `CNTPCT` on Core 1 untested | every `*_ticks` member depends on it (Component 4 prerequisite) |
+| Core 1 cache and MMU state unknown (1.4, F9) | the lock and the shared lines assume normal inner-shareable cacheable memory; to be checked before relying on the spinlock from Core 1 (S2a) |
+| Each instrumented call costs about a whole loop pass (1.4, F8) | Core 1 touches the state through as few calls as possible, or through `__nostackcheck` helpers |
+| Stack-check hook panics on a stack-limit violation at function entry | the monitor adds no large stack buffer on Core 1 |
+
+## 9. What this document does not decide
+
+The exact size of each array (derived in Component 4 from measurements), the final layout of Mode D2 state (Component 7), the byte layout of cmd 20's projection (Component 2, next subcomponent), and the event type list (the plan's glossary is the starting point).
+
+## 10. Approval checklist
+
+- [x] Section 3.1: one struct, `rpi3_mon` (approved)
+- [ ] Section 4: G1, G3, G4 accepted; G2, G5, G6, G8 accepted with the conditions in section 0; **G7: section 4a APPROVED**; **G9: section 4b proposed, pending** (G10 deferred to Component 7)
+- [ ] Section 4b: G9 v3 accepted (lock only, no seqlock in Component 2; Core 1 attempts the lock once per 256 passes; cmd 18 returns at most 16 entries per call)
+- [ ] Section 5: access rules R-A1 to R-A10 accepted
+- [ ] Section 6: the list of what may leave Secure World accepted
+- [ ] N-04 deferral and limits L-N04, L-TZ accepted as report wording

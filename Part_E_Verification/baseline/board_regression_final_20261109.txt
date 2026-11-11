@@ -1,0 +1,24 @@
+== test cmds must be refused on the hardened image ==
+not a test-statistics build (0xffff000a)
+== status ==
+page 0: version 1 length 128 boot_id 0xd5284060 flags 0x13 mode 0
+  now_ticks 2043610434 core1_poll_age_ticks 5145 poll_count 3216401773
+== V14 ==
+SHORT_BUFFER (page 0, 64-byte buffer) result 0xffff0010 (origin 4) | memref size now 128 (was 64) | health pair 00000000
+BAD_PARAMETERS (page 5)            result 0xffff0006 (origin 4) | memref size now 128 (was 128) | health pair 00000000 0
+SUCCESS control (page 0, 128 bytes) result 0x00000000 (origin 4) | memref size now 128 (was 128) | health pair 00000000 
+== V2 ==
+V2 atomic test: 3 threads x 2000000 increments, expected 6000000, got 6000000: PASS (no lost increments)
+== latency 5000 ==
+calls 5000 | BUSY 0 | other errors 0 | total 19.47 s | mean 3895 us | rate 257 calls/s
+latency us: min 3455 p50 3876 p90 3896 p99 4344 p99.9 5117 max 5509
+monitor counters during the run: skip_total 0 -> 115, pta_lock_timeouts 0 -> 0
+== soak 120 s ==
+soak: 120 s, period 100 ms, 1199 ticks
+frame verdicts: ACCEPTED 1198 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 121 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 75 p99 77 max 84
+frame submit latency (us): p50 9309 p99 9725 max 10254
+end state: flags 0x07 last_counter 2198 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +67 starved 0
+ls: /tmp/kf: No such file or directory
+ 00:03:48 up 3 min,  load average: 0.04, 0.07, 0.02

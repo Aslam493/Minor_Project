@@ -1,0 +1,23 @@
+reset: 0x00000000
+X9 trials 200: status call returned BUSY 200, SUCCESS 0, other 0
+holds: count 319485 | mean 6.39 us | max 192014 ticks = 10000.73 us | max by PTA 0.00 us | max by Core 1 10000.73 us
+hold histogram (ticks, floor log2 buckets; 19.2 ticks = 1 us):
+     2^1  .. 2^next      319284 holds
+     2^2  .. 2^next           1 holds
+  >= 2^15 ..                200 holds
+p99 hold <= 0.21 us (upper edge of the bucket holding the 99th percentile; coarse, factor 2)
+Core 1 attempt interval: count 319485 | min 21.51 us | mean 27.81 us | max 10022.45 us
+exhausted PTA waits: 200 | last: 1002.45 us waited, 384 attempts (attempts per ms = attempts / ms waited)
+  -> 383 attempts per ms while waiting
+Core 1 hold requests done: 200 (pending 0 ticks) | cadence: 256 passes per lock attempt
+---
+holds: count 321261 | mean 6.36 us | max 192014 ticks = 10000.73 us | max by PTA 0.00 us | max by Core 1 10000.73 us
+hold histogram (ticks, floor log2 buckets; 19.2 ticks = 1 us):
+     2^1  .. 2^next      321060 holds
+     2^2  .. 2^next           1 holds
+  >= 2^15 ..                200 holds
+p99 hold <= 0.21 us (upper edge of the bucket holding the 99th percentile; coarse, factor 2)
+Core 1 attempt interval: count 321260 | min 21.51 us | mean 27.77 us | max 10022.45 us
+exhausted PTA waits: 200 | last: 1002.45 us waited, 384 attempts (attempts per ms = attempts / ms waited)
+  -> 383 attempts per ms while waiting
+Core 1 hold requests done: 200 (pending 0 ticks) | cadence: 256 passes per lock attempt

@@ -1,0 +1,13 @@
+== monitor command on a non-monitor build (must be refused) ==
+status failed: 0xffff0006 (BAD_PARAMETERS)
+
+== wake #1 ==
+Wake core 1 (permanent Secure World diversion): PSCI status -4
+FAIL: core 1 was NOT (re)woken - PSCI_E_SUCCESS is 0; a non-zero code (e.g. -4 = PSCI_E_ALREADY_ON if this was already run once) means the heartbeat will not start/change.
+== wake #2 ==
+Wake core 1 (permanent Secure World diversion): PSCI status -4
+FAIL: core 1 was NOT (re)woken - PSCI_E_SUCCESS is 0; a non-zero code (e.g. -4 = PSCI_E_ALREADY_ON if this was already run once) means the heartbeat will not start/change.
+== wake #3 ==
+Wake core 1 (permanent Secure World diversion): PSCI status -4
+FAIL: core 1 was NOT (re)woken - PSCI_E_SUCCESS is 0; a non-zero code (e.g. -4 = PSCI_E_ALREADY_ON if this was already run once) means the heartbeat will not start/change.
+ 00:01:38 up 1 min,  load average: 0.33, 0.13, 0.04

@@ -1,0 +1,50 @@
+K10: 25 event types parsed from the design
+   0 AUTH_FAIL              header 0    ok
+   1 REPLAY                 header 1    ok
+   2 TIMEOUT                header 2    ok
+   3 ALTERED                header 3    ok
+   4 UNACCOUNTED            header 4    ok
+   5 CHIPB_FAULT            header 5    ok
+   6 MALFORMED              header 6    ok
+   7 COUNTER_GAP            header 7    ok
+   8 COUNTER_RESYNC         header 8    ok
+   9 TRAFFIC_RECOVERED      header 9    ok
+  10 HEARTBEAT_RECOVERED    header 10   ok  (header name HB_RECOVERED)
+  11 MODE_CHANGED           header 11   ok
+  12 LEASE_GRANTED          header 12   ok
+  13 LEASE_RENEWED          header 13   ok
+  14 LEASE_REFUSED          header 14   ok
+  15 LOCK_TIMEOUT           header 15   ok
+  16 MON_STARVED            header 16   ok
+  17 HB_SEQ_EXHAUSTED       header 17   ok
+  18 LEGACY_CMD_REFUSED     header 18   ok  (header name LEGACY_REFUSED)
+  19 LEGACY_CMD_USED        header 19   ok  (header name LEGACY_USED)
+  20 BAD_NONCE              header 20   ok
+  21 STALE_ANSWER           header 21   ok
+  22 UNISSUED_ANSWER        header 22   ok
+  23 DUPLICATE_ANSWER       header 23   ok  (header name DUP_ANSWER)
+  24 LATE_ANSWER            header 24   ok
+header event count: 25 (design: 25)
+K11 T_TRAFFIC_MS   design 300    header 300    ok
+K11 H_MS           design 1000   header 1000   ok
+K11 D_REQ_MS       design 500    header 500    ok
+K11 G_MS           design 60000  header 60000  ok
+K11 K_MISS         design 3      header 3      ok
+K11 K_STARVE       design 8      header 8      ok
+K11 IDLE_MAX_MS    design 60000  header 60000  ok
+K11 IDLE_USES_MAX  design 16     header 16     ok
+K11 BUDGET_TICKS   design 19200  header 19200  ok
+K11 ATTEMPT_CAP    design 2000   header 2000   ok
+K11 CORE1_CADENCE  design 256    header 256    ok
+  K11 text contains T = **300 ms**               yes
+  K11 text contains H = **1 s**                  yes
+  K11 text contains D_req = **500 ms**           yes
+  K11 text contains G = 60 s                     yes
+  K11 text contains k = 3                        yes
+  K11 text contains K = 8                        yes
+  K11 text contains `IDLE_MAX` = 60 s            yes
+  K11 text contains `IDLE_USES_MAX` = 16         yes
+  K11 text contains lock budget 19,200 ticks     yes
+  K11 text contains attempt cap 2,000            yes
+  K11 text contains cadence 256 passes           yes
+KY1 key lengths: {'FRAME': 32, 'HB': 32, 'TEST': 32} | pairwise distinct: True

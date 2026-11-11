@@ -1,0 +1,11 @@
+c4de00bdfd7e5b3066845d01f0b48be8f2d01bc9e4537d21364065205c2c7579  ./files/core/arch/arm/plat-rpi3/conf.mk
+5d8d3804cfa8e8c5380ead90f904f59edc64c8367aab26dcb934e10f0f44ec9a  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.c
+6a115d50b16c214467109addf450668d9b0c180a60c272a42a637ee0b9502eec  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.h
+2154ac4a49d17615f936a55588da340706cfbc211d27b7eab66ecf6bb380350a  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor_plat.h
+20918fc5e3fcb84329697e9cc53a395a50ed239152fa0377da77fc408c91e82b  ./files/core/arch/arm/plat-rpi3/rpi3_can_server.c
+c4d8db823862608d12fc0baf7e1a254bfc0867c05eacba02d2b0d2566bb4888a  ./files/core/arch/arm/plat-rpi3/sub.mk
+2a11f768a5ab514bf4cae62066c10032108f711cc5f20304c6b1c4374109ee08  ./files/core/pta/rpi3_can_spi_poc.c
+0d6fdfd6345fba2282aa06260f6ea94239701c0c6fa8d0747088e0f8e255ece9  ./files/core/pta/sub.mk
+bf541ded79824f2cce0bd421055815a852e0d28f7caac115485a1066b05e8682  ./files/lib/libutee/include/pta_rpi3_can_spi_poc.h
+c08453a91faf1ccba6d05caab3a1b2f05b0603518f79436bbbc9497ac3602bb2  ./tree_diff_sha256.txt
+4879ff3d8aa6532272519d6378e0930ca814471b05039041ce79607618748a08  ./tree_status_before.txt

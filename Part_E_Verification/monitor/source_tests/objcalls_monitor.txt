@@ -1,0 +1,39 @@
+rpi3_mon_acquire: atomic_inc32, cpu_spin_trylock, thread_mask_exceptions, thread_unmask_exceptions
+rpi3_mon_cmd17: __stack_chk_fail, memcpy, rpi3_mon_ct_equal, rpi3_mon_ev_append.constprop.0, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hmac, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_le32, rpi3_mon_mac_enter, rpi3_mon_mac_leave, rpi3_mon_release
+rpi3_mon_cmd18: __stack_chk_fail, memcpy, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_release
+rpi3_mon_cmd19: __stack_chk_fail, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_release
+rpi3_mon_cmd20: __stack_chk_fail, memcpy, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_release
+rpi3_mon_cmd21: __stack_chk_fail, rpi3_mon_ev_append.constprop.0, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_release
+rpi3_mon_cmd22: __stack_chk_fail, rpi3_mon_acquire, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hmac, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_le32, rpi3_mon_mac_enter, rpi3_mon_mac_leave, rpi3_mon_put_le32, rpi3_mon_put_le64, rpi3_mon_release
+rpi3_mon_cmd23: __stack_chk_fail, rpi3_mon_ev_append.constprop.0, rpi3_mon_evaluate.constprop.0, rpi3_mon_health_fill, rpi3_mon_health_zero, rpi3_mon_hold, rpi3_mon_init_ok, rpi3_mon_release
+rpi3_mon_core1_attempt: cpu_spin_trylock, cpu_spin_unlock, rpi3_mon_ev_append.constprop.0, rpi3_mon_evaluate.constprop.0
+rpi3_mon_core1_entry_check: __do_panic, thread_get_exceptions
+rpi3_mon_ct_equal: 
+rpi3_mon_ev_append.constprop.0: 
+rpi3_mon_evaluate.constprop.0: rpi3_mon_ev_append.constprop.0
+rpi3_mon_has_values: 
+rpi3_mon_health_fill: rpi3_mon_init_ok
+rpi3_mon_health_zero: 
+rpi3_mon_hmac: crypto_mac_final, crypto_mac_init, crypto_mac_update
+rpi3_mon_hold: rpi3_mon_acquire, rpi3_mon_wait_init
+rpi3_mon_init: memset, rpi3_mon_init_crypto, trace_printf
+rpi3_mon_init_crypto: __stack_chk_fail, crypto_mac_alloc_ctx, crypto_rng_read, rpi3_mon_hmac, rpi3_mon_le32, rpi3_mon_put_le64
+rpi3_mon_init_ok: 
+rpi3_mon_le32: 
+rpi3_mon_mac_enter: 
+rpi3_mon_mac_leave: 
+rpi3_mon_note_legacy: cpu_spin_trylock, cpu_spin_unlock_xrestore, rpi3_mon_ev_append.constprop.0, rpi3_mon_init_ok, thread_mask_exceptions, thread_unmask_exceptions
+rpi3_mon_pta_cmd17: __stack_chk_fail, rpi3_mon_cmd17, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd18: __stack_chk_fail, rpi3_mon_cmd18, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd19: __stack_chk_fail, rpi3_mon_cmd19, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd20: __stack_chk_fail, rpi3_mon_cmd20, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd21: __stack_chk_fail, rpi3_mon_cmd21, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd22: __stack_chk_fail, rpi3_mon_cmd22, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_cmd23: __stack_chk_fail, rpi3_mon_cmd23, rpi3_mon_has_values, rpi3_mon_put_health, rpi3_mon_to_tee
+rpi3_mon_pta_invoke: rpi3_mon_note_legacy, rpi3_mon_pta_cmd17, rpi3_mon_pta_cmd18, rpi3_mon_pta_cmd19, rpi3_mon_pta_cmd20, rpi3_mon_pta_cmd21, rpi3_mon_pta_cmd22, rpi3_mon_pta_cmd23
+rpi3_mon_put_health: 
+rpi3_mon_put_le32: 
+rpi3_mon_put_le64: rpi3_mon_put_le32
+rpi3_mon_release: cpu_spin_unlock_xrestore
+rpi3_mon_to_tee: 
+rpi3_mon_wait_init: 

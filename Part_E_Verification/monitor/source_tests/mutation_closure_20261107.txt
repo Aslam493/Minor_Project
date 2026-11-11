@@ -1,0 +1,142 @@
+caught (failed checks)                   old fail-open test (now>=t0 && elapsed>budget)
+SURVIVED                                 no 'now < t0' term (unsigned wrap already fails closed)  [expected equivalent]
+caught (hang)                            no attempt cap
+caught (failed checks)                   fresh budget per acquisition
+caught (failed checks)                   counter incremented on success
+caught (failed checks)                   no increment on exhaustion
+caught (failed checks)                   double increment on exhaustion
+caught (failed checks)                   unmask before unlock on release
+caught (failed checks)                   exceptions not restored after exhaustion
+caught (failed checks)                   exceptions never masked while trying
+caught (failed checks)                   pre-check removed
+caught (failed checks)                   backward timer after success charges nothing
+caught (failed checks)                   init_ok published before the extra steps
+caught (failed checks)                   init failure fails the OS boot
+caught (failed checks)                   init failure still publishes init_ok
+caught (failed checks)                   init failure not reported
+caught (failed checks)                   profile inverted
+SURVIVED                                 init does not clear the lock explicitly (memset already zeroes it)  [expected equivalent]
+caught (failed checks)                   init does not clear the state
+caught (failed checks)                   init_ticks not recorded
+caught (failed checks)                   boot_id from the wrong key
+caught (failed checks)                   init ignores an RNG failure
+caught (failed checks)                   init ignores a boot_id HMAC failure
+caught (failed checks)                   health age not saturated
+caught (failed checks)                   health 'never polled' sentinel removed
+caught (failed checks)                   health future stamp wraps (O-1 broken)
+caught (failed checks)                   health skip_count not saturated
+caught (failed checks)                   health init_ok bit missing
+caught (failed checks)                   health starved bit wrong
+caught (failed checks)                   health p3a reads the wrong field
+caught (failed checks)                   health age in ticks instead of ms
+caught (failed checks)                   event overwrite not counted
+caught (failed checks)                   pinned_used not maintained
+caught (failed checks)                   limit boundary off by one
+caught (failed checks)                   evidence flood rule reverted (evidence never limited)
+caught (failed checks)                   one shared limit bucket for all classes
+caught (failed checks)                   exact counter not kept
+caught (failed checks)                   pinned slots can be overwritten
+caught (failed checks)                   seq space exhaustion guard removed
+caught (failed checks)                   traffic recovery does not clear the flag
+caught (failed checks)                   lease expiry does not restart the window
+caught (failed checks)                   traffic timeout ignores the lease
+caught (failed checks)                   traffic timeout not exactly once
+caught (failed checks)                   heartbeat miss counted on every evaluation
+caught (failed checks)                   heartbeat timeout raised before the grace period
+caught (failed checks)                   heartbeat timeout after a single miss
+caught (failed checks)                   heartbeat detail codes swapped
+caught (failed checks)                   challenge burst (next issue relative to the old one)
+caught (failed checks)                   a new challenge keeps the old nonce valid
+caught (failed checks)                   challenge sequence can wrap
+caught (failed checks)                   older counter accepted as duplicate class (<=)
+caught (failed checks)                   no duplicate/conflict distinction
+SURVIVED                                 counter wrap guard removed  [expected equivalent]
+caught (failed checks)                   gap detail off by one
+caught (failed checks)                   every frame refreshes the state
+caught (failed checks)                   DUPLICATE mapped to the wrong event detail
+caught (failed checks)                   frame verdict total not counted
+caught (failed checks)                   HMAC over the whole frame
+caught (failed checks)                   tag compared over 31 bytes
+caught (failed checks)                   stream list not enforced
+caught (failed checks)                   can_id range not enforced
+caught (failed checks)                   length not enforced (buffer read)
+caught (failed checks)                   mac guard never released in command 17
+caught (failed checks)                   unauthenticated frames are applied
+caught (failed checks)                   HMAC failure not fail-closed
+caught (failed checks)                   mac guard not used in command 17
+caught (failed checks)                   command 18 allows 6 entries
+caught (failed checks)                   command 18 'more' flag missing
+caught (failed checks)                   command 18 order broken
+caught (failed checks)                   command 18 reports no ev_lost
+caught (failed checks)                   command 18 copies to the caller before the unlock
+caught (failed checks)                   command 19 not clamped
+caught (failed checks)                   command 19 can move backwards
+caught (failed checks)                   command 19 resets the lost counter
+caught (failed checks)                   command 20 accepts page 2
+caught (failed checks)                   command 20 wrong length field
+caught (failed checks)                   command 20 hardened flag inverted
+caught (failed checks)                   command 20 pinned_used missing
+caught (failed checks)                   command 20 lock-free fields read before the unlock
+caught (failed checks)                   command 20 page 1 counters wrong
+caught (failed checks)                   command 21 renewal is additive
+caught (failed checks)                   command 21 request not clamped
+caught (failed checks)                   command 21 cap not enforced
+caught (failed checks)                   command 21 return does not restart the window
+caught (failed checks)                   command 21 return consumes a use
+caught (failed checks)                   command 21 grant clears a raised timeout
+caught (failed checks)                   command 21 NO_CHANGE for a lease it just expired
+caught (failed checks)                   command 22 returns no nonce in MISSED
+caught (failed checks)                   command 22 always recomputes
+caught (failed checks)                   command 22 stores without the sequence check
+caught (failed checks)                   command 22 input layout: boot_id missing
+caught (failed checks)                   command 22 nonce words swapped
+caught (failed checks)                   command 22 mac guard not used
+caught (failed checks)                   command 23 compares nothing
+caught (failed checks)                   command 23 accepts a never-fetched nonce
+caught (failed checks)                   command 23 duplicate answer accepted again
+caught (failed checks)                   command 23 stale answer accepted
+caught (failed checks)                   command 23 never-issued answer accepted
+caught (failed checks)                   command 23 on-time answer keeps the miss count
+caught (failed checks)                   command 23 on-time answer does not clear the raised timeout
+caught (failed checks)                   command 23 late answer resets the miss count
+caught (failed checks)                   command 23 bad nonce changes state
+caught (failed checks)                   legacy event type swapped
+caught (hang)                            legacy event path spins for the lock
+caught (failed checks)                   Core 1 starvation threshold 1
+caught (failed checks)                   Core 1 resets skip_total
+caught (failed checks)                   Core 1 logs MON_STARVED below K
+caught (failed checks)                   Core 1 timeout delta not relative
+caught (failed checks)                   Core 1 never records what it observed
+caught (failed checks)                   Core 1 failure path writes protected state
+caught (failed checks)                   Core 1 does not record last_eval_ticks
+caught (failed checks)                   Core 1 never issues a challenge
+caught (failed checks)                   Core 1 entry check inverted
+caught (failed checks)                   Core 1 cadence 128
+caught (failed checks)                   Core 1 pass counts twice
+caught (failed checks)                   Core 1 attempts on every pass
+caught (compile-time static assertion)   G7 struct loses its 64-byte alignment
+caught (compile-time static assertion)   timeout counter shares a line with G7
+caught (compile-time static assertion)   lock shares a cache line
+caught (compile-time static assertion)   D_req not below H
+caught (compile-time static assertion)   traffic timeout below period + jitter
+caught (compile-time static assertion)   lock budget not 1 ms
+caught (compile-time static assertion)   event record grows to 32 bytes
+caught (compile-time static assertion)   event type count changes
+caught (compile-time static assertion)   page 0 field offset moves
+caught (compile-time static assertion)   page 1 layout moves
+caught (compile-time static assertion)   pinned quota 5 per class
+caught (failed checks)                   starvation threshold 1
+caught (failed checks)                   idle use cap 64
+caught (failed checks)                   heartbeat grace shortened
+caught (failed checks)                   known set extended to 24
+caught (failed checks)                   WRITE_REG32 no longer refused
+caught (failed checks)                   hardened profile allows the debug readers
+caught (failed checks)                   commands 12 refused
+caught (failed checks)                   health pair never written
+caught (failed checks)                   command 21 wrong parameter types
+caught (failed checks)                   BUSY values not written
+caught (failed checks)                   short-buffer size not returned
+caught (failed checks)                   legacy refusal logs nothing
+caught (failed checks)                   BUSY mapped to a different error
+caught 137 of 140; survivors: ["no 'now < t0' term (unsigned wrap already fails closed)", 'init does not clear the lock explicitly (memset already zeroes it)', 'counter wrap guard removed']
+mutation exit 0

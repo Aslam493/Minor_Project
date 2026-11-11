@@ -1,0 +1,7 @@
+  ok    rpi3_mon_acquire       calls: atomic_inc32 __cyg_profile_func_enter __cyg_profile_func_exit .text.cpu_spin_trylock thread_mask_exceptions thread_unmask_exceptions 
+  ok    rpi3_mon_release       calls: __cyg_profile_func_enter __cyg_profile_func_exit .text.cpu_spin_unlock_xrestore 
+  ok    rpi3_mon_health_fill   calls: __cyg_profile_func_enter __cyg_profile_func_exit rpi3_mon_init_ok 
+  ok    rpi3_mon_health_zero   calls: __cyg_profile_func_enter __cyg_profile_func_exit 
+  ok    rpi3_mon_wait_init     calls: __cyg_profile_func_enter __cyg_profile_func_exit 
+  ok    rpi3_mon_init_ok       calls: __cyg_profile_func_enter __cyg_profile_func_exit 
+  ok    rpi3_mon_init          calls: __cyg_profile_func_enter __cyg_profile_func_exit memset 

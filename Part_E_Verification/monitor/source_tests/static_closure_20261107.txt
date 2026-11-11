@@ -1,0 +1,56 @@
+static_checks: final monitor code (stages 1-6)
+  PASS     BG1 CFG_RPI3_CAN_MONITOR ?= n
+  PASS     BG1 CFG_RPI3_CAN_MONITOR_DEBUG ?= n
+  PASS     BG2 conf.mk errors when the monitor is on without the PTA
+  PASS     BG2 plat sub.mk compiles the monitor only when enabled
+  PASS     BG2 pta sub.mk compiles the glue only when enabled
+  PASS     X8 no cpu_spin_lock / xsave / no_dldetect / expired() anywhere in the monitor sources
+  PASS     G9 trylock is called only in rpi3_mon_acquire, rpi3_mon_note_legacy, rpi3_mon_core1_attempt (rpi3_mon_acquire rpi3_mon_core1_attempt rpi3_mon_note_legacy )
+  PASS     G9 exactly three trylock call sites
+  PASS     W5 unlocks only in release, note_legacy, core1_attempt (rpi3_mon_release rpi3_mon_note_legacy rpi3_mon_core1_attempt ); never in acquire
+  PASS     W5 exactly 3 unlock call sites in the logic file, no force release
+  PASS     BUD acquire unmasks only after a failed budget and unlocks first on success paths (release does unlock-restore)
+  PASS     Y1 Core 1 attempt uses cpu_spin_unlock (no mask restore) and never MASK/UNMASK
+  PASS     H2/CS1/CS2 critical-section helpers contain no memcpy/memset/heap/printing/crypto/lock calls
+  PASS     H2 the only memset in the logic file is in rpi3_mon_init
+  PASS     H1 informational: loops exist in critical helpers (bounded by constants; checked by the host timing tests)
+  PASS     F27 MAC/RNG/crypto primitives appear only in rpi3_mon_hmac and rpi3_mon_init_crypto (rpi3_mon_hmac rpi3_mon_init_crypto )
+  PASS     F27 rpi3_mon_hmac is called only from cmd17, cmd22 and init_crypto (rpi3_mon_cmd17 rpi3_mon_cmd22 rpi3_mon_init_crypto )
+  PASS     F27 Core 1 functions (attempt, entry check, pass) mention no hmac/mac/crypto/rng/malloc/free
+  PASS     F27 the monitor sources contain no heap allocation
+  PASS     F13 in command 17 the HMAC call comes before the lock is taken (line 46 < 57)
+  PASS     KEY keys are referenced only as arguments of rpi3_mon_hmac and in their own header
+  PASS     KEY glue and bindings never mention the key names
+  PASS     KEY test key is not instantiated in the logic file
+  PASS     KEY keys header is included only by the logic file
+  PASS     V3/V8 pta_lock_timeouts is touched only by MON_PLAT_INC32 and rpi3_mon_load_u32
+  PASS     V3 MON_PLAT_INC32 on the timeout counter appears exactly once, in rpi3_mon_acquire
+  PASS     Y8/Z2 G7 words are accessed only through rpi3_mon_load/store_u32/u64 (outside init)
+  PASS     INIT-4 init_ok is the last statement before the final return (release store)
+  PASS     INIT-4 init_ok is stored only once (no other publication)
+  PASS     INIT-4 init_ok is read with an acquire load
+  PASS     INIT-4 init failure returns TEE_SUCCESS (boot never fails because of the monitor)
+  PASS     V1/N5/EV1/TM1/Q2 compile-time guards present in the header (20 static assertions)
+  PASS     bindings header refuses non-AArch64 builds
+  PASS     D1 the monitor sources never unmask FIQ or IRQ (no ~THREAD_EXCP in logic, header, bindings, glue)
+  PASS     Y7 the only FIQ unmask in rpi3_can_server.c is in the #else (non-Monitor) branch (else)
+  PASS     F27/Y7 the legacy frame processing call is only in the #else branch (else)
+  PASS     Y6 server loop calls the entry check before the loop and rpi3_mon_core1_pass inside it
+  PASS     D1 rpi3_can_fiq.c (the FIQ handler) is byte-identical to the pre-change snapshot
+  PASS     PTA flags: the registration uses PTA_DEFAULT_FLAGS and a static assert forbids TA_FLAG_CONCURRENT
+  PASS     DEC-IF-3 dispatch: known set ends at command 23; unknown ids return NOT_SUPPORTED
+  PASS     DEC-IF-3 legacy refusals log an event and return NOT_SUPPORTED
+  PASS     glue takes no lock and masks nothing
+  PASS     glue contains no crypto and no allocation
+  PASS     BOUNDARY the 6 modified files that must not change are byte-identical to the pre-change snapshot (incl. thread asm, rpi3_can_fiq.c)
+  PASS     BOUNDARY core/pta/rpi3_can_spi_poc.c differs from the pre-change snapshot by exactly 25 added and 1 removed lines (got +25 -1)
+  PASS     BOUNDARY lib/libutee/include/pta_rpi3_can_spi_poc.h differs from the pre-change snapshot by exactly 20 added and 0 removed lines (got +20 -0)
+  PASS     BOUNDARY core/arch/arm/plat-rpi3/rpi3_can_server.c differs from the pre-change snapshot by exactly 22 added and 0 removed lines (got +22 -0)
+  PASS     BOUNDARY the one removed line in rpi3_can_spi_poc.c is the PTA flags initializer
+  PASS     BOUNDARY every added line in rpi3_can_spi_poc.c is inside CFG_RPI3_CAN_MONITOR (include, hook, flags macro)
+  PASS     BOUNDARY plat sub.mk is unchanged since the stage 2+ snapshot
+  PASS     BOUNDARY core/pta/sub.mk only gained the one glue line
+  PASS     BOUNDARY conf.mk only has additions (no line removed or changed)
+  PASS     BOUNDARY untracked files are exactly the 5 new monitor files and rpi3_can_server.c
+static_checks: 53 pass, 0 FAIL
+static exit 0

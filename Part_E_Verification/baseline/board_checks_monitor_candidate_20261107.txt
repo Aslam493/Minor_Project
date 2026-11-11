@@ -1,0 +1,45 @@
+# Board checks on the Pi (10.237.27.215), 8 GB spare card with the monitor candidate image (hardened), 2026-11-07. SSH only; no UART.
+# Image: build_scratch/candidate_image/rpi3-sdcard-monitor-hardened.img sha256 135c0473b6c87ab7...
+== uptime: 153.60s ; kernel 6.7.0-rc6-v8 ; [    7.288992] optee: revision 4.10 (a7ccc63e41c4acc5)
+== status page 0
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0
+  now_ticks 3300300439 core1_poll_age_ticks 166 poll_count 2041843083
+  skip_count 1 skip_total 8 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 0 hb_seq 154 hb_state MISSED hb_miss_count 154 idle_uses 0
+  traffic_age_ticks 18446744073709551615 hb_last_ok_age_ticks 18446744073709551615 lease_remaining_ticks 0
+  ev_seq 2 ev_ack 0 ev_lost 0 pinned_used 1
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=8
+== status page 1 (counters)
+page 1: version 1 length 128 verdict totals frame 0 heartbeat 0 crosscheck 0
+  TIMEOUT              1
+  LEGACY_CMD_REFUSED   2
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=2 pta_lock_timeouts=0 skip_total=10
+== events
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1353094157
+seq 2 LEGACY_CMD_REFUSED   counter 0 detail 13 ticks 2649936130
+  returned 2, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=2 pta_lock_timeouts=0 skip_total=12
+== W2 (indirect): init flag set and poll_count rising
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0   now_ticks 3302640569 core1_poll_age_ticks 165 poll_count 2043462794 
+page 0: version 1 length 128 boot_id 0xcbbd38db flags 0x13 mode 0   now_ticks 3322736061 core1_poll_age_ticks 157 poll_count 2057378305 
+== Y10 (pass rate and collisions, 5 s)
+read1: now_ticks 3342883065 poll_count 2071319041 skip_total 15
+read2: now_ticks 3439897361 poll_count 2138479105 skip_total 16
+interval 5.053 s | passes 67160064 | passes/s 13291580 | ns per pass 75.2 | lock attempts/s 51920 | collisions 1
+== V2 atomic test
+V2 atomic test: 3 threads x 2000000 increments, expected 6000000, got 6000000: PASS (no lost increments)
+== V14 probe
+SHORT_BUFFER (page 0, 64-byte buffer) result 0xffff0010 (origin 4) | memref size now 128 (was 64) | health pair 00000000 00000000 00000000 00000000 -> value outputs DELIVERED on this error
+BAD_PARAMETERS (page 5)            result 0xffff0006 (origin 4) | memref size now 128 (was 128) | health pair 00000000 00000000 00000000 00000000 -> value outputs DELIVERED on this error
+SUCCESS control (page 0, 128 bytes) result 0x00000000 (origin 4) | memref size now 128 (was 128) | health pair 00000000 00000002 00000000 00000011 -> value outputs DELIVERED on this error
+== W4 wake command (13) x2, then heartbeat
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004
+2145870849
+2159769089
+== LG1 on hardware: legacy raw SPI read (command 0), refused
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004
+== LG3 on hardware: commands 1, 2, 12 still work
+FIQ count (interrupts that reached Secure World directly from the CAN controller): 0
+Not yet - no CAN controller interrupt has reached Secure World yet. Trigger one (e.g. run secure_can_demo) then check again.
+FIQ_CONTROL register (live value): 0x00000000

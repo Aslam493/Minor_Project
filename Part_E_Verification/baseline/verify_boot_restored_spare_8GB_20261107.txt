@@ -1,0 +1,25 @@
+verify_boot: 10.237.27.215  mode=--expect-core1-pinned
+  PASS  ssh reachable
+  info  uptime 194.92s, kernel 6.7.0-rc6-v8
+  PASS  kernel is 6.7.0-rc6
+  info  [    7.304817] optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS  OP-TEE reports its revision
+  PASS  OP-TEE driver initialised
+  PASS  no OP-TEE error in dmesg
+  PASS  /dev/tee0 and /dev/teepriv0 exist
+  PASS  tee-supplicant is running
+  info  CPU online=0,2-3 offline=1
+  PASS  CPU mask is 0,2-3 (Core 1 diverted)
+  PASS  CPU1 reported as failing to come online
+  info  Core 1 heartbeat 81702973 -> 82834237
+  PASS  Core 1 heartbeat is rising
+  info  FIQ_CONTROL=0x00000000
+  PASS  PTA answers (fiq-count)
+  PASS  FIQ is NOT armed after boot (FIQ_CONTROL 0x00000000)
+  PASS  can0 exists
+  PASS  can0 is up
+  PASS  mcp251xfd found the chip on can0
+  PASS  no SPI CRC errors from the CAN driver
+  SKIP  canmode not on the Pi (/tmp); bitrate and mode not read
+  SKIP  ta_roundtrip not on the Pi (/tmp); TA/PTA round trip not run
+verify_boot: 16 pass, 0 FAIL, 2 skipped

@@ -1,0 +1,14 @@
+{
+  "_comment": "Board measurements (Pi 3 B, 19.2 MHz secure counter). Each value names its evidence file under Part_E_Verification/baseline/. PTA-injected frames, not CAN-bus traffic.",
+  "pass_ns_hardened": 27.4,        "_pass_src": "board_C4_cntpct_sanity_20261109.txt: 36.462 M passes/s at cadence 16384 (includes 12.6us/16384 of attempt cost)",
+  "pass_ns_base_hardened": 26.6,   "_base_src": "27.4 ns minus 12.6 us / 16384; cross-check: 26.6 ns + 12.6 us / 256 = 75.8 ns vs the measured 75.2 ns at cadence 256 (board_checks_monitor_candidate_20261107.txt)",
+  "attempt_us": 12.6,              "_att_src": "linear fit of the Core 1 attempt interval vs cadence on the test image (teststats_cadence_sweep_20261107.txt): interval = 0.03667 us * N + 12.6 us, agrees with 256/1024/8192/65536 within 0.5 us",
+  "hold_max_us_pta": 7.24,         "_hold_src": "largest PTA lock hold over all H3 runs (teststats_H3_*, teststats_cadence_sweep_20261107.txt)",
+  "hold_max_us_core1": 0.31,
+  "pta_latency_p99_us": 4344,      "_lat_src": "board_regression_final_20261109.txt: 5000 status calls, hardened image (idle)",
+  "pta_latency_p99_us_cpuload": 9980, "_lat2_src": "teststats_H3_cpuload_20261107.txt (3 busy loops)",
+  "frame_submit_latency_max_us": 10684, "_sub_src": "board_regression_final2_20261109.txt soak (max over 1199 frames)",
+  "send_lateness_max_us": 120,     "_late_src": "board_regression_final3_20261109.txt soak",
+  "wait_bound_ms_measured": 1.00245, "_wait_src": "teststats_X9_20261107.txt",
+  "attempts_per_ms_while_waiting": 383
+}

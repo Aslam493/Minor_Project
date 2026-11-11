@@ -1,0 +1,7 @@
+samples 3000 over 299.9 s (period 100 ms), failed calls 0
+1. now_ticks: went backwards 0 times, not increasing 0 times
+2. counter rate vs CLOCK_MONOTONIC_RAW: 19.199968 MHz (-1.7 ppm from 19.2 MHz)
+3. Core 1 stamp: age > now 0 times, last_poll went backwards 0 times; age min 0.26 us, mean 219.37 us, max 858.54 us
+4. poll_count went backwards 0 times; Core 1 passes 10934830446 in 299.9 s (36.462 M/s)
+CNTPCT sanity: PASS
+exit=0

@@ -1,0 +1,65 @@
+#!/bin/bash
+# Static checks for the Component 2.2 monitor source (stage 1). Read-only. Exit 0 = no FAIL.
+# PASS and FAIL are real results of the commands below; PENDING means the check belongs to a later stage.
+set -u
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+OS="$ROOT/optee_full/optee_os"; P="$OS/core/arch/arm/plat-rpi3"
+SNAP0="$ROOT/Part_E_Verification/source_snapshots/optee_os_20261106_pre_monitor"
+SNAP1="$ROOT/Part_E_Verification/source_snapshots/optee_os_20261107_stage1_pre"
+[ -n "${PLAT_OVERRIDE:-}" ] && P="$PLAT_OVERRIDE"
+C="$P/rpi3_can_monitor.c"; H="$P/rpi3_can_monitor.h"; PL="$P/rpi3_can_monitor_plat.h"
+pass=0; fail=0; pend=0
+ok(){ printf "  PASS     %s\n" "$1"; pass=$((pass+1)); }
+bad(){ printf "  FAIL     %s\n" "$1"; fail=$((fail+1)); }
+pnd(){ printf "  PENDING  %s\n" "$1"; pend=$((pend+1)); }
+chk(){ if [ "$2" = 1 ]; then ok "$1"; else bad "$1"; fi; }
+strip(){ python3 "$(dirname "$0")/strip_comments.py" "$1"; }   # remove ALL comments (multi-line block comments too)
+
+echo "static_checks: stage 1 of the monitor"
+# BG1 defaults, BG2 error rule
+chk "BG1 CFG_RPI3_CAN_MONITOR ?= n"          $(grep -q '^CFG_RPI3_CAN_MONITOR ?= n$' "$P/conf.mk" && echo 1 || echo 0)
+chk "BG1 CFG_RPI3_CAN_MONITOR_DEBUG ?= n"    $(grep -q '^CFG_RPI3_CAN_MONITOR_DEBUG ?= n$' "$P/conf.mk" && echo 1 || echo 0)
+chk "BG2 conf.mk errors when the monitor is on without the PTA" $(grep -q 'CFG_RPI3_CAN_MONITOR=y requires CFG_RPI3_CAN_SPI_POC_PTA=y' "$P/conf.mk" && echo 1 || echo 0)
+chk "BG2 sub.mk compiles the monitor only when enabled" $(grep -q '^srcs-\$(CFG_RPI3_CAN_MONITOR) += rpi3_can_monitor.c$' "$P/sub.mk" && echo 1 || echo 0)
+# X8: no unbounded lock API, no expired() in the monitor sources
+cnt=$( (strip "$C"; strip "$H"; strip "$PL") | grep -cE 'cpu_spin_lock[ (_]|cpu_spin_lock_xsave|cpu_spin_lock_no_dldetect|expired[ ]*\(' )
+chk "X8 no cpu_spin_lock / cpu_spin_lock_xsave / expired() in the monitor sources" $([ "$cnt" = 0 ] && echo 1 || echo 0)
+# W5: never force-release: the only unlock is the one in rpi3_mon_release
+chk "W5 exactly one unlock call site (rpi3_mon_release), no force release" $([ "$(strip "$C" | grep -c 'MON_PLAT_UNLOCK_RESTORE')" = 1 ] && echo 1 || echo 0)
+chk "G9 exactly one trylock call site (no nested or second lock)" $([ "$(strip "$C" | grep -c 'MON_PLAT_TRYLOCK')" = 1 ] && echo 1 || echo 0)
+# H2/CS1/CS2: forbidden calls anywhere in the logic file outside rpi3_mon_init
+forb=$(strip "$C" | awk '/^TEE_Result rpi3_mon_init\(void\)/{f=1} f&&/^}/{f=0; next} !f' | grep -nE '\b(memcpy|memcmp|memset|malloc|calloc|realloc|free|printf|IMSG|DMSG|EMSG|FMSG|trace_printf|crypto_[a-z_]+|mobj_[a-z_]+|tee_[a-z_]+)\b' | grep -v 'MON_PLAT_EMSG' | wc -l)
+chk "H2 no memcpy/memcmp/memset/heap/printing/crypto outside rpi3_mon_init" $([ "$forb" = 0 ] && echo 1 || echo 0)
+chk "H2 the only memset is in rpi3_mon_init, outside any hold" $([ "$(strip "$C" | grep -c '\bmemset\b')" = 1 ] && echo 1 || echo 0)
+chk "F27 no HMAC / crypto / heap in the monitor sources (stage 1)" $([ "$( (strip "$C"; strip "$H"; strip "$PL") | grep -cE 'crypto_|TEE_ALG|malloc|free\(' )" = 0 ] && echo 1 || echo 0)
+# V3/V8: pta_lock_timeouts only through the atomic increment and the load accessor
+bad_t=$(strip "$C" | grep -n 'rpi3_mon_pta_lock_timeouts' | grep -vE 'MON_PLAT_INC32|rpi3_mon_load_u32' | wc -l)
+chk "V3/V8 pta_lock_timeouts is touched only by MON_PLAT_INC32 and rpi3_mon_load_u32" $([ "$bad_t" = 0 ] && echo 1 || echo 0)
+# Y8/Z2: G7 words only through the accessors (inside rpi3_mon_init the memset clears them)
+bad_g=$(strip "$C" | awk '/^TEE_Result rpi3_mon_init\(void\)/{f=1} f&&/^}/{f=0; next} !f' | grep -n 'rpi3_mon\.health\.' | grep -vE 'rpi3_mon_(load|store)_u(32|64)' | wc -l)
+chk "Y8/Z2 G7 words are read only through rpi3_mon_load_u32/u64" $([ "$bad_g" = 0 ] && echo 1 || echo 0)
+# init_ok: published last by a release store, read by an acquire load
+last_stmt=$(strip "$C" | awk '/^TEE_Result rpi3_mon_init\(void\)/{f=1} f{print} f&&/^}/{exit}' | grep -vE '^\s*$' | tail -3 | head -2 | tr -d '\t ' | tr '\n' '|')
+chk "INIT-4 init_ok is the last statement before the final return (release store)" $([ "$last_stmt" = "MON_PLAT_STORE_RELEASE32(&rpi3_mon.init_ok,1);|returnTEE_SUCCESS;|" ] && echo 1 || echo 0)
+chk "INIT-4 init_ok is read with an acquire load" $(grep -q 'MON_PLAT_LOAD_ACQUIRE32(&rpi3_mon.init_ok)' "$C" && echo 1 || echo 0)
+# compile-time guards present
+sa=$(grep -c '_Static_assert' "$H"); chk "V1/N5/EV1/TM1/Q2 compile-time guards present in the header ($sa static assertions)" $([ "$sa" -ge 14 ] && echo 1 || echo 0)
+chk "bindings header refuses non-AArch64 builds" $(grep -q '#error' "$PL" && echo 1 || echo 0)
+# D1 option B: the stage 1 sources never unmask FIQ
+chk "D1 the monitor sources never unmask FIQ or IRQ (no ~THREAD_EXCP_*)" $([ "$( (strip "$C"; strip "$H"; strip "$PL") | grep -c '~THREAD_EXCP' )" = 0 ] && echo 1 || echo 0)
+if strip "$P/rpi3_can_server.c" | grep -B2 '~THREAD_EXCP_NATIVE_INTR' | grep -q 'CFG_RPI3_CAN_MONITOR'; then ok "Y7 Core 1 loop does not unmask FIQ in Monitor builds"; else pnd "Y7 Core 1 loop unmask is not guarded yet: rpi3_can_server.c is unchanged in stage 1 (Core 1 integration stage)"; fi
+# boundaries: nothing else in the OP-TEE tree changed
+cd "$OS" || exit 2
+same=1; for f in $(cat "$SNAP0/modified_files.txt"); do
+  case "$f" in core/arch/arm/plat-rpi3/sub.mk|core/arch/arm/plat-rpi3/conf.mk) continue;; esac
+  cmp -s "$SNAP0/files/$f" "$f" || { same=0; echo "     changed: $f"; }; done
+cmp -s "$SNAP0/files/core/arch/arm/plat-rpi3/rpi3_can_server.c" core/arch/arm/plat-rpi3/rpi3_can_server.c || { same=0; echo "     changed: rpi3_can_server.c"; }
+chk "BOUNDARY the other 8 modified files and rpi3_can_server.c are byte-identical to the pre-change snapshot" $same
+d=$(diff "$SNAP1/files/core/arch/arm/plat-rpi3/sub.mk" core/arch/arm/plat-rpi3/sub.mk | grep -c '^[<>]')
+chk "BOUNDARY sub.mk differs from the stage 1 snapshot by exactly one added line" $([ "$d" = 1 ] && echo 1 || echo 0)
+d=$(diff "$SNAP1/files/core/arch/arm/plat-rpi3/conf.mk" core/arch/arm/plat-rpi3/conf.mk | grep -c '^<')
+chk "BOUNDARY conf.mk only has additions (no line removed or changed)" $([ "$d" = 0 ] && echo 1 || echo 0)
+u=$(git status --short | grep '^??' | awk '{print $2}' | sort | tr '\n' ' ')
+chk "BOUNDARY untracked files are exactly the 3 new monitor files and rpi3_can_server.c" $([ "$u" = "core/arch/arm/plat-rpi3/rpi3_can_monitor.c core/arch/arm/plat-rpi3/rpi3_can_monitor.h core/arch/arm/plat-rpi3/rpi3_can_monitor_plat.h core/arch/arm/plat-rpi3/rpi3_can_server.c " ] && echo 1 || echo 0)
+echo "static_checks: $pass pass, $fail FAIL, $pend pending"
+[ "$fail" -eq 0 ]

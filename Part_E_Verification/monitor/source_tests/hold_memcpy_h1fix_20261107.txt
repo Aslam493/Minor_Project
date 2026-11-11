@@ -1,0 +1,11 @@
+rpi3_mon_cmd17             memcpy   at 1010ffcc : outside any hold
+rpi3_mon_cmd17             rpi3_mon_hmac at 1011002c : outside any hold
+rpi3_mon_cmd18             memcpy   at 10110cf8 : outside any hold
+rpi3_mon_cmd19             no memcpy/memset/memcmp/crypto call
+rpi3_mon_cmd20             memcpy   at 10111148 : outside any hold
+rpi3_mon_cmd20             memcpy   at 1011119c : outside any hold
+rpi3_mon_cmd21             no memcpy/memset/memcmp/crypto call
+rpi3_mon_cmd22             rpi3_mon_hmac at 101107f8 : outside any hold
+rpi3_mon_cmd23             no memcpy/memset/memcmp/crypto call
+rpi3_mon_note_legacy       no memcpy/memset/memcmp/crypto call
+rpi3_mon_core1_attempt     no memcpy/memset/memcmp/crypto call

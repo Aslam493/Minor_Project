@@ -1,0 +1,44 @@
+== monitor status: flags 0x11 (hardened bit 0x02 clear = DEBUG profile; hardened image showed 0x13) ==
+page 0: version 1 length 128 boot_id 0xf5c43a19 flags 0x11 mode 0
+
+== spi_poc_test  ==
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004
+rc=0
+
+== spi_poc_test --read-reg 0x0E ==
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004
+rc=0
+
+== spi_poc_test --last-frame ==
+No frame captured yet by Secure World.
+rc=0
+
+== spi_poc_test --core1-heartbeat ==
+Core 1 permanent Secure-World heartbeat: 3275526517
+Run this command again - if the value increased, core 1 is alive and running Secure World code forever, per Plan A's hard core-pinning design.
+rc=0
+
+== spi_poc_test --validation-debug ==
+TEEC_InvokeCommand failed: 0xffff0010 origin=0x00000004
+rc=0
+
+== spi_poc_test --timestamp-debug ==
+Last captured RX frame timestamp (RXMSGTS): 0
+Live CiTBC (free-running counter, right now): 3211247918
+Live CiTSCON: 0x00010000 (TBCEN=1, TBCPRE=0)
+Last captured frame's TBC epoch: 0  Current TBC epoch: 0 (match)
+Note: this is a hardware tick counter (~25ns/tick at TBCPRE=0), not wall-clock time - do not compare against Linux time. Wraps every ~107.4s.
+rc=0
+
+== spi_poc_test --debug ==
+Last capture: fifo_index=0 fifo_addr=0x00000000
+rc=0
+
+== validation-debug with a client built from the CURRENT source ==
+TEEC_InvokeCommand failed: 0xffff0010 origin=0x00000004
+
+== validation-debug with a client built from the CURRENT main.c ==
+Last validation status: NONE (no frame validated yet since boot)
+secure_last_counter (highest accepted this boot): 0
+Most recently checked: id=0x000 counter=0
+Frames dropped (secure RX buffer busy when FIQ fired): 0

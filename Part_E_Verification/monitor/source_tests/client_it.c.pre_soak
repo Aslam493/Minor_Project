@@ -1,0 +1,165 @@
+// Integration test: the Normal-World client (library and CLI, tools/monitor_client) against the REAL PTA glue and the REAL monitor logic.
+// A small shim implements the TEEC calls by building TEE_Param arrays and calling rpi3_mon_pta_invoke(). Host only; no hardware.
+#define _GNU_SOURCE
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <rpi3_can_monitor.c>
+#include "vectors.h"
+#include <tee_client_api.h>
+#include "mon_client.h"
+
+static int nchk, nfail;
+#define CHECK(c) do { nchk++; if (!(c)) { nfail++; printf("  FAIL line %d: %s\n", __LINE__, #c); } } while (0)
+static const char *cur;
+static void begin(const char *n) { cur = n; }
+static void end(void) { printf("ok   %s\n", cur); }
+
+/* ---- layout equality between the client's copies and the Secure World structs ---- */
+_Static_assert(sizeof(struct mon_event) == sizeof(struct rpi3_mon_event), "event size");
+_Static_assert(offsetof(struct mon_event, seq) == offsetof(struct rpi3_mon_event, seq) && offsetof(struct mon_event, type) == offsetof(struct rpi3_mon_event, type) &&
+	       offsetof(struct mon_event, flags) == offsetof(struct rpi3_mon_event, flags) && offsetof(struct mon_event, ticks) == offsetof(struct rpi3_mon_event, ticks) &&
+	       offsetof(struct mon_event, counter) == offsetof(struct rpi3_mon_event, counter) && offsetof(struct mon_event, detail) == offsetof(struct rpi3_mon_event, detail), "event offsets");
+_Static_assert(sizeof(struct mon_status0) == sizeof(struct rpi3_mon_proj0) && sizeof(struct mon_status0) == 128, "status0 size");
+#define SAME0(f) _Static_assert(offsetof(struct mon_status0, f) == offsetof(struct rpi3_mon_proj0, f), "status0 offset " #f)
+SAME0(version); SAME0(length); SAME0(boot_id); SAME0(flags); SAME0(now_ticks); SAME0(core1_poll_age_ticks); SAME0(poll_count); SAME0(skip_count); SAME0(skip_total);
+SAME0(pta_lock_timeouts); SAME0(pta_timeouts_seen); SAME0(last_counter); SAME0(hb_seq); SAME0(traffic_age_ticks); SAME0(hb_last_ok_age_ticks); SAME0(hb_miss_count);
+SAME0(idle_uses); SAME0(lease_remaining_ticks); SAME0(ev_seq); SAME0(ev_ack); SAME0(ev_lost); SAME0(pinned_used); SAME0(v_frame); SAME0(hb_state); SAME0(mode); SAME0(rsv2);
+_Static_assert(sizeof(struct mon_status1) == sizeof(struct rpi3_mon_proj1) && MON_EVENT_TYPES == RPI3_MON_EV_COUNT, "status1 size / event count");
+_Static_assert(offsetof(struct mon_status1, ev_count) == offsetof(struct rpi3_mon_proj1, ev_count) && offsetof(struct mon_status1, v_frame_total) == offsetof(struct rpi3_mon_proj1, v_frame_total) &&
+	       offsetof(struct mon_status1, rsv) == offsetof(struct rpi3_mon_proj1, rsv), "status1 offsets");
+_Static_assert(MON_FRAME_LEN == RPI3_MON_FRAME_LEN && MON_EVENT_MAX == 5 && MON_HP_STARVED == RPI3_MON_HP_STARVED && MON_HP_INIT_OK == RPI3_MON_HP_INIT_OK, "constants");
+_Static_assert(TEEC_VALUE_INPUT == TEE_PARAM_TYPE_VALUE_INPUT && TEEC_VALUE_OUTPUT == TEE_PARAM_TYPE_VALUE_OUTPUT && TEEC_VALUE_INOUT == TEE_PARAM_TYPE_VALUE_INOUT &&
+	       TEEC_MEMREF_TEMP_INPUT == TEE_PARAM_TYPE_MEMREF_INPUT && TEEC_MEMREF_TEMP_OUTPUT == TEE_PARAM_TYPE_MEMREF_OUTPUT && TEEC_NONE == TEE_PARAM_TYPE_NONE, "param type numbers");
+_Static_assert(RPI3_MON_V17_CONFLICT == 7 && RPI3_MON_V21_NO_CHANGE == 4 && RPI3_MON_V23_DUPLICATE == 5 && RPI3_MON_HB_LATE_ANSWERED == 4, "verdict numbering used by the client names");
+
+TEE_Result mock_init_extra(void) { return mock_init_extra_result; }	/* the harness hook is not needed here */
+
+/* ---- the TEEC shim ---- */
+static int shim_copy_back_on_error = 1;
+static void (*shim_tamper)(TEE_Param p[4]);
+static unsigned shim_calls; static uint32_t shim_last_pt, shim_last_cmd;
+TEEC_Result TEEC_InitializeContext(const char *n, TEEC_Context *c) { (void)n; (void)c; return TEEC_SUCCESS; }
+void TEEC_FinalizeContext(TEEC_Context *c) { (void)c; }
+TEEC_Result TEEC_OpenSession(TEEC_Context *c, TEEC_Session *s, const TEEC_UUID *u, uint32_t l, const void *d, TEEC_Operation *o, uint32_t *eo) { (void)c; (void)s; (void)u; (void)l; (void)d; (void)o; (void)eo; return TEEC_SUCCESS; }
+void TEEC_CloseSession(TEEC_Session *s) { (void)s; }
+TEEC_Result TEEC_InvokeCommand(TEEC_Session *s, uint32_t cmd, TEEC_Operation *op, uint32_t *eo)
+{
+	TEE_Param p[4]; bool handled = false; TEE_Result r; int i; (void)s; (void)eo;
+	shim_calls++; shim_last_pt = op->paramTypes; shim_last_cmd = cmd;
+	memset(p, 0, sizeof p);
+	for (i = 0; i < 4; i++) {
+		uint32_t t = (op->paramTypes >> (4 * i)) & 0xF;
+		if (t >= TEEC_VALUE_INPUT && t <= TEEC_VALUE_INOUT) { p[i].value.a = op->params[i].value.a; p[i].value.b = op->params[i].value.b; }
+		else if (t >= TEEC_MEMREF_TEMP_INPUT && t <= TEEC_MEMREF_TEMP_INOUT) { p[i].memref.buffer = op->params[i].tmpref.buffer; p[i].memref.size = op->params[i].tmpref.size; }
+	}
+	r = rpi3_mon_pta_invoke(cmd, op->paramTypes, p, &handled);
+	if (!handled) return TEEC_ERROR_NOT_SUPPORTED;				/* would be the legacy path */
+	if (shim_tamper) shim_tamper(p);
+	if (r == TEE_SUCCESS || shim_copy_back_on_error)
+		for (i = 0; i < 4; i++) {
+			uint32_t t = (op->paramTypes >> (4 * i)) & 0xF;
+			if (t == TEEC_VALUE_OUTPUT || t == TEEC_VALUE_INOUT) { op->params[i].value.a = p[i].value.a; op->params[i].value.b = p[i].value.b; }
+			else if (t == TEEC_MEMREF_TEMP_OUTPUT || t == TEEC_MEMREF_TEMP_INOUT) op->params[i].tmpref.size = p[i].memref.size;
+		}
+	return r;
+}
+
+/* ---- setup shared with the harness style ---- */
+static const uint8_t KF[32] = RPI3_MON_KEY_FRAME_INIT;
+static void setup(void)
+{
+	memset(&M, 0, sizeof M); M.now = 1000000000ull; M.step = 60;
+	mock_init_extra_result = TEE_SUCCESS; mock_profile_debug = 0; mock_emsg_count = 0;
+	mock_fail_mac_alloc = mock_fail_mac_init = mock_fail_mac_final = mock_fail_rng = 0; mock_hmac_calls = 0; mock_mac_final_hook = NULL;
+	memset(&rpi3_mon, 0, sizeof rpi3_mon); (void)rpi3_mon_init();
+	M.tmode = 1; M.now = 5000000000ull; rpi3_mon.init_ticks = M.now; shim_copy_back_on_error = 1; shim_tamper = NULL;
+}
+static uint32_t take(void) { struct rpi3_mon_wait w; uint32_t e = 0; rpi3_mon_wait_init(&w); if (rpi3_mon_acquire(&w, &e) != RPI3_MON_OK) abort(); return e; }
+
+/* ---- CLI capture ---- */
+#define main cli_main
+#include "../../tools/monitor_client/mon_cli.c"
+#undef main
+static char out_buf[8192];
+static int run_cli(int argc, char **argv)
+{
+	char path[] = "/tmp/clicap_XXXXXX"; int fd = mkstemp(path), saved = dup(1), rc; ssize_t n;
+	fflush(stdout); dup2(fd, 1); rc = cli_main(argc, argv); fflush(stdout); dup2(saved, 1); close(saved);
+	lseek(fd, 0, SEEK_SET); n = read(fd, out_buf, sizeof out_buf - 1); out_buf[n < 0 ? 0 : n] = 0; close(fd); unlink(path); return rc;
+}
+static char *A(const char *s) { return (char *)(uintptr_t)s; }
+
+int main(void)
+{
+	struct mon_ctx c; struct mon_health h; uint32_t v, d, lost, n, eff, rem, seq, st; int more; uint8_t f[MON_FRAME_LEN]; uint64_t nonce; TEEC_Result r;
+	struct mon_event ev[MON_EVENT_MAX]; struct mon_status0 s0; struct mon_status1 s1; int i;
+
+	begin("HMAC: client SHA-256/HMAC equals RFC 4231 case 2, the independent Python tag and the Secure World mock for many sizes");
+	{ uint8_t o[32], o2[32]; static const uint8_t key[4] = {'J','e','f','e'}; mon_hmac_sha256(key, 4, (const uint8_t *)"what do ya want for nothing?", 28, o);
+	  CHECK(memcmp(o, "\x5b\xdc\xc1\x46\xbf\x60\x75\x4e\x6a\x04\x24\x26\x08\x95\x75\xc7\x5a\x00\x3f\x08\x9d\x27\x39\x83\x9d\xec\x58\xb9\x64\xec\x38\x43", 32) == 0);
+	  mon_build_frame(KF, 0x123, 100, 0xDDCCBBAA, f); CHECK(memcmp(f + 12, VEC_FRAME_TAG, 32) == 0);				/* the same vector the harness uses */
+	  for (i = 0; i < 300; i += 7) { uint8_t m[300], k[80]; size_t kl = (size_t)(i % 79) + 1; int j; for (j = 0; j < 300; j++) m[j] = (uint8_t)(j * 31 + i); for (j = 0; j < 80; j++) k[j] = (uint8_t)(j * 17 + i);
+		mon_hmac_sha256(k, kl, m, (size_t)i, o); host_hmac_sha256(k, kl, m, (size_t)i, o2); CHECK(memcmp(o, o2, 32) == 0); } } end();
+
+	begin("COMMANDS: status, frames, events, ack through the client against the real glue and logic"); setup(); CHECK(mon_open(&c) == TEEC_SUCCESS);
+	r = mon_get_status0(&c, &s0, &h); CHECK(r == TEEC_SUCCESS && s0.version == 1 && s0.length == 128 && (s0.flags & RPI3_MON_PFLAG_INIT_OK) && (s0.flags & RPI3_MON_PFLAG_HARDENED) && (h.p2b & MON_HP_INIT_OK) && s0.boot_id == rpi3_mon.boot_id);
+	mon_build_frame(KF, 0x123, 100, 1, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_RESYNC && shim_last_cmd == 17);
+	mon_build_frame(KF, 0x123, 101, 2, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_ACCEPTED);
+	mon_build_frame(KF, 0x123, 105, 3, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_GAP && d == 3);
+	mon_build_frame(KF, 0x123, 90, 4, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_REPLAY);
+	mon_build_frame(KF, 0x123, 106, 5, f); f[12] ^= 1; r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_AUTH_FAIL);
+	{ uint8_t other[32]; memset(other, 7, 32); mon_build_frame(other, 0x123, 106, 5, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_AUTH_FAIL); }	/* a wrong key is an AUTH_FAIL */
+	mon_build_frame(KF, 0x124, 106, 5, f); r = mon_submit_frame(&c, f, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V17_MALFORMED && d == 3);
+	r = mon_get_status1(&c, &s1, &h); CHECK(r == TEEC_SUCCESS && s1.version == 1 && s1.v_frame_total == 7 && s1.ev_count[RPI3_MON_EV_AUTH_FAIL] == 2 && s1.ev_count[RPI3_MON_EV_COUNTER_GAP] == 1);
+	r = mon_get_events(&c, 0, 5, ev, &n, &more, &lost, &h); CHECK(r == TEEC_SUCCESS && n == 5 && more == 1 && ev[0].seq == 1 && ev[4].seq == 5);
+	for (i = 1; i < 5; i++) CHECK(ev[i].seq > ev[i - 1].seq);
+	r = mon_get_events(&c, ev[4].seq + 1, 5, ev, &n, &more, &lost, &h); CHECK(r == TEEC_SUCCESS && n >= 1 && more == 0);
+	r = mon_ack_events(&c, 3, &eff, &h); CHECK(r == TEEC_SUCCESS && eff == 3); r = mon_ack_events(&c, 1, &eff, &h); CHECK(r == TEEC_SUCCESS && eff == 3);
+	r = mon_ack_events(&c, 1000000, &eff, &h); CHECK(r == TEEC_SUCCESS && eff == rpi3_mon.l.ev_seq);
+	CHECK(mon_get_events(&c, 0, 0, ev, &n, &more, &lost, &h) == TEEC_ERROR_BAD_PARAMETERS && mon_get_events(&c, 0, 6, ev, &n, &more, &lost, &h) == TEEC_ERROR_BAD_PARAMETERS);
+	end();
+
+	begin("COMMANDS: idle lease, nonce and answer"); setup(); CHECK(mon_open(&c) == TEEC_SUCCESS);
+	r = mon_set_idle(&c, 1, 1000, &v, &rem, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V21_GRANTED && rem == 1000);
+	r = mon_set_idle(&c, 0, 0, &v, &rem, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V21_RETURNED);
+	r = mon_set_idle(&c, 2, 5, &v, &rem, &h); CHECK(r == TEEC_ERROR_BAD_PARAMETERS);
+	r = mon_get_nonce(&c, &nonce, &seq, &st, &h); CHECK(r == TEEC_SUCCESS && nonce == 0 && st == RPI3_MON_HB_NONE);
+	{ uint32_t e = take(); rpi3_mon_hb_issue_if_due(rpi3_mon_l(), M.now); rpi3_mon_release(e); }
+	r = mon_get_nonce(&c, &nonce, &seq, &st, &h); CHECK(r == TEEC_SUCCESS && nonce != 0 && seq == 1 && st == RPI3_MON_HB_OPEN);
+	r = mon_submit_answer(&c, seq, nonce ^ 1, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V23_BAD_NONCE);
+	r = mon_submit_answer(&c, seq, nonce, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V23_ON_TIME);
+	r = mon_submit_answer(&c, seq, nonce, &v, &d, &h); CHECK(r == TEEC_SUCCESS && v == RPI3_MON_V23_DUPLICATE);
+	r = mon_get_nonce(&c, &nonce, &seq, &st, &h); CHECK(r == TEEC_SUCCESS && nonce == 0 && st == RPI3_MON_HB_ANSWERED);
+	end();
+
+	begin("BUSY and error returns: BUSY is reported with the health pair; outputs dropped on error leave a zero pair; the client never reads past a broken contract"); setup(); CHECK(mon_open(&c) == TEEC_SUCCESS);
+	M.ext_hold = 1; r = mon_get_status0(&c, &s0, &h); CHECK(r == TEEC_ERROR_BUSY && h.p3a == 1 && (h.p2b & MON_HP_INIT_OK));
+	shim_copy_back_on_error = 0; memset(&h, 0xEE, sizeof h); r = mon_get_status0(&c, &s0, &h); CHECK(r == TEEC_ERROR_BUSY && h.p2a == 0 && h.p2b == 0 && h.p3a == 0 && h.p3b == 0);	/* driver that drops outputs: zeros, not garbage */
+	shim_copy_back_on_error = 1; M.ext_hold = 0; r = mon_get_status0(&c, &s0, &h); CHECK(r == TEEC_SUCCESS);
+	rpi3_mon.init_ok = 0; r = mon_get_status0(&c, &s0, &h); CHECK(r == TEEC_ERROR_BAD_STATE && h.p2a == 0 && h.p2b == 0); rpi3_mon.init_ok = 1;
+	{ void tamper_count(TEE_Param p[4]); shim_tamper = tamper_count; mon_build_frame(KF, 0x123, 100, 1, f); (void)mon_submit_frame(&c, f, &v, &d, &h);
+	  r = mon_get_events(&c, 0, 1, ev, &n, &more, &lost, &h); CHECK(r == TEEC_ERROR_GENERIC); shim_tamper = NULL; }					/* monitor claims 7 records for a 1-record buffer */
+	end();
+
+	begin("CLI end to end (commands status, frame, events, ack, idle, nonce, answer) against the real glue and logic"); setup();
+	{ char *a1[] = {A("mon_client"), A("status")}; CHECK(run_cli(2, a1) == 0 && strstr(out_buf, "page 0: version 1 length 128") && strstr(out_buf, "init_ok=1")); }
+	{ char hex[65]; char *a2[] = {A("mon_client"), A("frame"), A("0x123"), A("100"), A("7"), A("--key-hex"), hex}; for (i = 0; i < 32; i++) sprintf(hex + 2 * i, "%02x", KF[i]);
+	  CHECK(run_cli(7, a2) == 0 && strstr(out_buf, "verdict RESYNC")); a2[3] = A("101"); CHECK(run_cli(7, a2) == 0 && strstr(out_buf, "verdict ACCEPTED"));
+	  { char *a3[] = {A("mon_client"), A("frame"), A("0x123"), A("102"), A("7"), A("--key-hex"), hex, A("--bad-tag")}; CHECK(run_cli(8, a3) == 0 && strstr(out_buf, "verdict AUTH_FAIL")); }
+	  CHECK(strstr(out_buf, hex) == NULL); }												/* the key is never printed */
+	{ char *a4[] = {A("mon_client"), A("frame"), A("0x123"), A("103"), A("7")}; CHECK(run_cli(5, a4) == 2); }					/* no key: refused, nothing submitted */
+	{ char *a5[] = {A("mon_client"), A("frame"), A("0x123"), A("103"), A("7"), A("--key-hex"), A("zz")}; CHECK(run_cli(7, a5) == 2); }
+	{ char *a6[] = {A("mon_client"), A("events"), A("--all"), A("--ack")}; CHECK(run_cli(4, a6) == 0 && strstr(out_buf, "AUTH_FAIL") && strstr(out_buf, "acknowledged up to")); }
+	{ char *a7[] = {A("mon_client"), A("idle"), A("on"), A("2000")}; CHECK(run_cli(4, a7) == 0 && strstr(out_buf, "GRANTED")); char *a8[] = {A("mon_client"), A("idle"), A("off")}; CHECK(run_cli(3, a8) == 0 && strstr(out_buf, "RETURNED")); }
+	{ char *a9[] = {A("mon_client"), A("answer")}; CHECK(run_cli(2, a9) == 0 && strstr(out_buf, "nothing to answer")); { uint32_t e = take(); rpi3_mon_hb_issue_if_due(rpi3_mon_l(), M.now); rpi3_mon_release(e); }
+	  CHECK(run_cli(2, a9) == 0 && strstr(out_buf, "answered: ON_TIME")); char *a10[] = {A("mon_client"), A("nonce")}; CHECK(run_cli(2, a10) == 0 && strstr(out_buf, "state ANSWERED")); }
+	{ char *a11[] = {A("mon_client"), A("status"), A("1")}; CHECK(run_cli(3, a11) == 0 && strstr(out_buf, "page 1:")); char *a12[] = {A("mon_client"), A("status"), A("2")}; CHECK(run_cli(3, a12) == 2); }
+	{ M.ext_hold = 1; char *a13[] = {A("mon_client"), A("--retries"), A("2"), A("status")}; CHECK(run_cli(4, a13) == 1); M.ext_hold = 0; }			/* persistent BUSY: bounded retries, then a clear failure */
+	{ char *a14[] = {A("mon_client")}; CHECK(run_cli(1, a14) == 2); }
+	end();
+	printf("client integration: %d checks, %d failed\n", nchk, nfail);
+	return nfail ? 1 : 0;
+}
+void tamper_count(TEE_Param p[4]) { p[0].value.a = 7; }

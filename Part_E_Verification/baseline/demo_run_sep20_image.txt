@@ -1,0 +1,42 @@
+### before
+rx=0 tx=0 rxerr=0 txerr=0
+  controller state       ERROR-ACTIVE (0)
+  ctrlmode ACTIVE        0x00000000  <>
+  loopback               disabled
+### enable loopback
+rc=0
+  controller state       ERROR-ACTIVE (0)
+  ctrlmode ACTIVE        0x00000001  <LOOPBACK>
+  loopback               ENABLED
+### secure_can_demo
+pthread_setaffinity_np: Success
+Normal World challenge: 0x12345678
+Secure World response: 0xb791f3dd
+Secure World marker:   0x5343414e (SCAN)
+PASS: project-specific Normal World to Secure World round trip
+[core 0] t=0ms Linux (Normal World) starting live CAN message pipeline over real hardware
+[core 0] t=23ms CAN id=0x100 classified SECURE by Secure World, routing for authentication
+Linux: CAN id=0x100 data=00 01 02 03 04 05 06 07 -> Secure World tag=a569b39f02c5ba4e  [Linux forwards the authenticated frame]
+[core 0] t=905ms CAN id=0x101 classified SECURE by Secure World, routing for authentication
+Linux: CAN id=0x101 data=11 12 13 14 15 16 17 18 -> Secure World tag=e8372c03234080cc  [Linux forwards the authenticated frame]
+[core 0] t=1788ms CAN id=0x102 classified SECURE by Secure World, routing for authentication
+Linux: CAN id=0x102 data=22 23 24 25 26 27 28 29 -> Secure World tag=ae5375384469dd1b  [Linux forwards the authenticated frame]
+[core 0] t=2669ms CAN id=0x103 classified NORMAL by Secure World, handled directly in Normal World
+[core 0] t=3491ms CAN id=0x104 classified NORMAL by Secure World, handled directly in Normal World
+PASS: Linux-controlled real CAN frames classified and routed by Secure World
+Linux: re-verifying the last SECURE frame already received from the bus
+PASS: Secure World accepted the authentic frame
+Linux: simulating a tampered frame on the bus (one data byte flipped)
+PASS: Secure World rejected the tampered frame
+DEMO_EXIT=0
+### counters after the demo
+rx=10 tx=5 rxerr=0 txerr=0
+### secure-world side after the demo
+FIQ count (interrupts that reached Secure World directly from the CAN controller): 0
+Last validation status: NONE (no frame validated yet since boot)
+secure_last_counter (highest accepted this boot): 0
+### new dmesg lines during the demo
+[  150.845418] can: controller area network core
+[  150.856088] NET: Registered PF_CAN protocol family
+[  150.925392] can: raw protocol
+(end)

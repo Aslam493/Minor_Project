@@ -1,0 +1,1 @@
+TEEC_InvokeCommand failed: 0xffff000a origin=0x00000004

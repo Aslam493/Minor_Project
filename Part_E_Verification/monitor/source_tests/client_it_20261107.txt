@@ -1,0 +1,27 @@
+ok   HMAC: client SHA-256/HMAC equals RFC 4231 case 2, the independent Python tag and the Secure World mock for many sizes
+ok   COMMANDS: status, frames, events, ack through the client against the real glue and logic
+ok   COMMANDS: idle lease, nonce and answer
+ok   BUSY and error returns: BUSY is reported with the health pair; outputs dropped on error leave a zero pair; the client never reads past a broken contract
+frame needs a valid --key-file or --key-hex (32 bytes)
+frame needs a valid --key-file or --key-hex (32 bytes)
+usage: mon_client [--retries N] <command>
+  status [0|1]                         command 20 (page 0 default)
+  events [--from SEQ] [--max 1..5] [--all] [--ack]   command 18 (and 19 with --ack)
+  ack SEQ                              command 19 (bookmark only)
+  idle on MS | idle off                command 21
+  nonce                                command 22
+  answer                               commands 22 then 23: answer the open challenge once
+  frame CANID COUNTER PAYLOAD (--key-file F | --key-hex HEX64) [--bad-tag]   command 17
+BUSY results are retried up to --retries times (default 5).
+status failed: 0xffff000d (BUSY)
+usage: mon_client [--retries N] <command>
+  status [0|1]                         command 20 (page 0 default)
+  events [--from SEQ] [--max 1..5] [--all] [--ack]   command 18 (and 19 with --ack)
+  ack SEQ                              command 19 (bookmark only)
+  idle on MS | idle off                command 21
+  nonce                                command 22
+  answer                               commands 22 then 23: answer the open challenge once
+  frame CANID COUNTER PAYLOAD (--key-file F | --key-hex HEX64) [--bad-tag]   command 17
+BUSY results are retried up to --retries times (default 5).
+ok   CLI end to end (commands status, frame, events, ack, idle, nonce, answer) against the real glue and logic
+client integration: 98 checks, 0 failed

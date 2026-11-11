@@ -1,0 +1,28 @@
+== 1. baseline (idle, Core 1 filled its stack at its first attempt) ==
+Core 1 tmp stack: size 4096 bytes | already in use at the fill point 688 | deepest touched 688 bytes | headroom 3408 bytes (required margin 2048) -> OK
+
+== 2. cadence 64 (more attempts), 40 s with NO heartbeat answers: miss and timeout paths ==
+cadence 64: 0x00000000 (0 = accepted)
+  last_counter 0 hb_seq 137 hb_state OPEN hb_miss_count 136 idle_uses 0
+Core 1 tmp stack: size 4096 bytes | already in use at the fill point 688 | deepest touched 688 bytes | headroom 3408 bytes (required margin 2048) -> OK
+
+== 3. 60 s soak: answered heartbeats, recovery, frames, traffic armed ==
+heartbeat answers: ON_TIME 61 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 75 p99 78 max 103
+frame submit latency (us): p50 8877 p99 9410 max 10222
+end state: flags 0x07 last_counter 1598 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +1681 starved 0
+Core 1 tmp stack: size 4096 bytes | already in use at the fill point 688 | deepest touched 688 bytes | headroom 3408 bytes (required margin 2048) -> OK
+
+== 4. 5 s silence after the soak: traffic-deadline timeout ==
+page 0: version 1 length 128 boot_id 0x8f2d7158 flags 0x1f mode 0
+seq 2 COUNTER_RESYNC       counter 1000 detail 0 ticks 2969242273
+seq 3 HEARTBEAT_RECOVERED  counter 137 detail 0 ticks 2969469031
+seq 4 TIMEOUT              counter 0 detail 1 ticks 4123159829
+seq 5 TIMEOUT              counter 0 detail 2 ticks 4181103752
+  returned 5, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1685
+Core 1 tmp stack: size 4096 bytes | already in use at the fill point 688 | deepest touched 688 bytes | headroom 3408 bytes (required margin 2048) -> OK
+
+== 5. cadence back to default ==
+cadence 0: 0x00000000 (0 = accepted)
+ 00:03:21 up 3 min,  load average: 0.02, 0.04, 0.01

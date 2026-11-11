@@ -1,0 +1,24 @@
+/*
+ * N-04 candidate: tell Linux that OP-TEE's secure memory is not its own.
+ * Range = TF-A secure SRAM (0x10000000, 1 MiB) + OP-TEE secure DRAM (0x10100000, 15 MiB)
+ *       = 0x10000000 .. 0x10ffffff (16 MiB). Matches TF-A SEC_SRAM_BASE/SIZE + SEC_DRAM0_BASE/SIZE
+ *       and OP-TEE CFG_TZDRAM_START/SIZE.
+ * 'no-map' also removes it from Linux's own kernel mapping, so a stray kernel access faults
+ * instead of silently writing. It does NOT stop DMA or a deliberate attack (no TZASC on the Pi 3).
+ * The existing /memreserve/ 0x08000000+32 MiB (shared memory) is left untouched.
+ * CANDIDATE ONLY - not installed anywhere.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target-path = "/reserved-memory";
+		__overlay__ {
+			optee_secure@10000000 {
+				reg = <0x10000000 0x01000000>;
+				no-map;
+			};
+		};
+	};
+};

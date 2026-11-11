@@ -1,0 +1,11 @@
+a   D_req < H                                                                                           PASS        500 ms < 1000 ms
+d1  D_req >= 20 x worst measured frame/answer submit latency                                            PASS        D_req 500 ms vs 20 x 10.7 ms = 214 ms
+d2  T >= sender period + jitter + 5 x worst measured submit latency                                     PASS        T 300 ms vs 100 + 50 + 53 ms
+d3  Core 1 attempt interval << T and << D_req (>= 100x)                                                 PASS        interval 448 us (cadence 16384 x 26.6 ns + 12.6 us)
+d4  PTA lock wait budget >= 100 x worst measured PTA hold                                               PASS        budget 1.00 ms vs 100 x 7.24 us = 724 us
+d5  attempt cap not the limiting bound (cap >= 2 x attempts per budget measured)                        PASS        cap 2000 vs 2 x 383 x 1.00 ms = 766
+d6  starvation window K_starve x interval >= 100 x worst PTA hold (a healthy PTA never starves Core 1)  PASS        K=8 x 448 us = 3587 us vs 100 x 7.24 us
+d7  heartbeat timeout K_miss x H                                                                        PASS        TIMEOUT after 3 misses = 3000 ms (information, no limit stated in the plan)
+c   ring >= N_req (plan default 128 records)                                                            NOT CHECKED N_req is not defined anywhere in the repository; pass --n-req. Note: the implemented ring is 64 slots (24 pinned + 40 ordinary, design G8) vs the plan default of 128
+b   32T >= 1.25 (grace + R)                                                                             NOT CHECKED R and grace are not defined anywhere in the repository; pass --r-ms and --grace-ms. For information: 32T = 9600 ms; if grace were the boot grace G = 60000 ms the inequality could not hold for ANY R >= 0 (1.25 x G = 75000 ms)
+wrote /home/aslam/Minor_Project/Part_E_Verification/monitor/derived/mon_params.h

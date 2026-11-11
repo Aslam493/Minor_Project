@@ -1,0 +1,2233 @@
+diff --git a/core/arch/arm/include/kernel/thread_arch.h b/core/arch/arm/include/kernel/thread_arch.h
+index 4d4765d5b..82a439f81 100644
+--- a/core/arch/arm/include/kernel/thread_arch.h
++++ b/core/arch/arm/include/kernel/thread_arch.h
+@@ -86,6 +86,17 @@ struct thread_vector_table {
+ 	uint32_t fiq_entry;
+ 	uint32_t system_off_entry;
+ 	uint32_t system_reset_entry;
++	/*
++	 * Project-specific (Plan A hard core-pinning). Mirrors the
++	 * `secure_server_entry` field TF-A's own struct optee_vectors
++	 * gained (trusted-firmware-a/services/spd/opteed/opteed_private.h)
++	 * and the matching `b vector_secure_server_entry` slot appended to
++	 * thread_vector_table in thread_optee_smc_a32.S (this project's
++	 * OP-TEE core builds as ARM32 - the a64 copy of that table is dead
++	 * code here) - all three MUST stay in sync, this is a fixed
++	 * cross-build-tree ABI with no shared header.
++	 */
++	uint32_t secure_server_entry;
+ };
+ 
+ extern struct thread_vector_table thread_vector_table;
+diff --git a/core/arch/arm/include/sm/teesmc_opteed.h b/core/arch/arm/include/sm/teesmc_opteed.h
+index 7213531aa..a3e45d70a 100644
+--- a/core/arch/arm/include/sm/teesmc_opteed.h
++++ b/core/arch/arm/include/sm/teesmc_opteed.h
+@@ -117,4 +117,17 @@
+ #define TEESMC_OPTEED_RETURN_SYSTEM_RESET_DONE \
+ 	TEESMC_OPTEED_RV(TEESMC_OPTEED_FUNCID_RETURN_SYSTEM_RESET_DONE)
+ 
++/*
++ * Project-specific (Plan A hard core-pinning). MUST be kept numerically
++ * identical to trusted-firmware-a/services/spd/opteed/teesmc_opteed.h's
++ * copy of this same definition - no shared header exists between the two
++ * build trees. Issued via thread_smc() from OP-TEE core's own normal
++ * running state (not during any vector dispatch) to wake physical core 1
++ * on demand, once Normal World signals boot is complete - see
++ * optee_os/core/arch/arm/plat-rpi3/rpi3_can_server.c.
++ */
++#define RPI3_OPTEED_FUNCID_WAKE_CORE1 9
++#define RPI3_OPTEED_WAKE_CORE1 \
++	TEESMC_OPTEED_RV(RPI3_OPTEED_FUNCID_WAKE_CORE1)
++
+ #endif /*__SM_TEESMC_OPTEED_H*/
+diff --git a/core/arch/arm/kernel/thread_optee_smc_a32.S b/core/arch/arm/kernel/thread_optee_smc_a32.S
+index 2a8c14c76..96cf00a89 100644
+--- a/core/arch/arm/kernel/thread_optee_smc_a32.S
++++ b/core/arch/arm/kernel/thread_optee_smc_a32.S
+@@ -146,6 +146,40 @@ UNWIND(	.cantunwind)
+ 	panic_at_smc_return
+ END_FUNC vector_system_reset_entry
+ 
++/*
++ * Project-specific (Plan A hard core-pinning): entered exactly once, on
++ * core 1 only, via a fresh synchronous entry made from TF-A's
++ * opteed_enter_secure_server_if_core1() (services/spd/opteed/opteed_pm.c),
++ * called from bl31_warm_entrypoint's tail - strictly AFTER core 1 has
++ * already gone through the completely normal vector_cpu_on_entry above
++ * once (so per-core init is already done, and no PSCI power-domain lock is
++ * held at this point, unlike vector_cpu_on_entry's own call site). Core 1
++ * is woken by Linux's own normal SMP bring-up (it tries to online every
++ * enabled cpu@N node, same as cores 2/3) - no manual psci_cpu_on() call is
++ * made on its behalf.
++ *
++ * Deliberately does NOT end in `smc #0` - core 1 must never eret into
++ * Non-Secure again, so this vector calls into rpi3_can_server_loop()
++ * (optee_os/core/arch/arm/plat-rpi3/rpi3_can_server.c), which is
++ * __noreturn, and never returns here either.
++ *
++ * THIS is the file that actually matters for this project's real OP-TEE
++ * core build: this build has CFG_ARM32_core=1 / CFG_ARM64_core unset
++ * (confirmed via out/arm/include/generated/conf.h), so
++ * thread_optee_smc_a64.S's copy of this same vector/weak-default pair is
++ * dead code for this project - never compiled at all
++ * (core/arch/arm/kernel/sub.mk: `srcs-$(CFG_ARM64_core) +=
++ * thread_optee_smc_a64.S`). Kept there anyway for a hypothetical future
++ * ARM64-core build, but THIS a32 copy is the one that must stay correct.
++ */
++LOCAL_FUNC vector_secure_server_entry , : , .identity_map
++UNWIND(	.cantunwind)
++	readjust_pc
++	bl	rpi3_can_server_loop
++	/* rpi3_can_server_loop() is __noreturn; reaching here is a bug */
++	panic_at_smc_return
++END_FUNC vector_secure_server_entry
++
+ /*
+  * Vector table supplied to ARM Trusted Firmware (ARM-TF) at
+  * initialization.  Also used when compiled with the internal monitor, but
+@@ -165,8 +199,29 @@ UNWIND(	.cantunwind)
+ 	b	vector_fiq_entry
+ 	b	vector_system_off_entry
+ 	b	vector_system_reset_entry
++	b	vector_secure_server_entry
+ END_FUNC thread_vector_table
+ DECLARE_KEEP_PAGER thread_vector_table
++
++/*
++ * Weak default for rpi3_can_server_loop(), so this file - and therefore
++ * every OP-TEE build, including today's working, already-flashed demo -
++ * keeps linking cleanly on its own before
++ * core/arch/arm/plat-rpi3/rpi3_can_server.c (which provides the real,
++ * __noreturn implementation) is added to plat-rpi3/sub.mk. The moment that
++ * file is added to the build, its strong, non-weak C definition of this
++ * same symbol overrides this default automatically via standard ELF
++ * weak-symbol resolution - no other change needed here at that point. This
++ * default is never expected to actually run: vector_secure_server_entry
++ * above is only ever reached via TF-A's opteed_enter_secure_server_if_core1()
++ * (services/spd/opteed/opteed_pm.c), which fires when physical core 1 takes
++ * the warm-boot path - which happens whenever Linux tries to bring it
++ * online, exactly like cores 2/3.
++ */
++WEAK_FUNC rpi3_can_server_loop , : , .identity_map
++UNWIND(	.cantunwind)
++	panic_at_smc_return
++END_FUNC rpi3_can_server_loop
+ #endif /*if defined(CFG_WITH_ARM_TRUSTED_FW)*/
+ 
+ FUNC thread_std_smc_entry , :
+diff --git a/core/arch/arm/kernel/thread_optee_smc_a64.S b/core/arch/arm/kernel/thread_optee_smc_a64.S
+index 1b08414c2..0fadc1724 100644
+--- a/core/arch/arm/kernel/thread_optee_smc_a64.S
++++ b/core/arch/arm/kernel/thread_optee_smc_a64.S
+@@ -86,6 +86,47 @@ LOCAL_FUNC vector_cpu_on_entry , : , .identity_map
+ 	panic_at_smc_return
+ END_FUNC vector_cpu_on_entry
+ 
++/*
++ * Project-specific (Plan A hard core-pinning): entered exactly once, on
++ * core 0 only, via a fresh synchronous entry made from TF-A's
++ * opteed_enter_secure_server_if_core0() (services/spd/opteed/opteed_pm.c),
++ * called from bl31_warm_entrypoint's tail - strictly AFTER core 0 has
++ * already gone through the completely normal vector_cpu_on_entry above
++ * once (so per-core init - MMU, stack, thread_core_local - is already
++ * done, and no PSCI power-domain lock is held at this point, unlike
++ * vector_cpu_on_entry's own call site).
++ *
++ * Deliberately does NOT end in `smc #0` - core 0 must never eret into
++ * Non-Secure again, so this vector calls into rpi3_can_server_loop()
++ * (optee_os/core/arch/arm/plat-rpi3/rpi3_can_server.c), which is
++ * __noreturn, and never returns here either.
++ */
++LOCAL_FUNC vector_secure_server_entry , : , .identity_map
++	readjust_pc
++	bl	rpi3_can_server_loop
++	/* rpi3_can_server_loop() is __noreturn; reaching here is a bug */
++	panic_at_smc_return
++END_FUNC vector_secure_server_entry
++
++/*
++ * Weak default for rpi3_can_server_loop(), so this file - and therefore
++ * every OP-TEE build, including today's working, already-flashed demo -
++ * keeps linking cleanly on its own before
++ * core/arch/arm/plat-rpi3/rpi3_can_server.c (which provides the real,
++ * __noreturn implementation) is added to plat-rpi3/sub.mk. The moment that
++ * file is added to the build, its strong, non-weak C definition of this
++ * same symbol overrides this default automatically via standard ELF
++ * weak-symbol resolution - no other change needed here at that point. This
++ * default is never expected to actually run: vector_secure_server_entry
++ * above is only ever reached via TF-A's opteed_enter_secure_server_if_core0()
++ * (services/spd/opteed/opteed_pm.c), which itself only fires once
++ * RPI_PRIMARY_CPU has been moved off core 0 - not the case in any build
++ * produced today.
++ */
++WEAK_FUNC rpi3_can_server_loop , : , .identity_map
++	panic_at_smc_return
++END_FUNC rpi3_can_server_loop
++
+ LOCAL_FUNC vector_cpu_off_entry , : , .identity_map
+ 	readjust_pc
+ 	bl	thread_cpu_off_handler
+@@ -153,6 +194,7 @@ FUNC thread_vector_table , : , .identity_map, , nobti
+ 	b	vector_fiq_entry
+ 	b	vector_system_off_entry
+ 	b	vector_system_reset_entry
++	b	vector_secure_server_entry
+ END_FUNC thread_vector_table
+ DECLARE_KEEP_PAGER thread_vector_table
+ 
+diff --git a/core/arch/arm/plat-rpi3/platform_config.h b/core/arch/arm/plat-rpi3/platform_config.h
+index 4ee9093c1..39d513d8c 100644
+--- a/core/arch/arm/plat-rpi3/platform_config.h
++++ b/core/arch/arm/plat-rpi3/platform_config.h
+@@ -103,6 +103,30 @@
+ #define ARM_LOCAL_BASE                    0x40000000
+ #define ARM_LOCAL_REG_SIZE                0x100
+ #define ARM_LOCAL_GPU_INT_ROUTING_OFFSET  0x0c
++/* GPU_INT_ROUTING bits [3:2] select which physical core receives peripheral
++ * FIQs (bits [1:0] select IRQ routing, untouched here). Three separate call
++ * sites in this project's own code used to hardcode this to physical core 0
++ * via a magic-literal `routing &= ~0xcU`; all three now read this named
++ * constant instead.
++ *
++ * IMPORTANT - this constant identifies whichever physical core permanently
++ * owns Secure World / handles the CAN FIQ, which is deliberately NOT the
++ * same as "whichever core TF-A treats as boot-primary"
++ * (RPI_PRIMARY_CPU, trusted-firmware-a/plat/rpi/rpi3/include/platform_def.h).
++ * Under Plan A's hard-pinning design: RPI_PRIMARY_CPU stays at its stock
++ * value of 0 (physical core 0 always does the early boot on this hardware
++ * regardless of that setting - confirmed empirically, this design does not
++ * fight it), while physical core 1 is the one permanently diverted into
++ * Secure World (see opteed_enter_secure_server_if_core1() in
++ * trusted-firmware-a/services/spd/opteed/opteed_pm.c). So this constant must
++ * be 1 - the CAN FIQ must reach the permanent-secure core (1), not the
++ * boot-primary/Normal-World core (0). There is no shared header between the
++ * two build trees, so this must be kept correct by hand and re-checked
++ * whenever either RPI_PRIMARY_CPU or the secure-server target core changes.
++ */
++#define RPI3_PRIMARY_CORE_POS 1U
++#define ARM_LOCAL_GPU_INT_ROUTING_FIQ_MASK  0xcU
++#define ARM_LOCAL_GPU_INT_ROUTING_FIQ_SHIFT 2U
+ 
+ /*
+  * RPi memory map
+diff --git a/core/arch/arm/plat-rpi3/rpi3_can_fiq.c b/core/arch/arm/plat-rpi3/rpi3_can_fiq.c
+index 3cd349501..633bd1ae2 100644
+--- a/core/arch/arm/plat-rpi3/rpi3_can_fiq.c
++++ b/core/arch/arm/plat-rpi3/rpi3_can_fiq.c
+@@ -11,32 +11,357 @@
+  * failed attempts before reverting entirely. See KNOWLEDGE.md's eighth
+  * and ninth addenda for why this attempt is scoped/verified differently.
+  *
+- * Safety note specific to this file: everything here runs inside an
+- * FIQ handler - interrupts masked, no OP-TEE scheduler, no watchdog.
+- * Every wait loop below has a hard, small iteration bound. A loop that
+- * doesn't terminate here hangs the whole board with no recovery path,
+- * unlike a boot-time misconfiguration (which at least fails visibly at
+- * the next boot). Deliberately self-contained (its own SPI transfer
+- * code, not shared with rpi3_can_spi_poc.c) so every bound is auditable
+- * in this one file.
++ * Safety note specific to this file: interrupt_main_handler() (the actual
++ * FIQ entry point) and everything it calls directly run inside an FIQ
++ * handler - interrupts masked, no OP-TEE scheduler, no watchdog. Every wait
++ * loop in that path has a hard, small iteration bound. A loop that doesn't
++ * terminate there hangs the whole board with no recovery path, unlike a
++ * boot-time misconfiguration (which at least fails visibly at the next
++ * boot). Deliberately self-contained (its own SPI transfer code, not
++ * shared with rpi3_can_spi_poc.c) so every bound is auditable in this one
++ * file.
++ *
++ * STEP 4.4D REDESIGN: interrupt_main_handler() itself is now capture-only
++ * (bounded hardware I/O, no crypto, no heap allocation) - see its own
++ * comment. secure_can_validate_frame() (CAN ID/counter/timestamp/HMAC) has
++ * moved OUT of FIQ context entirely: it is now called from
++ * rpi3_can_server.c's rpi3_can_server_loop() (Core 1's permanent, ordinary
++ * -execution-context loop), via the exported rpi3_can_fiq_process_pending_frame()
++ * below, using a single-slot producer/consumer handoff
++ * (can0_frame_state/can0_last_frame_*). This was forced by a real hardware
++ * incident: HMAC-SHA256 computed directly inside interrupt_main_handler()
++ * hung the whole board (unresponsive to SSH and ICMP), consistent with
++ * KNOWLEDGE.md's Incident 3 (an undersized stack during HMAC crypto taking
++ * down the whole system, not failing gracefully). See
++ * can0_hmac_ctx's own comment for what was verified (and NOT fully
++ * resolved) about the stack this change actually runs on.
+  */
+ 
++#include <arm.h>
++#include <crypto/crypto.h>
+ #include <initcall.h>
+ #include <io.h>
+ #include <kernel/interrupt.h>
+ #include <kernel/panic.h>
++#include <kernel/thread.h>
++#include <kernel/thread_arch.h>
+ #include <mm/core_memprot.h>
+ #include <platform_config.h>
+ #include <string.h>
++#include <string_ext.h>
++#include <tee_api_defines.h>
+ #include <trace.h>
+ 
+ static uint32_t can0_fiq_count;
+ static uint32_t can0_last_frame_id;
+-static uint8_t can0_last_frame_data[8];
++/* Step 4.4C: widened from 8 to CAN0_FD_MEANINGFUL_LEN (40) bytes - [0..3]
++ * counter, [4..7] application payload, [8..39] received HMAC-SHA256 tag.
++ * rpi3_can_fiq_get_last_frame() (pre-existing debug command, unchanged)
++ * still only copies the first 8 bytes of this array, so it continues to
++ * expose counter+payload only, never the tag, without needing any
++ * modification itself.
++ */
++static uint8_t can0_last_frame_data[40];
+ static uint32_t can0_last_frame_valid;
+ 
++/* Step 4.4D: single-slot producer/consumer handoff between the FIQ
++ * (producer, interrupt_main_handler()) and Core 1's ordinary-context loop
++ * (consumer, rpi3_can_server_loop() in rpi3_can_server.c, via
++ * rpi3_can_fiq_process_pending_frame() below). This is deliberately NOT a
++ * queue - one frame in flight at a time, by design, for this first
++ * implementation (see can0_frame_dropped_count's own comment for the
++ * explicit overflow policy this implies).
++ *
++ * State machine:
++ *   EMPTY      - buffer free, FIQ may capture a new frame into it
++ *   PENDING    - FIQ has finished copying a complete frame; not yet claimed
++ *   PROCESSING - Core 1's loop has claimed it and is validating (including
++ *                HMAC) - FIQ must not touch can0_last_frame_* until this
++ *                goes back to EMPTY
++ *
++ * volatile (not a full atomic - none is needed: this is single-core,
++ * single-writer-per-field discipline, same class of primitive
++ * rpi3_can_server.c's own rpi3_can_server_heartbeat already uses) plus
++ * dsb() at every producer/consumer handoff point, matching the exact
++ * ordering discipline rpi3_can_server_push_result() already documents in
++ * rpi3_can_server.c ("coherency guarantees eventual visibility, not *when*
++ * - the barrier is what fixes ordering, not the cache").
++ */
++#define CAN0_FRAME_EMPTY      0U
++#define CAN0_FRAME_PENDING    1U
++#define CAN0_FRAME_PROCESSING 2U
++static volatile uint32_t can0_frame_state = CAN0_FRAME_EMPTY;
++
++/* Incremented whenever the FIQ finds a new frame but the single-slot buffer
++ * is not EMPTY (Core 1 hasn't finished the previous one yet). Explicit
++ * policy per this phase's design: do NOT overwrite the in-flight frame and
++ * do NOT block/wait in the FIQ for it to free up - drop the new event and
++ * count it. The dropped frame is not drained from the chip's own RX FIFO
++ * in this case (no UINC issued for it), so it is not silently lost at the
++ * hardware level either - it stays queued in the chip and will be picked
++ * up by a later FIQ once the buffer is free again and FIQ_CONTROL is
++ * re-armed. A bounded queue replacing this single-slot policy is
++ * explicitly deferred to a later step (Step 4.5), not this one.
++ */
++static uint32_t can0_frame_dropped_count;
++/* Step 4.3B: RX object bytes [8..11] (R2/RXMSGTS, only present because
++ * RXTSEN is set - see CAN0_CAPTURED_RXFIFOCON), previously read into obj[]
++ * and discarded. Same little-endian convention as every other multi-byte
++ * field in this file.
++ */
++static uint32_t can0_last_frame_timestamp;
++
++/* --- Step 4.2: Secure CAN Packet Validation (CAN ID + per-packet counter) ---
++ *
++ * Deliberately does NOT touch Step 3 (core-pinning), FIQ routing, GPIO25
++ * arming, CAN0_MSGRAM_BASE, or interrupt_main_handler()'s own control flow
++ * (SPI-idle wait, interrupt-clear, FIQ disarm, fiq_count/IMSG). This is a
++ * single, bounded, fixed-size validation step called AFTER
++ * read_pending_rx_frame() has already captured a frame into
++ * can0_last_frame_id/can0_last_frame_data, using only stack locals and
++ * updating a few static globals - no allocation, no unbounded loop, same
++ * FIQ-context safety discipline as the rest of this file.
++ *
++ * Packet format as of Step 4.2 (Classical CAN, 8-byte payload):
++ *   data[0..3] = uint32_t counter, little-endian
++ *   data[4..7] = 4-byte application payload (not interpreted here)
++ * STALE AS OF STEP 4.4C - superseded by the CAN-FD format below. Left here
++ * only as the historical record of what Step 4.2 itself introduced; see
++ * CAN0_FD_* further down for the current on-wire layout (counter and
++ * application payload keep these exact same byte offsets, 0..3 and 4..7 -
++ * only bytes 8 onward changed, from "unused/not present" to "HMAC tag +
++ * padding").
++ */
++#define SECURE_ALLOWED_CAN_ID 0x123U
++
++/* Validation outcome codes - exposed to Normal World for debugging only
++ * (see rpi3_can_fiq_get_validation_debug()); the *decision itself* is made
++ * and enforced entirely in Secure World, before this status is ever
++ * written for Normal World to read.
++ */
++#define CAN0_VALIDATION_NONE       0U /* no frame validated yet since boot */
++#define CAN0_VALIDATION_ACCEPTED   1U
++#define CAN0_VALIDATION_INVALID_ID 2U
++#define CAN0_VALIDATION_REPLAY     3U /* counter <= secure_last_counter */
++#define CAN0_VALIDATION_STALE      4U /* age > CAN0_TIMESTAMP_FRESHNESS_TICKS */
++#define CAN0_VALIDATION_HMAC_FAIL  5U /* received tag != recomputed tag */
++
++/* Step 4.4C: CAN-FD authenticated packet format (approved design, Step
++ * 4.4B). Canonical HMAC input is CAN_ID || COUNTER || APPLICATION_PAYLOAD,
++ * all little-endian, 12 bytes total - matches every other multi-byte
++ * field's byte order in this file. RXMSGTS/freshness (Step 4.3) stays a
++ * separate, receiver-side-only check and is deliberately NOT part of this
++ * input: the sender cannot predict the receiving chip's own free-running
++ * timestamp counter, so including it here would only ever verify under
++ * Internal Loopback (sender == validator), not a genuine second CAN node.
++ *
++ * On-wire CAN-FD payload layout (40 meaningful bytes):
++ *   bytes 0..3   counter, little-endian (same offset/semantics as Step 4.2)
++ *   bytes 4..7   application payload (unchanged from the old 8-byte format)
++ *   bytes 8..39  HMAC-SHA256 tag, full 32 bytes, over CAN_ID||COUNTER||PAYLOAD
++ *   bytes 40..47 explicit zero padding, NOT covered by HMAC, ignored on RX
++ *                (fills PLSIZE_48's 48-byte message-RAM slot; 40 is not
++ *                itself a valid CAN-FD DLC length - see can_fd_dlc2len() in
++ *                linux/drivers/net/can/dev/length.c, verified, not guessed:
++ *                {..,32,48,64} are the valid lengths above 32, so 48 is the
++ *                smallest that fits 40 meaningful bytes)
++ */
++#define CAN0_FD_COUNTER_LEN      4U
++#define CAN0_FD_APP_PAYLOAD_LEN  4U
++#define CAN0_FD_HMAC_TAG_LEN     32U
++#define CAN0_FD_MEANINGFUL_LEN   (CAN0_FD_COUNTER_LEN + CAN0_FD_APP_PAYLOAD_LEN + \
++				  CAN0_FD_HMAC_TAG_LEN) /* 40 */
++#define CAN0_FD_PLSIZE_BYTES     48U /* smallest valid CAN-FD length >= 40 */
++#define CAN0_FD_PADDING_LEN      (CAN0_FD_PLSIZE_BYTES - CAN0_FD_MEANINGFUL_LEN) /* 8 */
++/* can_fd_len2dlc(48) == 14 - linux/drivers/net/can/dev/length.c's own
++ * len2dlc[] table, verified directly, not derived by hand.
++ */
++#define CAN0_FD_DLC              14U
++/* TX/RX object flags word (same word this file's old comment already
++ * called "DLC=8 in bits 3:0, IDE=0, RTR=0, FDF=0") - bit positions verified
++ * against linux/drivers/net/can/spi/mcp251xfd/mcp251xfd.h's
++ * MCP251XFD_OBJ_FLAGS_FDF/BRS (BIT(7)/BIT(6)), not guessed. BRS
++ * (bit-rate switching, data phase at a different bitrate) is deliberately
++ * left unset everywhere in this file - enabling it would need a new,
++ * unverified CiDBTCFG (data bit timing) register value this project has
++ * never captured, and BRS=0 is always valid for a CAN-FD frame (data phase
++ * simply runs at the same nominal bitrate already configured via
++ * CAN0_CAPTURED_NBTCFG).
++ */
++#define MCP251XFD_OBJ_FLAGS_FDF  BIT32(7)
++
++/* Step 4.3C: Timestamp Freshness Validation - approved project policy.
++ * 200,000,000 ticks at the MCP2518FD's default 40MHz Time Base Counter
++ * clock (CiTSCON.TBCPRE left at reset value, i.e. no prescale) is 5.0
++ * seconds. Comparison uses unsigned 32-bit modular subtraction
++ * (age = live_tbc - packet_timestamp), which is correct for a free-running
++ * counter as long as the true elapsed time never exceeds half the 32-bit
++ * range (~107 seconds) - a stale-by-hours-or-days packet still computes a
++ * small, wrong "age" once elapsed time wraps past that half-range, but that
++ * is a fundamental property of a 32-bit modular counter, not a bug in this
++ * comparison; a packet that old is unambiguously not fresh either way.
++ */
++#define CAN0_TIMESTAMP_FRESHNESS_TICKS 200000000U
++
++/* Secure-World-only replay state. NOT exposed for Normal World to modify -
++ * only rpi3_can_fiq_get_validation_debug() (read-only) touches it from
++ * outside this file's own validation function.
++ *
++ * INITIALIZATION / REBOOT LIMITATION (deliberately not hidden): this is a
++ * plain static uint32_t, zero-initialized by BSS at every boot, same as
++ * every other static in this file. There is currently NO persistent
++ * (across-reboot) anti-replay state - a fresh boot always resets this to 0,
++ * so counter=1 is accepted again immediately after any reboot. This is
++ * intentional and acceptable for this first controlled test phase (Step
++ * 4.2 only claims replay protection *within a single boot session*), but
++ * it means a captured-and-replayed old frame WOULD be accepted again after
++ * a legitimate reboot. Persistent anti-replay state (e.g. via secure
++ * storage) is explicitly out of scope for this step and not implemented.
++ */
++static uint32_t secure_last_counter;
++
++/* Step 4.3C: TBC-reset epoch tracking. can0_secure_init() is called once
++ * per can0_secure_transmit() (see that function) but empirically (verified
++ * against Step 4.3B hardware data) does NOT reset an already-running CiTBC
++ * - only the first-ever TBCEN 0->1 transition since power-on actually
++ * resets/starts the counter; every later call finds TBCEN already set and
++ * leaves CiTBC running undisturbed. can0_tbc_epoch increments only on a
++ * genuine 0->1 transition, so a captured packet's timestamp can be checked
++ * against the SAME numbering epoch of CiTBC it was captured under - if the
++ * epoch ever changed between capture and validation (which cannot happen
++ * within one atomic FIQ today, but would matter if that ever changed), the
++ * packet is unconditionally treated as stale rather than comparing raw tick
++ * values across two different counter lifetimes.
++ */
++static uint32_t can0_tbc_epoch;
++static uint32_t can0_last_frame_tbc_epoch;
++
++/* Step 4.4C: HMAC-SHA256 key and pre-allocated MAC context.
++ *
++ * KEY: identical to secure_can_demo/ta/secure_can_ta.c's secure_can_demo_key
++ * and rpi3_can_server.c's rpi3_can_server_key (Step 4.4A audit found both;
++ * reused verbatim per this phase's instructions, not a new arbitrary key).
++ * This is a prototype/test key only, compiled directly into Secure World
++ * code - it is NOT provisioned via OP-TEE secure storage. Persistent,
++ * properly-provisioned key storage is explicitly future work (Step 4.4A/B
++ * found REE-FS secure storage requires a blocking RPC to Normal World's
++ * tee-supplicant, which cannot happen from FIQ context - a real
++ * provisioning path needs a one-time, non-FIQ load into this same static,
++ * not a per-packet storage read). Never exposed via any PTA command or the
++ * CLI - only this file's own HMAC computation ever reads it.
++ */
++#define CAN0_HMAC_KEY_LEN 32U
++static const uint8_t can0_hmac_key[CAN0_HMAC_KEY_LEN] = {
++	0x4b, 0x1e, 0x9a, 0x77, 0x3c, 0xd2, 0x08, 0xf5,
++	0x61, 0xae, 0x2f, 0x90, 0xc3, 0x14, 0x7b, 0xe6,
++	0x82, 0x35, 0xda, 0x0c, 0x59, 0xf1, 0xa4, 0x6d,
++	0x27, 0xbb, 0x93, 0x40, 0xe8, 0x1c, 0x66, 0xf9,
++};
++
++/* Allocated exactly once, from rpi3_can_fiq_init() (a driver_init() hook -
++ * ordinary boot-time init context, never FIQ context, and guaranteed to run
++ * after OP-TEE's crypto subsystem is ready: call_service_initcalls() runs
++ * tee_cryp_init()/crypto_init() strictly before call_driver_initcalls() runs
++ * this file's own init, per core/arch/arm/kernel/boot.c - verified, not
++ * assumed). Never freed (this is a permanent, boot-lifetime allocation, same
++ * lifetime as every other static in this file) and never reallocated per
++ * packet: crypto_mac_alloc_ctx()/crypto_mac_free_ctx() are called exactly
++ * once total.
++ *
++ * STEP 4.4D: can0_compute_hmac() (which uses this context) is no longer
++ * called from interrupt_main_handler()/secure_can_validate_frame() while
++ * they're running as the FIQ - that call chain hung the whole board on real
++ * hardware (see this file's top-of-file comment). It is now called only
++ * from rpi3_can_server_loop()'s ordinary execution, via
++ * rpi3_can_fiq_process_pending_frame() below.
++ *
++ * WHAT THIS DOES AND DOES NOT FIX (verified by inspection, not assumed):
++ * core/arch/arm/kernel/entry_a32.S's cpu_on_handler() sets SVC-mode's SP
++ * *and* FIQ-mode's SP to the exact same value - the top of this core's
++ * stack_tmp (thread_core_local[core].tmp_stack_va_end) - at the point every
++ * core, including core 1, comes up. rpi3_can_server_loop() runs in SVC
++ * mode. This means Core 1's loop and interrupt_main_handler() execute on
++ * the *same physical stack_tmp buffer* (2048 bytes total on this build:
++ * STACK_TMP_SIZE = 2048 + STACK_TMP_OFFS(0) + CFG_STACK_TMP_EXTRA(0), from
++ * core/arch/arm/include/kernel/thread_private_arch.h and this build's own
++ * out/arm/conf.mk) - NOT a separate, larger stack. What this redesign
++ * actually fixes is the *nesting depth*: the old crash called this same
++ * HMAC chain from *inside* an FIQ that had interrupted whatever was already
++ * on that stack, on top of the exception-entry prologue's own frame; now it
++ * runs from the loop's own top-level call depth, with nothing else nested
++ * underneath it on the same stack. That is a real improvement, but it is
++ * NOT the same claim as "this has a large, separate, thread-sized stack" -
++ * it does not. If HMAC's actual call depth (crypto_mac_init/update/final ->
++ * libtomcrypt's hmac_process()/hmac_done() -> SHA-256's own compression
++ * function and its message-schedule locals) still exceeds what's left of
++ * 2048 bytes, the same class of corruption is possible again. This has not
++ * been measured on hardware. Bumping CFG_STACK_TMP_EXTRA (a plain build
++ * config value, affects every core/every exception context) is the
++ * available, low-risk lever if headroom turns out to be insufficient -
++ * not exercised in this change, flagged for the next review.
++ *
++ * Separately (and unaffected by the above): libtomcrypt's own
++ * hmac_init()/hmac_done() (core/lib/libtomcrypt/src/mac/hmac/hmac_init.c,
++ * hmac_done.c) each internally XMALLOC/XFREE a small, fixed-size scratch
++ * buffer on every call, independent of this pre-allocated context - this
++ * remains true regardless of which context calls in, but is no longer a
++ * FIQ-context concern now that the call site is Core 1's ordinary loop,
++ * which is free to contend for OP-TEE's heap-allocator spinlock without
++ * violating this file's FIQ-specific "no unbounded wait" rule.
++ */
++static void *can0_hmac_ctx;
++
++/* Debug-only snapshot of the most recent validation attempt (accepted or
++ * rejected) - read by rpi3_can_fiq_get_validation_debug() only.
++ */
++static uint32_t can0_last_validation_status = CAN0_VALIDATION_NONE;
++static uint32_t can0_last_validation_id;
++static uint32_t can0_last_validation_counter;
++static uint32_t can0_last_fifo_index;
++static uint32_t can0_last_fifo_addr;
++static uint32_t can0_last_rxif_mask;
++static uint32_t can0_last_int_reg;
++static uint32_t can0_last_bdiag1;
++/* Step 4.4C: renumbered for the CAN-FD object. Which step of
++ * can0_secure_transmit() last returned false: 0 = last attempt succeeded
++ * (or none made yet), 1 = can0_secure_init(), 2 = can0_compute_hmac(),
++ * 3 = FIFOUA read, 4 = id write, 5 = flags write, 6..17 = the 12 payload
++ * word writes (6 + word index, word 0 = counter, word 1 = app payload,
++ * words 2..9 = HMAC tag, words 10..11 = padding), 18 = FIFOCON read,
++ * 19 = final FIFOCON write (the one issued right after arm_fiq_control() -
++ * see that function's comment for why this step in particular is the one
++ * under suspicion).
++ */
++static uint32_t can0_last_tx_fail_point;
++
+ uint32_t rpi3_can_fiq_count(void);
+ uint32_t rpi3_can_fiq_get_last_frame(uint32_t *id, uint8_t data[8]);
++uint32_t rpi3_can_fiq_get_debug(uint32_t *fifo_index, uint32_t *fifo_addr);
++void rpi3_can_fiq_get_rxif_debug(uint32_t *rxif_mask, uint32_t *int_reg);
++void rpi3_can_fiq_arm_gpio(void);
++uint32_t rpi3_can_fiq_transmit(uint32_t id, const uint8_t data[8]);
++uint32_t rpi3_can_fiq_get_bdiag1_debug(void);
++uint32_t rpi3_can_fiq_get_tx_fail_point(void);
++void rpi3_can_fiq_get_timestamp_debug(uint32_t *last_timestamp, uint32_t *tbc,
++				      uint32_t *tscon, uint32_t *packet_epoch,
++				      uint32_t *current_epoch);
++uint32_t rpi3_can_fiq_get_gpio_debug(uint32_t *gpeds0);
++void rpi3_route_fiq_to_primary_core(vaddr_t local);
++uint32_t rpi3_can_fiq_get_validation_debug(uint32_t *last_counter,
++					   uint32_t *checked_id,
++					   uint32_t *checked_counter,
++					   uint32_t *dropped_count);
++/* Step 4.4D: called from rpi3_can_server.c's rpi3_can_server_loop() only -
++ * see its own comment further down for the full handoff design. */
++bool rpi3_can_fiq_process_pending_frame(void);
++
++/* Diagnostic only (Problem 3I): thin exported wrapper around the existing,
++ * already-fixed mcp251xfd_write32() below, so a PTA command can isolate a
++ * single raw SPI write independent of the full can0_secure_transmit()
++ * sequence. No new SPI implementation - calls the exact same static
++ * function every other write in this file already uses.
++ */
++uint32_t rpi3_can_fiq_write_reg32(uint32_t addr, uint32_t value);
+ 
+ /* --- BCM2835 SPI0, self-contained (see file header for why) --- */
+ #define SPI_CS   0x00
+@@ -54,21 +379,211 @@ uint32_t rpi3_can_fiq_get_last_frame(uint32_t *id, uint8_t data[8]);
+ #define GPIO_GPSET0  0x1c
+ #define GPIO_GPCLR0  0x28
+ 
++/* GPIO 25 (can0's interrupt pin) register offsets/bit positions, verified
++ * against linux/drivers/pinctrl/bcm/pinctrl-bcm2835.c directly (not from
++ * memory - GPFSEL0 only covers pins 0-9, GPIO 25 needs GPFSEL2):
++ *   FSEL_REG(p)   = GPFSEL0 + (p/10)*4  -> FSEL_REG(25) = 0x08 (GPFSEL2)
++ *   FSEL_SHIFT(p) = (p%10)*3            -> FSEL_SHIFT(25) = 15
++ *   GPIO_REG_OFFSET/SHIFT(p) = p/32, p%32 -> GPIO 25 is bank 0, bit 25,
++ *     for the per-bank registers below (GPEDS0/GPLEN0 etc.)
++ */
++#define GPIO_GPFSEL2 0x08
++#define GPIO_GPEDS0  0x40
++#define GPIO_GPLEN0  0x70
++/* Pin Level register - reads GPIO 0-31's live electrical state directly,
++ * independent of any latched event/enable bit. Added to check whether
++ * GPIO 25 (can0's /INT pin, active-low) is genuinely asserted low right
++ * now, since FIQs keep firing on every arm even when CiINT shows zero
++ * interrupt flags (see KNOWLEDGE.md's ninth addendum).
++ */
++#define GPIO_GPLEV0  0x34
++#define CAN0_IRQ_GPIO       25U
++#define CAN0_IRQ_FSEL_SHIFT 15U /* FSEL_SHIFT(25) */
++#define CAN1_IRQ_GPIO       24U /* stays Linux-owned; must not be disturbed */
++
+ /* MCP251XFD registers/instructions used here (same specification
+  * reference as rpi3_can_spi_poc.c - Linux's drivers/net/can/spi/mcp251xfd,
+  * consulted for addresses/formats only, no code shared/reused).
+  */
+ #define MCP251XFD_INSTRUCTION_READ  0x3000
+ #define MCP251XFD_INSTRUCTION_WRITE 0x2000
++#define MCP251XFD_REG_CON        0x0000
++#define MCP251XFD_REG_CON_REQOP_SHIFT 24
++#define MCP251XFD_REG_CON_OPMOD_SHIFT 21
++#define MCP251XFD_REG_CON_MODE_MASK   0x7U
++#define MCP251XFD_REG_CON_MODE_INT_LOOPBACK 2U
++#define MCP251XFD_REG_CON_MODE_CONFIG       4U
++/* External Loopback: unlike Internal Loopback, the message is actually
++ * driven onto TXCAN and received back via RXCAN through the chip's real
++ * CAN protocol engine - tried after Internal Loopback was confirmed, via
++ * every register (CiCON mode, TXQ FIFOSTA showing the frame sent, RX
++ * FIFOSTA showing empty despite correct filter/FIFO config), to never
++ * deliver a frame to the RX FIFO on this specific chip - see
++ * KNOWLEDGE.md's ninth addendum.
++ */
++#define MCP251XFD_REG_CON_MODE_EXT_LOOPBACK  5U
++#define MCP251XFD_REG_NBTCFG     0x0004
++#define MCP251XFD_REG_TDC        0x000c
+ #define MCP251XFD_REG_INT        0x001c
+ #define MCP251XFD_REG_INT_RXIF   BIT32(1)
++#define MCP251XFD_REG_INT_RXIE   BIT32(17)
++#define MCP251XFD_FIFOCON_TXREQ  BIT32(9)
++#define MCP251XFD_FIFOCON_TXEN     BIT32(7)
++#define MCP251XFD_FIFOCON_RXTSEN   BIT32(5)
++#define MCP251XFD_FIFOCON_RXOVIE   BIT32(3)
++#define MCP251XFD_FIFOCON_TFNRFNIE BIT32(0)
++#define MCP251XFD_FIFOCON_FSIZE_SHIFT  24
++#define MCP251XFD_FIFOCON_PLSIZE_SHIFT 29
++#define MCP251XFD_FIFOCON_PLSIZE_8     0U
++/* Step 4.4C: PLSIZE encoding verified against
++ * linux/drivers/net/can/spi/mcp251xfd/mcp251xfd.h
++ * (MCP251XFD_REG_FIFOCON_PLSIZE_*, same GENMASK(31,29) field this file
++ * already uses) - values 0..7 map to 8,12,16,20,24,32,48,64 bytes; 6 is
++ * PLSIZE_48, the class this project's CAN-FD format uses.
++ */
++#define MCP251XFD_FIFOCON_PLSIZE_48    6U
++/* TXQCON-specific bits needed to rebuild CAN0_CAPTURED_TXQCON from named
++ * bits instead of hand-editing its raw literal (see that macro's own
++ * comment for why a hand-edit here specifically has bitten this project
++ * before). Verified against the same Linux header as the PLSIZE constants
++ * above: MCP251XFD_REG_TXQCON_TXAT_MASK = GENMASK(22,21),
++ * MCP251XFD_REG_TXQCON_TXAT_UNLIMITED = 3, MCP251XFD_REG_TXQCON_TXEN = BIT(7).
++ */
++#define MCP251XFD_REG_TXQCON_TXAT_SHIFT     21
++#define MCP251XFD_REG_TXQCON_TXAT_UNLIMITED 3U
++#define MCP251XFD_REG_TXQCON_TXEN           BIT32(7)
++/* Acceptance filter 0: without an enabled filter, the chip has nowhere
++ * to route a matching (or, as here, looped-back) frame at all - it gets
++ * dropped and flagged IVMIF instead of ever reaching an RX FIFO. Linux's
++ * own driver always configures one filter per RX ring for exactly this
++ * reason (mcp251xfd_chip_rx_filter_init_one() in mcp251xfd-chip-fifo.c);
++ * this file previously configured the RX FIFO itself but never a filter
++ * to feed it - see KNOWLEDGE.md's ninth addendum.
++ */
++#define MCP251XFD_REG_FLTCON0        0x01d0
++#define MCP251XFD_REG_FLTCON0_FLTEN0 BIT32(7)
++#define MCP251XFD_REG_FLTOBJ0        0x01f0
++#define MCP251XFD_REG_FLTMASK0       0x01f4
++/* Bus Diagnostic Register 1: the exact fault bit behind an IVMIF, per
++ * Linux's mcp251xfd_handle_ivmif() - IVMIF alone in CiINT never says
++ * *which* bus/format error occurred, only that one did.
++ */
++#define MCP251XFD_REG_BDIAG1         0x003c
++
++/* Step 4.3B: Time Base Counter (CiTBC) and its control register (CiTSCON) -
++ * addresses and bit positions confirmed against the official MCP2518FD
++ * datasheet (Registers 3-11/3-12) and cross-checked against Linux's own
++ * mcp251xfd-core.c (MCP251XFD_REG_TSCON/MCP251XFD_REG_TSCON_TBCEN) during
++ * the Step 4.3A read-only audit - not hand-derived.
++ *
++ * CiTBC is a free-running 32-bit counter, clocked from the chip's own
++ * oscillator (confirmed 40MHz via this project's own dmesg output), that
++ * only runs while CiTSCON.TBCEN=1 - "the TBC will be stopped and reset
++ * when TBCEN=0" (datasheet). POR default is TBCEN=0, and this project's
++ * own can0_secure_init() never touched this register until now - Step
++ * 4.3A's own hardware test confirmed CiTSCON reads 0x00000000 (TBCEN off)
++ * even after Linux's probe, because Linux only enables it from its
++ * ndo_open() ("ip link up") path, which this project has never invoked.
++ * TBCPRE=0 (bits 9:0, left at 0 here) means "increments every 1 clock" -
++ * the finest available resolution, matching what Linux's own driver uses
++ * when it does enable this (mcp251xfd_chip_timestamp_init()). At 40MHz
++ * this 32-bit counter wraps every ~107.4 seconds (2^32/40e6) - Linux's own
++ * driver comment states this explicitly for the same TBCPRE=0 setting.
++ */
++#define MCP251XFD_REG_TBC            0x0010
++#define MCP251XFD_REG_TSCON          0x0014
++#define MCP251XFD_REG_TSCON_TBCEN    BIT32(16)
++
++/* Secure-World CAN chip bring-up (roadmap Steps 16/17): this chip is
++ * never initialized by anything else once Linux's binding is removed
++ * (KNOWLEDGE.md's ninth addendum) - oscillator/bit-timing/FIFO config
++ * and the RXIE enable bit all have to come from here instead. These
++ * exact values were captured from Linux's own live, working
++ * configuration (`spi_poc_test --read-reg <addr>` while can0 was up
++ * under Linux) and reused verbatim rather than re-derived from a
++ * datasheet by hand - this project has been burned by hand-derived
++ * register values more than once already.
++ */
++#define CAN0_CAPTURED_NBTCFG    0x00440904U
++#define CAN0_CAPTURED_TDC       0x99000000U
++/* Step 4.4C: bumped from PLSIZE_8 to PLSIZE_48 for the CAN-FD 40-meaningful/
++ * 48-total-byte format (Step 4.4B design). Rebuilt from named bits (was a
++ * raw 0x00600080U literal: PLSIZE_8(000) | TXAT_UNLIMITED(11) at bits
++ * [22:21] | TXEN(1) at bit 7, FSIZE=0 meaning 1 slot - decoded, not
++ * guessed, before changing only the PLSIZE field) rather than hand-editing
++ * the literal, for the exact reason CAN0_CAPTURED_RXFIFOCON's own comment
++ * below already documents: a prior hand-edit of a raw PLSIZE literal
++ * silently dropped unrelated bits it didn't mean to touch.
++ */
++#define CAN0_CAPTURED_TXQCON \
++	((MCP251XFD_FIFOCON_PLSIZE_48 << MCP251XFD_FIFOCON_PLSIZE_SHIFT) | \
++	 (MCP251XFD_REG_TXQCON_TXAT_UNLIMITED << MCP251XFD_REG_TXQCON_TXAT_SHIFT) | \
++	 MCP251XFD_REG_TXQCON_TXEN)
++/* FIFOCON(1): RX, PLSIZE_48 - Step 4.4C bumped this together with
++ * CAN0_CAPTURED_TXQCON above, deliberately, in the same change.
++ *
++ * This project already hit the exact hazard being avoided here: a PLSIZE_16
++ * experiment was tried once (RX only, TXQ left at PLSIZE_8) after External
++ * Loopback mode showed a DLCMM fault ("received DLC larger than this FIFO's
++ * configured payload size"), on the theory that a bigger RX FIFO would
++ * remove the mismatch. It did the opposite: DLCMM then started appearing in
++ * Internal Loopback mode too, which had never faulted before that change.
++ * This points to DLCMM actually checking that a received object's size
++ * CLASS matches the FIFO's configured size class, not literally comparing
++ * DLC against byte capacity - internal loopback likely copies the TX
++ * object's own PLSIZE-shaped bytes into the RX slot, and a mismatched
++ * destination PLSIZE is what the chip objects to. That earlier experiment
++ * was reverted back to PLSIZE_8 on both sides to match - see
++ * KNOWLEDGE.md's ninth addendum. This time both TXQCON and RXFIFOCON are
++ * raised to PLSIZE_48 together, in this same edit, specifically to avoid
++ * repeating that mismatch.
++ *
++ * Built from named bits, not a hand-edited magic literal - a prior
++ * hand-edit of this exact value (bumping only PLSIZE) silently dropped
++ * RXOVIE and TFNRFNIE, which have nothing to do with PLSIZE but everything
++ * to do with whether this FIFO's "not empty" condition ever reaches
++ * CiINT.RXIF / the chip's physical /INT pin at all - Linux's own driver
++ * (mcp251xfd_chip_fifo.c) always sets both on every RX FIFO it configures.
++ */
++#define CAN0_CAPTURED_RXFIFOCON \
++	((MCP251XFD_FIFOCON_PLSIZE_48 << MCP251XFD_FIFOCON_PLSIZE_SHIFT) | \
++	 (31U << MCP251XFD_FIFOCON_FSIZE_SHIFT) | \
++	 MCP251XFD_FIFOCON_RXTSEN | MCP251XFD_FIFOCON_RXOVIE | \
++	 MCP251XFD_FIFOCON_TFNRFNIE)
++#define CAN0_RX_FIFO_INDEX      1U
++/* Bitmask, one bit per FIFO index: unambiguously RX-only, unlike
++ * FIFOSTA's TFNRFNIF bit which means something different for TX FIFOs
++ * ("not full") vs RX FIFOs ("not empty") - scanning FIFOSTA directly
++ * was the cause of the wrong-FIFO reads in earlier attempts (see
++ * KNOWLEDGE.md's ninth addendum).
++ */
++#define MCP251XFD_REG_RXIF       0x0020
+ #define MCP251XFD_FIFOCON(x)     (0x0050 + 0xc * (x))
+ #define MCP251XFD_FIFOCON_UINC   BIT32(8)
+ #define MCP251XFD_FIFOSTA(x)     (0x0054 + 0xc * (x))
+ #define MCP251XFD_FIFOSTA_TFNRFNIF BIT32(0)
+ #define MCP251XFD_FIFOUA(x)      (0x0058 + 0xc * (x))
+ #define MCP251XFD_MAX_FIFO       31U
+-#define MCP251XFD_RX_OBJ_LEN     20U /* id(4) + flags(4) + ts(4) + data(8) */
++/* Step 4.4C: bumped from 20 (8-byte Classical CAN payload) to 60 (48-byte
++ * CAN-FD PLSIZE_48 payload) - id(4) + flags(4) + ts(4) + data(48). Header
++ * layout (id/flags/ts) is unchanged and at the same offsets regardless of
++ * PLSIZE - confirmed against Linux's own struct mcp251xfd_hw_rx_obj_canfd
++ * (mcp251xfd.h), which has the identical id/flags/ts header before its
++ * (larger, PLSIZE_64-sized) data field. Only the data region grows.
++ */
++#define MCP251XFD_RX_OBJ_LEN     60U /* id(4) + flags(4) + ts(4) + data(48) */
++
++/* FIFOUA(x) returns an OFFSET within the chip's 2KB message RAM, not an
++ * absolute SPI address - confirmed from the datasheet's own text ("the
++ * address rolls over from 0xBFF to 0x400") and from this project's own live
++ * observation that FIFOUA(0) reads back as a small value (e.g. 0x08), nowhere
++ * near the 0x400-0xBFF RAM region. Without this base added, every message-
++ * object read/write in this file landed on real, unrelated SFRs instead of
++ * message RAM (0x08=C1DBTCFG, 0x0c=C1TDC, 0x10=C1TBC, 0x14=C1TSCON per the
++ * datasheet's own register map) - found via a live-hardware register audit,
++ * not a simulator or guess.
++ */
++#define CAN0_MSGRAM_BASE         0x0400U
+ 
+ /* Small, fixed loop bounds throughout - see file header. */
+ #define SPI_POLL_TIMEOUT_LOOPS 100000U
+@@ -123,6 +638,29 @@ static bool spi_wait_bit(vaddr_t base, uint32_t bit)
+ 	return false;
+ }
+ 
++/* Linux's own SPI0 driver may be mid-transaction (e.g. completing an
++ * unrelated transmit) at the exact instant this FIQ preempts it - the
++ * FIQ_CONTROL diversion means Linux never sees *this* interrupt, but it
++ * says nothing about what Linux's driver happens to be doing on the bus
++ * at that instant. Touching the bus while TA is already set would
++ * corrupt whatever Linux was doing (this is the confirmed cause of the
++ * CRC error / garbage frame seen in earlier attempts - see KNOWLEDGE.md's
++ * ninth addendum). Wait, bounded, for the bus to go idle first; if it
++ * never does, skip this event rather than corrupt anything - a graceful
++ * miss, not a hang.
++ */
++static bool wait_for_spi_idle(void)
++{
++	vaddr_t base = spi_base();
++	uint32_t i;
++
++	for (i = 0; i < SPI_POLL_TIMEOUT_LOOPS; i++) {
++		if (!(io_read32(base + SPI_CS) & SPI_CS_TA))
++			return true;
++	}
++	return false;
++}
++
+ static bool spi_transfer(const uint8_t *tx, uint8_t *rx, size_t len)
+ {
+ 	vaddr_t base = spi_base();
+@@ -175,6 +713,17 @@ static bool mcp251xfd_read(uint16_t addr, uint8_t *data, size_t len)
+ 	return true;
+ }
+ 
++static bool mcp251xfd_read32(uint16_t addr, uint32_t *value)
++{
++	uint8_t buf[4];
++
++	if (!mcp251xfd_read(addr, buf, sizeof(buf)))
++		return false;
++	*value = (uint32_t)buf[0] | ((uint32_t)buf[1] << 8) |
++		((uint32_t)buf[2] << 16) | ((uint32_t)buf[3] << 24);
++	return true;
++}
++
+ static bool mcp251xfd_write32(uint16_t addr, uint32_t value)
+ {
+ 	uint8_t tx[6] = { 0 };
+@@ -191,11 +740,427 @@ static bool mcp251xfd_write32(uint16_t addr, uint32_t value)
+ 	return spi_transfer(tx, rx, sizeof(tx));
+ }
+ 
++/* Bounded poll (SPI_POLL_TIMEOUT_LOOPS-scale, same safety discipline as
++ * spi_wait_bit) for CiCON.OPMOD to reach the requested mode after
++ * writing CiCON.REQOP - matches this project's existing "small, fixed
++ * iteration bound, no unbounded retry" rule even though this code path
++ * runs in ordinary PTA context (not FIQ context), not just for FIQ code.
++ */
++static bool can0_request_mode(uint32_t mode)
++{
++	uint32_t con = 0;
++	uint32_t opmod;
++	uint32_t i;
++
++	if (!mcp251xfd_read32(MCP251XFD_REG_CON, &con))
++		return false;
++	con &= ~(MCP251XFD_REG_CON_MODE_MASK << MCP251XFD_REG_CON_REQOP_SHIFT);
++	con |= mode << MCP251XFD_REG_CON_REQOP_SHIFT;
++	if (!mcp251xfd_write32(MCP251XFD_REG_CON, con))
++		return false;
++
++	for (i = 0; i < SPI_POLL_TIMEOUT_LOOPS; i++) {
++		if (!mcp251xfd_read32(MCP251XFD_REG_CON, &con))
++			return false;
++		opmod = (con >> MCP251XFD_REG_CON_OPMOD_SHIFT) &
++			MCP251XFD_REG_CON_MODE_MASK;
++		if (opmod == mode)
++			return true;
++	}
++	return false;
++}
++
++/* Brings the CAN chip up from scratch entirely from Secure World - see
++ * the CAN0_CAPTURED_* comment above for where these values come from.
++ * Idempotent: safe to call before every transmit, matching this file's
++ * existing "don't trust driver_init()-time state, redo cheap setup
++ * explicitly" discipline (see rpi3_can_fiq_arm_gpio()).
++ */
++static bool can0_secure_init(void)
++{
++	if (!can0_request_mode(MCP251XFD_REG_CON_MODE_CONFIG))
++		return false;
++
++	if (!mcp251xfd_write32(MCP251XFD_REG_NBTCFG, CAN0_CAPTURED_NBTCFG))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_REG_TDC, CAN0_CAPTURED_TDC))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_FIFOCON(0), CAN0_CAPTURED_TXQCON))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_FIFOCON(CAN0_RX_FIFO_INDEX),
++			       CAN0_CAPTURED_RXFIFOCON))
++		return false;
++
++	/* Accept-all filter 0, routed to the RX FIFO above - without this,
++	 * the chip has nowhere to route a matching frame and drops it
++	 * (IVMIF) instead of ever setting RXIF. FLTOBJ/FLTMASK both zero
++	 * means "don't care" for every ID bit (matches Linux's own
++	 * approach, which relies on their power-on-reset value rather than
++	 * writing them explicitly - written here anyway since this code
++	 * cannot assume the chip is at a fresh power-on reset).
++	 */
++	if (!mcp251xfd_write32(MCP251XFD_REG_FLTOBJ0, 0))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_REG_FLTMASK0, 0))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_REG_FLTCON0,
++			       MCP251XFD_REG_FLTCON0_FLTEN0 | CAN0_RX_FIFO_INDEX))
++		return false;
++
++	/* Mode transitions (e.g. into loopback below) set MODIF - and were
++	 * empirically observed to also leave IVMIF set (--rxif-debug showed
++	 * INT=0x00028008, both flags, RXIF never set, identical across
++	 * multiple otherwise-different transmit attempts - see
++	 * KNOWLEDGE.md's ninth addendum). Enable RXIE only *after* the mode
++	 * transition and only after explicitly clearing whatever the
++	 * transition itself latched, so a genuine later RXIF isn't
++	 * ambiguous against stale transition flags.
++	 */
++	if (!can0_request_mode(MCP251XFD_REG_CON_MODE_INT_LOOPBACK))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_REG_INT, 0))
++		return false;
++	/* BDIAG1 is sticky (only cleared by an explicit write, same as
++	 * Linux's mcp251xfd_handle_ivmif()) - clear it here so a later
++	 * --bdiag1-debug read after a transmit can only reflect *this*
++	 * attempt's fault, never one latched from a previous run.
++	 */
++	if (!mcp251xfd_write32(MCP251XFD_REG_BDIAG1, 0))
++		return false;
++	if (!mcp251xfd_write32(MCP251XFD_REG_INT, MCP251XFD_REG_INT_RXIE))
++		return false;
++
++	/* Step 4.3B: explicitly enable the Time Base Counter. Exact value
++	 * written: 0x00010000 (TBCEN=1, bit 16; TBCPRE[9:0]=0, i.e. finest
++	 * resolution/1 clock per tick - matches Linux's own
++	 * mcp251xfd_chip_timestamp_init(), which this project never invokes
++	 * since it requires "ip link up", never done here). Idempotent, same
++	 * as every other write in this function - safe to call on every
++	 * transmit. Read back and verify the bit actually took hold, matching
++	 * this file's existing "verify, don't just hope" discipline (see
++	 * can0_request_mode()'s own OPMOD poll above).
++	 */
++	{
++		uint32_t tscon_before = 0;
++		uint32_t tscon_readback = 0;
++		bool tbc_was_running;
++
++		/* Step 4.3C: read CiTSCON *before* writing it, so a call that
++		 * finds TBCEN already set (every call after the first this
++		 * boot, per the Step 4.3B hardware finding referenced above)
++		 * does not bump can0_tbc_epoch - only a genuine 0->1
++		 * transition does, since only that transition actually
++		 * resets/(re)starts CiTBC.
++		 */
++		if (!mcp251xfd_read32(MCP251XFD_REG_TSCON, &tscon_before))
++			return false;
++		tbc_was_running = (tscon_before & MCP251XFD_REG_TSCON_TBCEN) != 0;
++
++		if (!mcp251xfd_write32(MCP251XFD_REG_TSCON, MCP251XFD_REG_TSCON_TBCEN))
++			return false;
++		if (!mcp251xfd_read32(MCP251XFD_REG_TSCON, &tscon_readback))
++			return false;
++		if (!(tscon_readback & MCP251XFD_REG_TSCON_TBCEN))
++			return false;
++
++		if (!tbc_was_running)
++			can0_tbc_epoch++;
++	}
++	return true;
++}
++
++/* Step 4.4C: computes the canonical HMAC-SHA256 tag over
++ * CAN_ID || COUNTER || APPLICATION_PAYLOAD (12 bytes, all little-endian -
++ * same byte order as every other multi-byte field in this file). Used both
++ * by can0_secure_transmit() (to construct a tag to send) and
++ * secure_can_validate_frame() (to recompute the expected tag to compare
++ * against a received one) - one implementation, not duplicated. Defined
++ * here (before its first use in can0_secure_transmit() below) rather than
++ * near secure_can_validate_frame(), matching this file's existing
++ * define-before-use style for static helpers.
++ *
++ * Uses the pre-allocated can0_hmac_ctx (see its own comment for the
++ * allocate-once rationale and the documented residual per-call allocator
++ * touch inside crypto_mac_init()/crypto_mac_final()). Does NOT call
++ * crypto_mac_alloc_ctx()/crypto_mac_free_ctx() - only init/update/final,
++ * reusing the same context object every time.
++ */
++static bool can0_compute_hmac(uint32_t id, uint32_t counter,
++			      const uint8_t app_payload[CAN0_FD_APP_PAYLOAD_LEN],
++			      uint8_t tag_out[CAN0_FD_HMAC_TAG_LEN])
++{
++	uint8_t msg[4 + CAN0_FD_COUNTER_LEN + CAN0_FD_APP_PAYLOAD_LEN];
++
++	if (!can0_hmac_ctx)
++		return false;
++
++	msg[0] = (uint8_t)id;
++	msg[1] = (uint8_t)(id >> 8);
++	msg[2] = (uint8_t)(id >> 16);
++	msg[3] = (uint8_t)(id >> 24);
++	msg[4] = (uint8_t)counter;
++	msg[5] = (uint8_t)(counter >> 8);
++	msg[6] = (uint8_t)(counter >> 16);
++	msg[7] = (uint8_t)(counter >> 24);
++	memcpy(&msg[8], app_payload, CAN0_FD_APP_PAYLOAD_LEN);
++
++	if (crypto_mac_init(can0_hmac_ctx, can0_hmac_key, CAN0_HMAC_KEY_LEN))
++		return false;
++	if (crypto_mac_update(can0_hmac_ctx, msg, sizeof(msg)))
++		return false;
++	if (crypto_mac_final(can0_hmac_ctx, tag_out, CAN0_FD_HMAC_TAG_LEN))
++		return false;
++
++	return true;
++}
++
++/* Constructs and transmits a test frame directly via SPI, entirely from
++ * Secure World - needed because once Linux's binding to can0 is removed
++ * there is no SocketCAN interface left for anything else to send with.
++ * Loopback mode (set by can0_secure_init()) means the chip echoes this
++ * back to its own RX FIFO without needing a real second bus node,
++ * exactly like the existing `ip link ... loopback on` test flow this
++ * replaces.
++ */
++/* Routes peripheral FIQs to whichever core is actually primary
++ * (RPI3_PRIMARY_CORE_POS, platform_config.h), instead of the magic-literal
++ * "always core 0" this project had drifted into at THREE separate call
++ * sites (this file's rpi3_can_fiq_init() and arm_fiq_control(), plus
++ * core/pta/rpi3_can_spi_poc.c's ARM_FIQ command) - found in a full sweep
++ * after tonight's RPI_PRIMARY_CPU change, none of the three had been
++ * updated to match. Exported (not static) so the PTA file can call it too,
++ * replacing its own independent copy of the same three lines.
++ */
++void rpi3_route_fiq_to_primary_core(vaddr_t local)
++{
++	uint32_t routing = io_read32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET);
++
++	routing &= ~ARM_LOCAL_GPU_INT_ROUTING_FIQ_MASK;
++	routing |= (RPI3_PRIMARY_CORE_POS << ARM_LOCAL_GPU_INT_ROUTING_FIQ_SHIFT) &
++		   ARM_LOCAL_GPU_INT_ROUTING_FIQ_MASK;
++	io_write32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET, routing);
++}
++
++/* Arms FIQ routing for this platform's one FIQ source (see the
++ * VC_INTC and ARM_LOCAL register comments in platform_config.h).
++ * Deliberately separate from the ARM_FIQ PTA command's copy of this same
++ * logic: this one gets called from inside can0_secure_transmit(), timed
++ * to happen only after the chip is fully reinitialized and the message
++ * is already staged - arming any earlier risks a stray interrupt
++ * condition from the mode-transition sequence itself preempting our own
++ * in-flight SPI transaction, corrupting it exactly like Linux's
++ * transactions were corrupted before this file existed (see
++ * KNOWLEDGE.md's ninth addendum). This is why plain "arm, then transmit"
++ * as two separate PTA calls does not work reliably for this specific
++ * flow.
++ */
++static void arm_fiq_control(void)
++{
++	vaddr_t local = arm_local_base();
++	vaddr_t intc = vc_intc_base();
++
++	rpi3_route_fiq_to_primary_core(local);
++	rpi3_can_fiq_arm_gpio();
++	io_write32(intc + VC_INTC_FIQ_CONTROL_OFFSET,
++		  VC_INTC_FIQ_ENABLE | CAN0_GPIO_FIQ_SOURCE);
++}
++
++/* Step 4.4C: data[8] keeps its Step 4.2 meaning exactly (data[0..3]=counter
++ * little-endian, data[4..7]=application payload) - the external interface
++ * (this function, rpi3_can_fiq_transmit(), the PTA command, the CLI's
++ * --transmit-secure) is unchanged. Only the internal construction changes:
++ * this now computes the HMAC itself and writes the full CAN-FD object
++ * (counter+payload+tag+padding) instead of the old plain 8-byte object.
++ */
++static bool can0_secure_transmit(uint32_t id, const uint8_t data[8])
++{
++	uint8_t ua[4];
++	uint32_t addr;
++	uint32_t counter;
++	uint8_t payload[CAN0_FD_PLSIZE_BYTES] = { 0 }; /* zero-initialized: bytes
++							 * 40..47 stay 0 (explicit
++							 * padding) unless written */
++	uint32_t flags = CAN0_FD_DLC | MCP251XFD_OBJ_FLAGS_FDF; /* DLC=14 (48
++					bytes) in bits[3:0], FDF=1 (CAN-FD),
++					BRS=0 (deliberately not set - see
++					CAN0_FD_DLC's own comment: avoids
++					needing an unverified data-phase bit
++					timing register), IDE=0, RTR=0 */
++	uint32_t i;
++
++	/* Fully initialize and stage the message with FIQ_CONTROL still
++	 * disarmed - see arm_fiq_control()'s comment for why order matters
++	 * here.
++	 */
++	io_write32(vc_intc_base() + VC_INTC_FIQ_CONTROL_OFFSET, 0);
++
++	can0_last_tx_fail_point = 0;
++
++	if (!can0_secure_init()) {
++		can0_last_tx_fail_point = 1;
++		return false;
++	}
++
++	counter = (uint32_t)data[0] | ((uint32_t)data[1] << 8) |
++		  ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24);
++
++	/* payload[0..7] = counter + application payload, verbatim - same
++	 * bytes as the old 8-byte format occupied.
++	 */
++	memcpy(&payload[0], data, CAN0_FD_COUNTER_LEN + CAN0_FD_APP_PAYLOAD_LEN);
++
++	/* payload[8..39] = HMAC-SHA256 over CAN_ID||counter||app_payload
++	 * (the approved canonical input - see can0_compute_hmac()'s comment).
++	 * payload[40..47] is left at 0 from the initializer above - explicit
++	 * zero padding, not covered by HMAC.
++	 */
++	if (!can0_compute_hmac(id, counter, &data[CAN0_FD_COUNTER_LEN],
++			       &payload[CAN0_FD_COUNTER_LEN + CAN0_FD_APP_PAYLOAD_LEN])) {
++		can0_last_tx_fail_point = 2;
++		return false;
++	}
++
++	if (!mcp251xfd_read(MCP251XFD_FIFOUA(0), ua, sizeof(ua))) {
++		can0_last_tx_fail_point = 3;
++		return false;
++	}
++	addr = CAN0_MSGRAM_BASE + ((uint32_t)ua[0] | ((uint32_t)ua[1] << 8) |
++		((uint32_t)ua[2] << 16) | ((uint32_t)ua[3] << 24));
++
++	if (!mcp251xfd_write32((uint16_t)addr, id)) {
++		can0_last_tx_fail_point = 4;
++		return false;
++	}
++	if (!mcp251xfd_write32((uint16_t)(addr + 4), flags)) {
++		can0_last_tx_fail_point = 5;
++		return false;
++	}
++
++	/* TX objects are id(4)+flags(4)+data(48) = 56 bytes at PLSIZE_48 - NO
++	 * timestamp field (that only exists on RX objects; the chip fills it
++	 * in on receive) - same fact as the old 8-byte format, just a bigger
++	 * data region now. Written as CAN0_FD_PLSIZE_BYTES/4 = 12 4-byte
++	 * words, a small fixed-count bounded loop, same discipline as every
++	 * other loop in this file.
++	 */
++	for (i = 0; i < CAN0_FD_PLSIZE_BYTES / 4U; i++) {
++		uint32_t word = (uint32_t)payload[4U * i] |
++			((uint32_t)payload[4U * i + 1] << 8) |
++			((uint32_t)payload[4U * i + 2] << 16) |
++			((uint32_t)payload[4U * i + 3] << 24);
++
++		if (!mcp251xfd_write32((uint16_t)(addr + 8U + 4U * i), word)) {
++			can0_last_tx_fail_point = 6U + i; /* 6..17 */
++			return false;
++		}
++	}
++
++	{
++		uint32_t fifocon;
++		bool ok;
++
++		/* Read-modify-write: a blind overwrite here would wipe out
++		 * TXEN/PLSIZE/FSIZE etc. that CAN0_CAPTURED_TXQCON set,
++		 * leaving only the strobe bits - the same mistake fixed
++		 * below in read_pending_rx_frame()'s UINC write.
++		 */
++		if (!mcp251xfd_read32(MCP251XFD_FIFOCON(0), &fifocon)) {
++			can0_last_tx_fail_point = 18;
++			return false;
++		}
++		fifocon |= MCP251XFD_FIFOCON_UINC | MCP251XFD_FIFOCON_TXREQ;
++
++		/* Arm only now - everything above this point runs unarmed,
++		 * so nothing here can preempt itself.
++		 */
++		arm_fiq_control();
++
++		ok = mcp251xfd_write32(MCP251XFD_FIFOCON(0), fifocon);
++		if (!ok)
++			can0_last_tx_fail_point = 19;
++		return ok;
++	}
++}
++
+ uint32_t rpi3_can_fiq_count(void)
+ {
+ 	return can0_fiq_count;
+ }
+ 
++uint32_t rpi3_can_fiq_transmit(uint32_t id, const uint8_t data[8])
++{
++	return can0_secure_transmit(id, data) ? 1 : 0;
++}
++
++uint32_t rpi3_can_fiq_write_reg32(uint32_t addr, uint32_t value)
++{
++	return mcp251xfd_write32((uint16_t)addr, value) ? 1 : 0;
++}
++
++uint32_t rpi3_can_fiq_get_debug(uint32_t *fifo_index, uint32_t *fifo_addr)
++{
++	*fifo_index = can0_last_fifo_index;
++	*fifo_addr = can0_last_fifo_addr;
++	return can0_last_frame_valid;
++}
++
++void rpi3_can_fiq_get_rxif_debug(uint32_t *rxif_mask, uint32_t *int_reg)
++{
++	*rxif_mask = can0_last_rxif_mask;
++	*int_reg = can0_last_int_reg;
++}
++
++uint32_t rpi3_can_fiq_get_bdiag1_debug(void)
++{
++	return can0_last_bdiag1;
++}
++
++uint32_t rpi3_can_fiq_get_tx_fail_point(void)
++{
++	return can0_last_tx_fail_point;
++}
++
++/* Step 4.3B: last captured RX timestamp (cached from the most recent FIQ
++ * capture) plus live reads of CiTBC/CiTSCON. Called from ordinary PTA
++ * invoke_command context (like read_register32() for --read-reg), never
++ * from FIQ context - a fresh SPI transaction here is safe, matching this
++ * file's existing pattern for anything that needs the CURRENT chip state
++ * rather than a FIQ-time snapshot. On an SPI failure, the corresponding
++ * output is left at 0 rather than propagating a bool/TEE_Result, matching
++ * this debug-only command's existing simple void-return siblings.
++ */
++void rpi3_can_fiq_get_timestamp_debug(uint32_t *last_timestamp, uint32_t *tbc,
++				      uint32_t *tscon, uint32_t *packet_epoch,
++				      uint32_t *current_epoch)
++{
++	*last_timestamp = can0_last_frame_timestamp;
++	if (!mcp251xfd_read32(MCP251XFD_REG_TBC, tbc))
++		*tbc = 0;
++	if (!mcp251xfd_read32(MCP251XFD_REG_TSCON, tscon))
++		*tscon = 0;
++	/* Step 4.3C: expose the epoch bookkeeping used by
++	 * can0_check_timestamp_fresh(), so a test can confirm whether the
++	 * last captured packet's epoch still matches the live one.
++	 */
++	*packet_epoch = can0_last_frame_tbc_epoch;
++	*current_epoch = can0_tbc_epoch;
++}
++
++/* Live GPIO 25 pin level and GPEDS0's latched-event bit, read directly -
++ * neither goes through the CAN chip at all, so this can't be affected by
++ * anything wrong on the SPI/chip side. Used to check whether GPIO 25 is
++ * genuinely electrically asserted (active-low) right now, since FIQs keep
++ * firing on every arm even when CiINT shows zero interrupt flags.
++ */
++uint32_t rpi3_can_fiq_get_gpio_debug(uint32_t *gpeds0)
++{
++	vaddr_t base = gpio_base();
++	uint32_t gplev0 = io_read32(base + GPIO_GPLEV0);
++
++	*gpeds0 = io_read32(base + GPIO_GPEDS0);
++	return (gplev0 >> CAN0_IRQ_GPIO) & 1U;
++}
++
+ uint32_t rpi3_can_fiq_get_last_frame(uint32_t *id, uint8_t data[8])
+ {
+ 	if (!can0_last_frame_valid)
+@@ -213,52 +1178,377 @@ uint32_t rpi3_can_fiq_get_last_frame(uint32_t *id, uint8_t data[8])
+ static bool read_pending_rx_frame(void)
+ {
+ 	uint32_t fifo;
+-	uint8_t sta[4];
++	uint8_t rxif[4];
++	uint32_t rxif_mask;
+ 	uint8_t ua[4];
+ 	uint32_t addr;
+ 	uint8_t obj[MCP251XFD_RX_OBJ_LEN];
+ 
++	if (!mcp251xfd_read(MCP251XFD_REG_RXIF, rxif, sizeof(rxif)))
++		return false;
++	rxif_mask = (uint32_t)rxif[0] | ((uint32_t)rxif[1] << 8) |
++		((uint32_t)rxif[2] << 16) | ((uint32_t)rxif[3] << 24);
++	can0_last_rxif_mask = rxif_mask;
++	mcp251xfd_read32(MCP251XFD_REG_INT, &can0_last_int_reg);
++	/* Read before anything else touches the chip: this is the only
++	 * place that says *which* bus/format error set IVMIF (DLCMM,
++	 * NACKERR, form/stuff/CRC error, ...), and it stays latched until
++	 * explicitly cleared (see mcp251xfd_handle_ivmif() in Linux).
++	 */
++	mcp251xfd_read32(MCP251XFD_REG_BDIAG1, &can0_last_bdiag1);
++
+ 	for (fifo = 1; fifo <= FIFO_SCAN_MAX; fifo++) {
+-		if (!mcp251xfd_read(MCP251XFD_FIFOSTA(fifo), sta, sizeof(sta)))
+-			return false;
+-		if (!(sta[0] & MCP251XFD_FIFOSTA_TFNRFNIF))
++		if (!(rxif_mask & BIT32(fifo)))
+ 			continue;
+ 
+ 		if (!mcp251xfd_read(MCP251XFD_FIFOUA(fifo), ua, sizeof(ua)))
+ 			return false;
+-		addr = (uint32_t)ua[0] | ((uint32_t)ua[1] << 8) |
+-			((uint32_t)ua[2] << 16) | ((uint32_t)ua[3] << 24);
++		addr = CAN0_MSGRAM_BASE + ((uint32_t)ua[0] | ((uint32_t)ua[1] << 8) |
++			((uint32_t)ua[2] << 16) | ((uint32_t)ua[3] << 24));
+ 
+ 		if (!mcp251xfd_read((uint16_t)addr, obj, sizeof(obj)))
+ 			return false;
+ 
+ 		can0_last_frame_id = (uint32_t)obj[0] | ((uint32_t)obj[1] << 8) |
+ 			((uint32_t)obj[2] << 16) | ((uint32_t)obj[3] << 24);
+-		memcpy(can0_last_frame_data, &obj[12], 8);
++		/* Step 4.3B: obj[4..7] is the flags/DLC word (R1), still not
++		 * parsed here - only obj[8..11] (R2/RXMSGTS) is new.
++		 */
++		can0_last_frame_timestamp = (uint32_t)obj[8] | ((uint32_t)obj[9] << 8) |
++			((uint32_t)obj[10] << 16) | ((uint32_t)obj[11] << 24);
++		/* Step 4.3C: tag this capture with the CiTBC epoch it was taken
++		 * under (see can0_tbc_epoch's declaration comment).
++		 */
++		can0_last_frame_tbc_epoch = can0_tbc_epoch;
++		/* Step 4.4C: obj[12..51] is the 40 meaningful CAN-FD payload
++		 * bytes (counter[0..3] + app payload[4..7] + HMAC tag[8..39]);
++		 * obj[52..59] is the 8 padding bytes and is deliberately never
++		 * copied anywhere or looked at - the receiver only ever needs
++		 * the meaningful bytes. RXMSGTS above (obj[8..11]) is not
++		 * confused with any of this - it is read from a completely
++		 * separate, earlier, fixed offset that does not move with
++		 * PLSIZE (verified against Linux's own
++		 * struct mcp251xfd_hw_rx_obj_canfd).
++		 */
++		memcpy(can0_last_frame_data, &obj[12], CAN0_FD_MEANINGFUL_LEN);
+ 		can0_last_frame_valid = 1;
++		can0_last_fifo_index = fifo;
++		can0_last_fifo_addr = addr;
+ 
+ 		/* Advance the FIFO tail (UINC) so the chip knows this
+-		 * message was consumed.
++		 * message was consumed. Read-modify-write: a blind overwrite
++		 * would wipe out this FIFO's TXEN/PLSIZE/FSIZE/RXTSEN config
++		 * bits, leaving only UINC set - fine for a one-shot capture
++		 * but would corrupt the FIFO's config for any later use.
+ 		 */
+-		mcp251xfd_write32(MCP251XFD_FIFOCON(fifo), MCP251XFD_FIFOCON_UINC);
++		{
++			uint32_t fifocon;
++
++			if (mcp251xfd_read32(MCP251XFD_FIFOCON(fifo), &fifocon)) {
++				fifocon |= MCP251XFD_FIFOCON_UINC;
++				mcp251xfd_write32(MCP251XFD_FIFOCON(fifo), fifocon);
++			}
++		}
+ 		return true;
+ 	}
+ 	return false;
+ }
+ 
++/* Step 4.3C: freshness check. packet_timestamp/packet_epoch come from
++ * can0_last_frame_timestamp/can0_last_frame_tbc_epoch, captured at the same
++ * moment read_pending_rx_frame() read the RX object - not re-read here.
++ * live_tbc is read fresh, right now, via a direct SPI read of CiTBC.
++ *
++ * age uses unsigned 32-bit modular subtraction, which is the wrap-safe way
++ * to compare a free-running counter's "now" against an earlier sample, as
++ * long as the true elapsed time stays under half the 32-bit range (see
++ * CAN0_TIMESTAMP_FRESHNESS_TICKS's comment for the wraparound caveat).
++ */
++static bool can0_check_timestamp_fresh(uint32_t packet_timestamp,
++					uint32_t packet_epoch)
++{
++	uint32_t live_tbc = 0;
++	uint32_t age;
++
++	if (packet_epoch != can0_tbc_epoch)
++		return false;
++
++	if (!mcp251xfd_read32(MCP251XFD_REG_TBC, &live_tbc))
++		return false;
++
++	age = live_tbc - packet_timestamp;
++	return age <= CAN0_TIMESTAMP_FRESHNESS_TICKS;
++}
++
++/* Step 4.2/4.3/4.4C/4.4D validation. STEP 4.4D: no longer called from FIQ
++ * context - called only from rpi3_can_fiq_process_pending_frame() below,
++ * itself only ever called from rpi3_can_server_loop()'s ordinary Core 1
++ * execution (rpi3_can_server.c). id/data are the frame
++ * rpi3_can_fiq_process_pending_frame() has just claimed from the
++ * can0_frame_state handoff (CAN0_FD_MEANINGFUL_LEN bytes) - read_pending_rx_frame()
++ * (FIQ context) captured them earlier; nothing here re-reads the chip. This
++ * is exactly the function whose HMAC step previously ran inside the FIQ and
++ * hung the board - see this file's top-of-file comment and can0_hmac_ctx's
++ * own comment for what changed and what is/isn't fixed by that change.
++ *
++ * Validation order (Step 4.4C adds the HMAC check between freshness and
++ * final accept; the CAN ID, replay, and freshness checks themselves are
++ * unchanged from Step 4.2/4.3):
++ *   1. extract counter (data[0..3], little-endian) and note the id
++ *   2. check CAN ID first
++ *   3. check counter strictly-monotonic against secure_last_counter
++ *   4. check the captured frame's timestamp is fresh (age within policy)
++ *   5. recompute the HMAC over CAN_ID||counter||data[4..7] and compare,
++ *      constant-time, against the received tag at data[8..39]
++ *   6. only on ALL FOUR passing: accept and advance secure_last_counter
++ *   7. on any failing: drop, secure_last_counter is left untouched
++ *
++ * secure_last_counter is deliberately NOT advanced until step 5 also
++ * passes: a replay-valid, fresh, but HMAC-invalid frame must not consume
++ * that counter value, otherwise a genuine later frame reusing it would be
++ * wrongly rejected as a replay.
++ */
++static void secure_can_validate_frame(uint32_t id,
++				      const uint8_t data[CAN0_FD_MEANINGFUL_LEN])
++{
++	uint32_t counter = (uint32_t)data[0] | ((uint32_t)data[1] << 8) |
++			   ((uint32_t)data[2] << 16) | ((uint32_t)data[3] << 24);
++	const uint8_t *app_payload = &data[CAN0_FD_COUNTER_LEN];
++	const uint8_t *received_tag = &data[CAN0_FD_COUNTER_LEN + CAN0_FD_APP_PAYLOAD_LEN];
++	uint8_t expected_tag[CAN0_FD_HMAC_TAG_LEN];
++
++	can0_last_validation_id = id;
++	can0_last_validation_counter = counter;
++
++	if (id != SECURE_ALLOWED_CAN_ID) {
++		can0_last_validation_status = CAN0_VALIDATION_INVALID_ID;
++		return;
++	}
++
++	/* Strictly monotonic: counter must be greater than the last ACCEPTED
++	 * counter. Equal or lower is replay/out-of-order - reject without
++	 * touching secure_last_counter.
++	 */
++	if (counter <= secure_last_counter) {
++		can0_last_validation_status = CAN0_VALIDATION_REPLAY;
++		return;
++	}
++
++	/* Counter/replay passed - do NOT commit secure_last_counter yet,
++	 * the freshness and HMAC checks can still reject this frame.
++	 */
++	if (!can0_check_timestamp_fresh(can0_last_frame_timestamp,
++					 can0_last_frame_tbc_epoch)) {
++		can0_last_validation_status = CAN0_VALIDATION_STALE;
++		return;
++	}
++
++	/* HMAC over CAN_ID||counter||application_payload only - padding
++	 * bytes 40..47 are never read here, matching the approved design
++	 * (Step 4.4B/4.4C: padding is not part of the authenticated input).
++	 */
++	if (!can0_compute_hmac(id, counter, app_payload, expected_tag) ||
++	    consttime_memcmp(expected_tag, received_tag,
++			     CAN0_FD_HMAC_TAG_LEN) != 0) {
++		can0_last_validation_status = CAN0_VALIDATION_HMAC_FAIL;
++		return;
++	}
++
++	secure_last_counter = counter;
++	can0_last_validation_status = CAN0_VALIDATION_ACCEPTED;
++}
++
++/* Step 4.4D: the Core-1-side half of the FIQ<->loop handoff. Called only
++ * from rpi3_can_server_loop() (rpi3_can_server.c), in its own ordinary
++ * execution - never from FIQ context. Returns false (nothing to do) unless
++ * a frame is actually PENDING.
++ *
++ * Claims the frame (PENDING -> PROCESSING) before touching
++ * can0_last_frame_*, so a new FIQ capture during validation is safely
++ * refused by interrupt_main_handler()'s own EMPTY check instead of racing
++ * this read. Releases it (-> EMPTY) only after secure_can_validate_frame()
++ * (HMAC included) has fully finished, with a barrier on each side of the
++ * claim, matching this file's now-established producer/consumer barrier
++ * discipline (see can0_frame_state's own comment).
++ *
++ * STEP 4.4E: after releasing the buffer, makes exactly one bounded
++ * catch-up attempt to drain any frame that arrived while this one was
++ * being processed. This closes a real gap found by inspection (not
++ * assumed): CiINT.RXIF is not software-clearable (confirmed against
++ * MCP251XFD_REG_INT_IF_CLEARABLE_MASK in Linux's mcp251xfd.h - RXIF is not
++ * a member of that mask, unlike MODIF/IVMIF/CERRIF/SERRIF/WAKIF), so a
++ * frame left undrained in the chip's RX FIFO while the buffer was busy is
++ * never lost at the hardware level, but nothing was otherwise going to
++ * service it soon - the only thing that previously re-armed FIQ_CONTROL is
++ * can0_secure_transmit(), i.e. a future, logically unrelated transmit.
++ * This makes Core 1 self-sufficient for draining that backlog instead:
++ * bounded (one read_pending_rx_frame() call, which itself already returns
++ * cleanly and quickly if nothing is pending - not a new loop), and reuses
++ * exactly the same capture function and barrier convention the FIQ itself
++ * uses, just called from this safer, non-FIQ context. Does NOT touch
++ * FIQ_CONTROL, GPIO25, or any interrupt routing - if more than one extra
++ * frame is queued, this drains one per call, and rpi3_can_server_loop()'s
++ * own tight polling loop naturally drains the rest over the next few
++ * iterations without ever introducing an unbounded loop in any single
++ * call.
++ */
++bool rpi3_can_fiq_process_pending_frame(void)
++{
++	if (can0_frame_state != CAN0_FRAME_PENDING)
++		return false;
++
++	can0_frame_state = CAN0_FRAME_PROCESSING;
++	dsb();
++
++	secure_can_validate_frame(can0_last_frame_id, can0_last_frame_data);
++
++	dsb();
++	can0_frame_state = CAN0_FRAME_EMPTY;
++
++	/* One bounded catch-up attempt only - not a drain loop. Mirrors
++	 * interrupt_main_handler()'s own "only touch SPI if idle" discipline;
++	 * if the bus isn't idle right now, this attempt is silently skipped
++	 * (not retried here) - the next call to this same function (next
++	 * loop iteration) will try again. can0_frame_dropped_count is
++	 * untouched by this path - it still means exactly what it meant
++	 * before (a frame the FIQ itself declined to capture because the
++	 * buffer was busy), not frames recovered here.
++	 *
++	 * TOCTOU fix: the EMPTY check, wait_for_spi_idle(), and
++	 * read_pending_rx_frame() below run with this core's own FIQ taking
++	 * masked, closing the race where the FIQ preempts between this
++	 * check and the read and independently captures+publishes a frame
++	 * that this call would otherwise clobber. This does NOT touch
++	 * GPIO25, FIQ_CONTROL, or interrupt routing - it only masks this
++	 * CPU's own local FIQ-taking (CPSR.F) for the few instructions of
++	 * this specific check-and-capture sequence, using the same
++	 * thread_get_exceptions()/thread_set_exceptions() pair
++	 * rpi3_can_server_loop() already uses in this project
++	 * (rpi3_can_server.c) - not a different or guessed API. THREAD_EXCP_NATIVE_INTR
++	 * is confirmed (out/arm/conf.mk: CFG_CORE_IRQ_IS_NATIVE_INTR=n) to
++	 * resolve to CPSR.F on this build, i.e. exactly the FIQ this file's
++	 * own CAN0 interrupt arrives as - the same bit
++	 * rpi3_can_server_loop() unmasks to receive it in the first place.
++	 *
++	 * The previous full exception state is saved before masking and
++	 * restored exactly afterward (thread_set_exceptions(exceptions), not
++	 * a blind unmask) - thread_set_exceptions() is a direct, absolute
++	 * set of the CPSR mask bits (core/arch/arm/kernel/thread.c), so
++	 * restoring the saved value returns every bit (including
++	 * THREAD_EXCP_FOREIGN_INTR) to precisely what it was, regardless of
++	 * what it happened to be before this function ran.
++	 *
++	 * Scope is deliberately minimal: masking starts after
++	 * secure_can_validate_frame() (HMAC included) has already fully
++	 * completed and the buffer has already been released to EMPTY -
++	 * HMAC computation itself is never inside this masked window.
++	 */
++	{
++		uint32_t exceptions = thread_get_exceptions();
++
++		thread_set_exceptions(exceptions | THREAD_EXCP_NATIVE_INTR);
++
++		if (can0_frame_state == CAN0_FRAME_EMPTY &&
++		    wait_for_spi_idle() && read_pending_rx_frame()) {
++			dsb();
++			can0_frame_state = CAN0_FRAME_PENDING;
++		}
++
++		thread_set_exceptions(exceptions);
++	}
++
++	return true;
++}
++
++/* Debug-only readback of Step 4.2's validation state, for the PTA command
++ * used by tonight's test cases. Returns the last validation outcome
++ * (CAN0_VALIDATION_*); *last_counter is the current secure_last_counter
++ * (i.e. the highest counter value accepted so far this boot); *checked_id
++ * and *checked_counter are the CAN ID and counter of the most recently
++ * attempted validation (accepted or rejected), for confirming a test
++ * actually reached this code at all. Step 4.4D: *dropped_count is the
++ * running count of FIQ events seen while the single-slot secure frame
++ * buffer was still busy (see can0_frame_dropped_count's own comment).
++ */
++uint32_t rpi3_can_fiq_get_validation_debug(uint32_t *last_counter,
++					   uint32_t *checked_id,
++					   uint32_t *checked_counter,
++					   uint32_t *dropped_count)
++{
++	*last_counter = secure_last_counter;
++	*checked_id = can0_last_validation_id;
++	*checked_counter = can0_last_validation_counter;
++	*dropped_count = can0_frame_dropped_count;
++	return can0_last_validation_status;
++}
++
+ /* Overrides the weak default (which panics on any secure interrupt) -
+  * see core/kernel/interrupt.c. Called with exactly one possible cause:
+  * nothing else on this platform is ever configured to generate an FIQ.
++ *
++ * STEP 4.4D: this function is capture-only. It must never call
++ * secure_can_validate_frame()/can0_compute_hmac() or anything else that
++ * allocates or runs expensive/variable-length computation - see the
++ * top-of-file comment for exactly why (a real hardware hang). Its whole
++ * job is: read the RX object (bounded, fixed-size SPI reads only, same as
++ * before), copy it into the single-slot secure frame buffer if that buffer
++ * is free, publish CAN0_FRAME_PENDING with a barrier, and unconditionally
++ * acknowledge/clear the hardware interrupt so the chip's /INT line
++ * deasserts. Core 1's loop (rpi3_can_server_loop(), rpi3_can_server.c) is
++ * the only place validation (including HMAC) now runs.
+  */
+ void interrupt_main_handler(void)
+ {
+-	bool got_frame = read_pending_rx_frame();
++	bool got_frame = false;
++
++	if (wait_for_spi_idle()) {
++		if (can0_frame_state == CAN0_FRAME_EMPTY) {
++			got_frame = read_pending_rx_frame();
++		} else {
++			/* Single-slot buffer still holds an unconsumed frame -
++			 * Core 1 hasn't finished validating it yet. Do NOT
++			 * touch can0_last_frame_* (Core 1 may be mid-read of
++			 * it) - see can0_frame_dropped_count's own comment
++			 * for the full policy (frame stays queued in the
++			 * chip's own RX FIFO, not lost, just not serviced
++			 * this round).
++			 */
++			can0_frame_dropped_count++;
++		}
++	} else {
++		IMSG("rpi3_can_fiq: SPI bus stayed busy (Linux mid-transaction) - skipping this event to avoid corrupting it");
++	}
++
++	if (got_frame) {
++		/* Frame is now fully copied into can0_last_frame_id/data/
++		 * timestamp/tbc_epoch by read_pending_rx_frame() above.
++		 * Barrier before publishing PENDING - same ordering
++		 * discipline rpi3_can_server_push_result() already documents
++		 * in rpi3_can_server.c: coherency/program-order alone doesn't
++		 * guarantee the consumer never observes the flag before the
++		 * data it gates.
++		 */
++		dsb();
++		can0_frame_state = CAN0_FRAME_PENDING;
++	}
+ 
+-	/* Clear the RX interrupt flag regardless of whether a frame was
+-	 * successfully decoded, so the chip's INT line deasserts and this
+-	 * FIQ doesn't immediately re-fire.
++	/* Clear all interrupt flags (bits 15:0) regardless of whether a
++	 * frame was successfully decoded, so the chip's INT line deasserts
++	 * and this FIQ doesn't immediately re-fire. Read-modify-write. A
++	 * blind write of 0 here also zeroed CiINT's enable bits (bits
++	 * 31:16, including RXIE) - the same class of mistake already fixed
++	 * once for FIFOCON's blind-overwrite bug, just not caught here at
++	 * the time. Left uncaught, RXIE stays cleared after the first FIQ
++	 * for the rest of this boot, since nothing else in this file
++	 * re-enables it except a fresh can0_secure_init() call.
+ 	 */
+-	mcp251xfd_write32(MCP251XFD_REG_INT, 0);
++	{
++		uint32_t int_reg;
++
++		if (mcp251xfd_read32(MCP251XFD_REG_INT, &int_reg))
++			mcp251xfd_write32(MCP251XFD_REG_INT,
++					  int_reg & 0xffff0000U);
++	}
+ 
+ 	/* Disable further FIQ generation - hands the physical line back to
+ 	 * Linux's existing IRQ path right away, same one-shot scope as
+@@ -271,21 +1561,80 @@ void interrupt_main_handler(void)
+ 				      : "no pending frame found");
+ }
+ 
++/* Arms GPIO 25's level-detect hardware (GPLEN0 bit 25) so the peripheral
++ * interrupt (source 49) actually gets generated at all. Today this is
++ * only ever armed as a side effect of Linux's mcp251xfd driver calling
++ * request_irq() at probe time - OP-TEE's FIQ_CONTROL code only redirects
++ * an already-firing interrupt, it never arms the underlying GPIO detect
++ * itself. Once Linux's binding to can0 is removed (KNOWLEDGE.md's ninth
++ * addendum), nothing else would ever do this - so OP-TEE must take over
++ * this responsibility explicitly, independent of Linux's own probe.
++ *
++ * GPIO 24 (can1's interrupt, staying Linux-owned) shares this exact
++ * GPLEN0 register - this uses read-modify-write specifically so can1's
++ * bit is never disturbed by this code.
++ *
++ * Called both from rpi3_can_fiq_init() (driver_init context) and from
++ * the ARM_FIQ PTA command (invoke_command context) as a fallback, since
++ * driver_init()-time MMIO writes already proved unreliable once on this
++ * platform for the VC interrupt controller (see KNOWLEDGE.md's eighth
++ * addendum) - calling this twice is harmless (idempotent).
++ */
++void rpi3_can_fiq_arm_gpio(void)
++{
++	vaddr_t base = gpio_base();
++	uint32_t fsel;
++	uint32_t glen;
++
++	/* Ensure GPIO 25 is plain input - defensive: Linux's mcp251xfd_pins
++	 * pinctrl fragment already does this today, but this must hold
++	 * independently once Linux's binding is removed.
++	 */
++	fsel = io_read32(base + GPIO_GPFSEL2);
++	fsel &= ~(0x7U << CAN0_IRQ_FSEL_SHIFT);
++	io_write32(base + GPIO_GPFSEL2, fsel);
++
++	/* Clear any stale latched event before arming */
++	io_write32(base + GPIO_GPEDS0, BIT32(CAN0_IRQ_GPIO));
++
++	/* Arm low-level-detect for GPIO 25 only */
++	glen = io_read32(base + GPIO_GPLEN0);
++	glen |= BIT32(CAN0_IRQ_GPIO);
++	io_write32(base + GPIO_GPLEN0, glen);
++}
++
+ static TEE_Result rpi3_can_fiq_init(void)
+ {
+ 	vaddr_t local = arm_local_base();
+-	uint32_t routing;
+ 
+-	/* Explicitly route peripheral FIQs/IRQs to core 0 (matches
+-	 * RPI_PRIMARY_CPU) rather than trusting the power-on-reset default.
+-	 * (This write alone does not arm FIQ generation - that's done
+-	 * explicitly via the ARM_FIQ PTA command; see KNOWLEDGE.md's
++	/* Explicitly route peripheral FIQs/IRQs to whichever core is
++	 * actually primary (RPI3_PRIMARY_CORE_POS) rather than trusting the
++	 * power-on-reset default. This used to hardcode "always core 0" via
++	 * a magic literal that silently stopped matching RPI_PRIMARY_CPU
++	 * once that was changed - see rpi3_route_fiq_to_primary_core()'s own
++	 * comment. (This write alone does not arm FIQ generation - that's
++	 * done explicitly via the ARM_FIQ PTA command; see KNOWLEDGE.md's
+ 	 * eighth addendum for why the driver_init()-time arming attempt
+ 	 * didn't take effect.)
+ 	 */
+-	routing = io_read32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET);
+-	routing &= ~0xcU;
+-	io_write32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET, routing);
++	rpi3_route_fiq_to_primary_core(local);
++
++	rpi3_can_fiq_arm_gpio();
++
++	/* Step 4.4C: the one and only crypto_mac_alloc_ctx() call for this
++	 * file's entire boot lifetime - see can0_hmac_ctx's own declaration
++	 * comment for why driver_init() specifically is the safe, non-FIQ,
++	 * guaranteed-after-crypto-is-ready place to do this. Never freed
++	 * (permanent, boot-lifetime allocation - this driver never shuts
++	 * down). A failure here is logged, not treated as fatal to the rest
++	 * of platform init (matching this function's own existing style of
++	 * not panicking over CAN-peripheral-specific setup) - can0_hmac_ctx
++	 * stays NULL, and can0_compute_hmac() already checks for that and
++	 * fails cleanly (HMAC verification/transmit then simply fails,
++	 * rather than dereferencing a NULL context).
++	 */
++	if (crypto_mac_alloc_ctx(&can0_hmac_ctx, TEE_ALG_HMAC_SHA256))
++		EMSG("rpi3_can_fiq: failed to allocate the HMAC-SHA256 context - HMAC authentication will fail closed until next boot");
+ 
+ 	return TEE_SUCCESS;
+ }
+diff --git a/core/arch/arm/plat-rpi3/sub.mk b/core/arch/arm/plat-rpi3/sub.mk
+index c86fef2f9..e22add099 100644
+--- a/core/arch/arm/plat-rpi3/sub.mk
++++ b/core/arch/arm/plat-rpi3/sub.mk
+@@ -1,3 +1,4 @@
+ global-incdirs-y += .
+ srcs-y += main.c
+ srcs-y += rpi3_can_fiq.c
++srcs-y += rpi3_can_server.c
+diff --git a/core/pta/rpi3_can_spi_poc.c b/core/pta/rpi3_can_spi_poc.c
+index 85816cda7..17994e0bf 100644
+--- a/core/pta/rpi3_can_spi_poc.c
++++ b/core/pta/rpi3_can_spi_poc.c
+@@ -22,7 +22,27 @@
+ 
+ /* Defined in rpi3_can_fiq.c (Phase 2, roadmap Steps 15-17) */
+ uint32_t rpi3_can_fiq_count(void);
++uint32_t rpi3_can_fiq_write_reg32(uint32_t addr, uint32_t value);
++uint32_t rpi3_can_fiq_get_debug(uint32_t *fifo_index, uint32_t *fifo_addr);
+ uint32_t rpi3_can_fiq_get_last_frame(uint32_t *id, uint8_t data[8]);
++void rpi3_can_fiq_arm_gpio(void);
++uint32_t rpi3_can_fiq_transmit(uint32_t id, const uint8_t data[8]);
++void rpi3_can_fiq_get_rxif_debug(uint32_t *rxif_mask, uint32_t *int_reg);
++uint32_t rpi3_can_fiq_get_bdiag1_debug(void);
++uint32_t rpi3_can_fiq_get_tx_fail_point(void);
++uint32_t rpi3_can_fiq_get_gpio_debug(uint32_t *gpeds0);
++uint32_t rpi3_can_fiq_get_validation_debug(uint32_t *last_counter,
++					   uint32_t *checked_id,
++					   uint32_t *checked_counter,
++					   uint32_t *dropped_count);
++void rpi3_can_fiq_get_timestamp_debug(uint32_t *last_timestamp, uint32_t *tbc,
++				      uint32_t *tscon, uint32_t *packet_epoch,
++				      uint32_t *current_epoch);
++
++/* Defined in rpi3_can_server.c (Plan A hard core-pinning, Test A) */
++uint64_t rpi3_can_server_get_heartbeat(void);
++int32_t rpi3_can_server_wake_core1(void);
++void rpi3_route_fiq_to_primary_core(vaddr_t local);
+ #include <pta_rpi3_can_spi_poc.h>
+ #include <trace.h>
+ 
+@@ -150,11 +170,11 @@ out:
+ 	return res;
+ }
+ 
+-static TEE_Result read_osc_register(uint32_t *value)
++static TEE_Result read_register32(uint16_t addr, uint32_t *value)
+ {
+ 	uint8_t tx[6] = { 0 };
+ 	uint8_t rx[6] = { 0 };
+-	uint16_t cmd = MCP251XFD_INSTRUCTION_READ | MCP251XFD_REG_OSC;
++	uint16_t cmd = MCP251XFD_INSTRUCTION_READ | addr;
+ 	TEE_Result res = TEE_SUCCESS;
+ 
+ 	tx[0] = (cmd >> 8) & 0xff;
+@@ -208,12 +228,153 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
+ 		return TEE_SUCCESS;
+ 	}
+ 
++	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_GET_VALIDATION_DEBUG) {
++		uint32_t exp_pt_val = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
++						      TEE_PARAM_TYPE_MEMREF_OUTPUT,
++						      TEE_PARAM_TYPE_NONE,
++						      TEE_PARAM_TYPE_NONE);
++		uint32_t last_counter = 0;
++		uint32_t checked_id = 0;
++		uint32_t checked_counter = 0;
++		uint32_t dropped_count = 0;
++		uint32_t status;
++		uint8_t out[12];
++
++		if (param_types != exp_pt_val)
++			return TEE_ERROR_BAD_PARAMETERS;
++		if (params[1].memref.size < sizeof(out))
++			return TEE_ERROR_SHORT_BUFFER;
++
++		status = rpi3_can_fiq_get_validation_debug(&last_counter,
++							   &checked_id,
++							   &checked_counter,
++							   &dropped_count);
++		params[0].value.a = status;
++		params[0].value.b = last_counter;
++
++		out[0] = (uint8_t)checked_id;
++		out[1] = (uint8_t)(checked_id >> 8);
++		out[2] = (uint8_t)(checked_id >> 16);
++		out[3] = (uint8_t)(checked_id >> 24);
++		out[4] = (uint8_t)checked_counter;
++		out[5] = (uint8_t)(checked_counter >> 8);
++		out[6] = (uint8_t)(checked_counter >> 16);
++		out[7] = (uint8_t)(checked_counter >> 24);
++		out[8] = (uint8_t)dropped_count;
++		out[9] = (uint8_t)(dropped_count >> 8);
++		out[10] = (uint8_t)(dropped_count >> 16);
++		out[11] = (uint8_t)(dropped_count >> 24);
++		memcpy(params[1].memref.buffer, out, sizeof(out));
++		return TEE_SUCCESS;
++	}
++
++	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_GET_TIMESTAMP_DEBUG) {
++		uint32_t exp_pt_ts = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
++						     TEE_PARAM_TYPE_MEMREF_OUTPUT,
++						     TEE_PARAM_TYPE_NONE,
++						     TEE_PARAM_TYPE_NONE);
++		uint32_t last_timestamp = 0;
++		uint32_t tbc = 0;
++		uint32_t tscon = 0;
++		uint32_t packet_epoch = 0;
++		uint32_t current_epoch = 0;
++		uint8_t out_tscon[12];
++
++		if (param_types != exp_pt_ts)
++			return TEE_ERROR_BAD_PARAMETERS;
++		if (params[1].memref.size < sizeof(out_tscon))
++			return TEE_ERROR_SHORT_BUFFER;
++
++		rpi3_can_fiq_get_timestamp_debug(&last_timestamp, &tbc, &tscon,
++						 &packet_epoch, &current_epoch);
++		params[0].value.a = last_timestamp;
++		params[0].value.b = tbc;
++
++		out_tscon[0] = (uint8_t)tscon;
++		out_tscon[1] = (uint8_t)(tscon >> 8);
++		out_tscon[2] = (uint8_t)(tscon >> 16);
++		out_tscon[3] = (uint8_t)(tscon >> 24);
++		out_tscon[4] = (uint8_t)packet_epoch;
++		out_tscon[5] = (uint8_t)(packet_epoch >> 8);
++		out_tscon[6] = (uint8_t)(packet_epoch >> 16);
++		out_tscon[7] = (uint8_t)(packet_epoch >> 24);
++		out_tscon[8] = (uint8_t)current_epoch;
++		out_tscon[9] = (uint8_t)(current_epoch >> 8);
++		out_tscon[10] = (uint8_t)(current_epoch >> 16);
++		out_tscon[11] = (uint8_t)(current_epoch >> 24);
++		memcpy(params[1].memref.buffer, out_tscon, sizeof(out_tscon));
++		return TEE_SUCCESS;
++	}
++
++	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_READ_REG32) {
++		uint32_t exp_pt_reg = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
++						      TEE_PARAM_TYPE_NONE,
++						      TEE_PARAM_TYPE_NONE,
++						      TEE_PARAM_TYPE_NONE);
++		uint16_t addr;
++		uint32_t reg_value = 0;
++
++		if (param_types != exp_pt_reg)
++			return TEE_ERROR_BAD_PARAMETERS;
++
++		addr = (uint16_t)params[0].value.a;
++		res = read_register32(addr, &reg_value);
++		if (res)
++			return res;
++		params[0].value.a = addr;
++		params[0].value.b = reg_value;
++		return TEE_SUCCESS;
++	}
++
++	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_WRITE_REG32) {
++		uint32_t exp_pt_wreg = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
++						       TEE_PARAM_TYPE_NONE,
++						       TEE_PARAM_TYPE_NONE,
++						       TEE_PARAM_TYPE_NONE);
++		uint32_t addr;
++		uint32_t wvalue;
++		uint32_t ok;
++
++		if (param_types != exp_pt_wreg)
++			return TEE_ERROR_BAD_PARAMETERS;
++
++		addr = params[0].value.a;
++		wvalue = params[0].value.b;
++		ok = rpi3_can_fiq_write_reg32(addr, wvalue);
++		params[0].value.a = ok;
++		return TEE_SUCCESS;
++	}
++
++	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_TRANSMIT_TEST_FRAME) {
++		/* INOUT: params[0].a is the CAN ID (in), params[0].b is the
++		 * success/fail result (out) - both directions on the same
++		 * slot, so INPUT alone is wrong here (see main.c's comment
++		 * on this same command for what that bug actually caused).
++		 */
++		uint32_t exp_pt_tx = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
++						     TEE_PARAM_TYPE_MEMREF_INPUT,
++						     TEE_PARAM_TYPE_NONE,
++						     TEE_PARAM_TYPE_NONE);
++		uint32_t id;
++		uint32_t ok;
++
++		if (param_types != exp_pt_tx)
++			return TEE_ERROR_BAD_PARAMETERS;
++		if (params[1].memref.size < 8)
++			return TEE_ERROR_BAD_PARAMETERS;
++
++		id = params[0].value.a;
++		ok = rpi3_can_fiq_transmit(id, (const uint8_t *)params[1].memref.buffer);
++		params[0].value.b = ok;
++		return TEE_SUCCESS;
++	}
++
+ 	if (param_types != exp_pt)
+ 		return TEE_ERROR_BAD_PARAMETERS;
+ 
+ 	switch (cmd_id) {
+ 	case PTA_RPI3_CAN_SPI_POC_CMD_READ_OSC_REG:
+-		res = read_osc_register(&value);
++		res = read_register32(MCP251XFD_REG_OSC, &value);
+ 		if (res)
+ 			return res;
+ 		IMSG(PTA_NAME ": read OSC register over real SPI0: %#" PRIx32,
+@@ -231,10 +392,19 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
+ 						ARM_LOCAL_REG_SIZE);
+ 		vaddr_t intc = core_mmu_get_va(VC_INTC_BASE, MEM_AREA_IO_SEC,
+ 					       VC_INTC_REG_SIZE);
+-		uint32_t routing = io_read32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET);
+ 
+-		routing &= ~0xcU;
+-		io_write32(local + ARM_LOCAL_GPU_INT_ROUTING_OFFSET, routing);
++		/* Was its own independent copy of "always route FIQ to core
++		 * 0" - now shares rpi3_can_fiq.c's single implementation, per
++		 * the same fix applied there (see that function's comment).
++		 */
++		rpi3_route_fiq_to_primary_core(local);
++		/* Fallback re-arm of GPIO 25's level-detect: the driver_init()
++		 * call already does this, but that context has already proven
++		 * unreliable once on this platform (see this command's own
++		 * FIQ_CONTROL write below, which exists for the same reason) -
++		 * calling this again here is idempotent and cheap.
++		 */
++		rpi3_can_fiq_arm_gpio();
+ 		io_write32(intc + VC_INTC_FIQ_CONTROL_OFFSET,
+ 			  VC_INTC_FIQ_ENABLE | CAN0_GPIO_FIQ_SOURCE);
+ 		value = io_read32(intc + VC_INTC_FIQ_CONTROL_OFFSET);
+@@ -242,6 +412,53 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
+ 		     value);
+ 		break;
+ 	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_DEBUG: {
++		uint32_t fifo_index = 0;
++		uint32_t fifo_addr = 0;
++
++		rpi3_can_fiq_get_debug(&fifo_index, &fifo_addr);
++		params[0].value.a = fifo_index;
++		params[0].value.b = fifo_addr;
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_RXIF_DEBUG: {
++		uint32_t rxif_mask = 0;
++		uint32_t int_reg = 0;
++
++		rpi3_can_fiq_get_rxif_debug(&rxif_mask, &int_reg);
++		params[0].value.a = rxif_mask;
++		params[0].value.b = int_reg;
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_BDIAG1_DEBUG: {
++		params[0].value.a = rpi3_can_fiq_get_bdiag1_debug();
++		params[0].value.b = 0;
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_TX_FAIL_DEBUG: {
++		params[0].value.a = rpi3_can_fiq_get_tx_fail_point();
++		params[0].value.b = 0;
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_GPIO_DEBUG: {
++		uint32_t gpeds0 = 0;
++		uint32_t level = rpi3_can_fiq_get_gpio_debug(&gpeds0);
++
++		params[0].value.a = level;
++		params[0].value.b = gpeds0;
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_CORE1_HEARTBEAT: {
++		uint64_t heartbeat = rpi3_can_server_get_heartbeat();
++
++		params[0].value.a = (uint32_t)heartbeat;
++		params[0].value.b = (uint32_t)(heartbeat >> 32);
++		return TEE_SUCCESS;
++	}
++	case PTA_RPI3_CAN_SPI_POC_CMD_WAKE_CORE1:
++		params[0].value.a = (uint32_t)rpi3_can_server_wake_core1();
++		params[0].value.b = 0;
++		return TEE_SUCCESS;
+ 	default:
+ 		return TEE_ERROR_NOT_SUPPORTED;
+ 	}
+diff --git a/lib/libutee/include/pta_rpi3_can_spi_poc.h b/lib/libutee/include/pta_rpi3_can_spi_poc.h
+index 5dbf7a497..7ff663b58 100644
+--- a/lib/libutee/include/pta_rpi3_can_spi_poc.h
++++ b/lib/libutee/include/pta_rpi3_can_spi_poc.h
+@@ -67,4 +67,186 @@
+  */
+ #define PTA_RPI3_CAN_SPI_POC_CMD_GET_LAST_FRAME 4
+ 
++/*
++ * Debug only: which FIFO index and raw message-RAM address the last
++ * capture used, to diagnose the known Step 17 frame-content bug (see
++ * KNOWLEDGE.md's ninth addendum).
++ *
++ * params[0].value.a (out): FIFO index used.
++ * params[0].value.b (out): raw address read from FIFOUA.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_DEBUG 5
++
++/*
++ * Temporary debug-only command (Step 17 planning): reads an arbitrary
++ * MCP251XFD register address, used once to capture Linux's live
++ * bit-timing/FIFO-config values before disabling its can0 binding, so
++ * Secure World's own chip bring-up can reuse them verbatim instead of
++ * re-deriving bit-timing math by hand. Not meant to stay long-term.
++ *
++ * params[0].value.a (in): 16-bit register address to read.
++ * params[0].value.b (out): the 32-bit value read.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_READ_REG32 6
++
++/*
++ * Roadmap Steps 16/17: constructs and transmits a CAN frame directly via
++ * SPI, entirely from Secure World - brings the chip up from scratch
++ * (oscillator/bit-timing/FIFO config/RXIE, all normally done by Linux's
++ * probe routine) if not already done, then transmits. Needed once
++ * Linux's binding to can0 is removed - nothing else can inject a frame
++ * onto the bus anymore.
++ *
++ * params[0] is VALUE_INOUT, not VALUE_INPUT: value.a (in) is the 32-bit
++ * CAN ID, value.b (out) is 1 if transmit succeeded, 0 if not - both
++ * directions share this one slot, so INPUT alone silently drops the
++ * result across the Normal/Secure World boundary per the GlobalPlatform
++ * TEE Client API spec (found the hard way - every earlier test run
++ * reported FAIL regardless of what actually happened on the chip).
++ * params[1] (in, memref): 8 bytes of frame data.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_TRANSMIT_TEST_FRAME 7
++
++/*
++ * Debug only: the RXIF bitmask and INT register value captured at the
++ * moment of the last FIQ, for diagnosing why read_pending_rx_frame()
++ * did or didn't find a match (KNOWLEDGE.md's ninth addendum).
++ *
++ * params[0].value.a (out): RXIF bitmask.
++ * params[0].value.b (out): INT register value.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_RXIF_DEBUG 8
++
++/*
++ * Debug only: the Bus Diagnostic Register 1 (BDIAG1) value captured at
++ * the moment of the last FIQ - the only register that says *which* bus
++ * error (DLCMM controller misconfiguration, NACKERR, form/stuff/CRC
++ * error, ...) actually set IVMIF in CiINT, since IVMIF alone never says
++ * why (see Linux's mcp251xfd_handle_ivmif()).
++ *
++ * params[0].value.a (out): raw BDIAG1 register value.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_BDIAG1_DEBUG 9
++
++/*
++ * Debug only: which step inside can0_secure_transmit() last returned
++ * false - 0 (last attempt succeeded, or none made yet), 1
++ * (can0_secure_init()), 2 (FIFOUA read), 3/4/5/6 (the id/flags/data
++ * writes to the TX message object), 7 (FIFOCON read), 8 (the final
++ * FIFOCON write that sets TXREQ, issued right after FIQ routing is
++ * (re-)armed - see arm_fiq_control()'s comment for why this exact step
++ * is under suspicion of self-preemption).
++ *
++ * params[0].value.a (out): the fail-point code above.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_TX_FAIL_DEBUG 10
++
++/*
++ * Debug only: GPIO 25's live electrical level (can0's /INT pin,
++ * active-low) and GPEDS0's latched-event bit for that pin, read directly
++ * from the GPIO peripheral - neither goes through the CAN chip/SPI at
++ * all, so this isolates "is the pin itself asserted" from "does the chip
++ * think it has something to report" (CiINT can show zero flags while
++ * FIQs keep firing - see KNOWLEDGE.md's ninth addendum).
++ *
++ * params[0].value.a (out): raw GPLEV0 bit for GPIO 25 - 1 if the pin
++ * currently reads electrically high (inactive), 0 if low (asserted,
++ * since this pin is active-low).
++ * params[0].value.b (out): raw GPEDS0 register value.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_GPIO_DEBUG 11
++
++/*
++ * Debug only (Plan A hard core-pinning, Test A): reads the free-running
++ * heartbeat counter incremented forever by core 1's permanent Secure-World
++ * loop (rpi3_can_server_loop(), optee_os/core/arch/arm/plat-rpi3/rpi3_can_server.c).
++ * A continuously-increasing value across repeated calls proves core 1 is
++ * alive and running Secure World code, rather than hung or never reached.
++ *
++ * params[0].value.a (out): heartbeat's low 32 bits.
++ * params[0].value.b (out): heartbeat's high 32 bits.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_CORE1_HEARTBEAT 12
++
++/*
++ * Plan A hard core-pinning: invoked from Normal World userspace once boot is
++ * fully complete, to trigger core 1's one-time, permanent wake-into-Secure-World
++ * (rpi3_can_server_wake_core1(), optee_os/core/arch/arm/plat-rpi3/rpi3_can_server.c).
++ * By design this must happen only after boot completes, never during the
++ * boot chain itself - there is deliberately no automatic trigger for this.
++ *
++ * params[0].value.a (out): raw PSCI status code from psci_cpu_on() (0 =
++ * success). A non-zero value (e.g. PSCI_E_ALREADY_ON if called twice) means
++ * core 1 was NOT (re)woken - check this before assuming the heartbeat will
++ * start incrementing.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_WAKE_CORE1 13
++
++/*
++ * Diagnostic only (Problem 3I - isolating whether a raw Message-RAM write
++ * via the existing mcp251xfd_write32() actually persists, independent of
++ * the full can0_secure_init()/can0_secure_transmit() sequence). Not meant
++ * to stay long-term - same caveat as PTA_RPI3_CAN_SPI_POC_CMD_READ_REG32.
++ *
++ * params[0] is VALUE_INOUT, matching PTA_RPI3_CAN_SPI_POC_CMD_TRANSMIT_TEST_FRAME's
++ * own rationale: value.a (in) is the 16-bit register/RAM address to write,
++ * value.b (in) is the 32-bit value to write - then value.a is overwritten
++ * with the result (1 = write succeeded, 0 = failed) before returning, since
++ * VALUE_INPUT alone would silently drop that result across the boundary.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_WRITE_REG32 14
++
++/*
++ * Step 4.2 (Secure CAN Packet Validation): debug-only readback of the most
++ * recent CAN-ID + per-packet-counter (+ timestamp, + HMAC as of Step
++ * 4.3C/4.4C) validation outcome, computed entirely in Secure World in
++ * secure_can_validate_frame()
++ * (optee_os/core/arch/arm/plat-rpi3/rpi3_can_fiq.c). As of Step 4.4D that
++ * function runs from rpi3_can_server_loop() (Core 1's ordinary execution,
++ * rpi3_can_server.c), not from interrupt_main_handler()/FIQ context
++ * anymore - see rpi3_can_fiq.c's top-of-file comment for why. Read-only -
++ * Normal World cannot influence the validation decision through this or any
++ * other command; this exists purely so test tooling can observe the
++ * result.
++ *
++ * params[0].value.a (out): last validation status -
++ *   0 = CAN0_VALIDATION_NONE (no frame validated yet since boot)
++ *   1 = CAN0_VALIDATION_ACCEPTED
++ *   2 = CAN0_VALIDATION_INVALID_ID
++ *   3 = CAN0_VALIDATION_REPLAY (counter <= secure_last_counter)
++ *   4 = CAN0_VALIDATION_STALE (Step 4.3C: timestamp age over policy)
++ *   5 = CAN0_VALIDATION_HMAC_FAIL (Step 4.4C: received tag != recomputed tag)
++ * params[0].value.b (out): current secure_last_counter (the highest counter
++ *   value accepted so far this boot - 0 if none accepted yet since boot;
++ *   see rpi3_can_fiq.c's own comment on why this does NOT persist across
++ *   reboots).
++ * params[1] (MEMREF_OUTPUT, 12 bytes): [0..3] = CAN ID of the most recently
++ *   *attempted* validation (accepted or rejected), [4..7] = its counter
++ *   value, [8..11] = Step 4.4D's dropped-frame count (FIQ events seen while
++ *   the single-slot secure frame buffer was still busy - see
++ *   can0_frame_dropped_count's own comment in rpi3_can_fiq.c), all
++ *   little-endian uint32_t.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_VALIDATION_DEBUG 15
++
++/*
++ * Step 4.3B (Secure CAN Timestamp Capture): debug-only readback of the
++ * MCP2518FD Time Base Counter state - the last RX frame's captured
++ * timestamp (RXMSGTS, cached from the most recent FIQ capture), plus a
++ * LIVE read of CiTBC (the free-running counter itself) and CiTSCON (its
++ * control register, to confirm TBCEN/TBCPRE). This command does NOT
++ * decide freshness/validity - it only observes state; see
++ * rpi3_can_fiq.c's own comments for why a freshness policy is not yet
++ * defined.
++ *
++ * params[0].value.a (out): last captured RX frame's timestamp (RXMSGTS),
++ *   0 if no frame captured yet since boot.
++ * params[0].value.b (out): live CiTBC value at the moment of this call
++ *   (NOT the value at RX time - this changes on every call while the
++ *   counter is running).
++ * params[1] (MEMREF_OUTPUT, 4 bytes): live CiTSCON value, little-endian
++ *   uint32_t - bit 16 is TBCEN, bits 9:0 are TBCPRE.
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_GET_TIMESTAMP_DEBUG 16
++
+ #endif /* __PTA_RPI3_CAN_SPI_POC_H__ */

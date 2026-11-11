@@ -1,0 +1,16 @@
+# pta_latency, PRELIMINARY (2026-11-06): Linux -> PTA command 12 (read Core 1 heartbeat), idle board, 2000 calls per run
+# tool: Part_E_Verification/tools/pta_latency/pta_latency.c (sha256 5400ebfcfd79f917...), run from /tmp on the Pi
+# CPU governor: powersave, all CPUs at 600000 kHz (scaling_max 1200000), CPU mask 0,2-3
+# NOT the Component 4 measurement matrix (no load, no SPI, no CAN traffic)
+
+A. one caller alone
+cpu 0: 2000 calls in 6.085 s = 329 calls/s | us: min 2843.9  p50 2873.9  p90 3274.6  p99 3292.9  max 5293.6  mean 3042.4
+cpu 2: 2000 calls in 6.438 s = 311 calls/s | us: min 2873.1  p50 3289.4  p90 3310.7  p99 3715.3  max 6133.8  mean 3218.8
+cpu 3: 2000 calls in 6.123 s = 327 calls/s | us: min 2843.0  p50 2888.4  p90 3276.5  p99 3311.7  max 4122.2  mean 3061.5
+(an earlier 20000-call run on cpu 0: 327 calls/s, min 2839.5, p50 2880.0, p99 3290.5, max 6078.9)
+
+C. three callers at the same time, one per Linux core
+cpu 0: 2000 calls in 13.426 s = 149 calls/s | us: min 857.1  p50 872.9  p90 23996.0  p99 76236.4  max 131426.9  mean 6712.7
+cpu 2: 2000 calls in 12.475 s = 160 calls/s | us: min 859.7  p50 874.7  p90 23847.4  p99 72513.7  max 128577.6  mean 6237.5
+cpu 3: 2000 calls in 12.759 s = 157 calls/s | us: min 857.0  p50 871.8  p90 22805.4  p99 65555.3  max 122732.3  mean 6379.3
+aggregate: 466 calls/s

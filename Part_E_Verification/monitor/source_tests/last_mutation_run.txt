@@ -1,0 +1,38 @@
+caught (failed checks)                   faithful OLD R-A2 test (now>=t0 && elapsed>budget)
+SURVIVED                                 no 'now < t0' term (unsigned wrap fails closed anyway)  [expected equivalent]
+caught (hang)                            no attempt cap in the loop
+caught (failed checks)                   budget is fresh per acquisition
+caught (failed checks)                   counter incremented on success
+caught (failed checks)                   no increment on exhaustion
+caught (failed checks)                   double increment on exhaustion
+caught (failed checks)                   unmask before unlock on release
+caught (failed checks)                   exceptions not restored after exhaustion
+caught (failed checks)                   exceptions never masked while trying
+caught (failed checks)                   pre-check removed
+caught (failed checks)                   pre-check ignores the attempt count
+caught (failed checks)                   backward timer after success charges nothing
+caught (failed checks)                   init_ok published before the extra steps
+caught (failed checks)                   init failure fails the OS boot
+caught (failed checks)                   init failure still publishes init_ok
+caught (failed checks)                   init failure not reported
+caught (failed checks)                   profile inverted
+SURVIVED                                 init does not clear the lock explicitly (memset already zeroes it)  [expected equivalent]
+caught (failed checks)                   init does not clear the state
+caught (failed checks)                   init_ticks not recorded
+caught (failed checks)                   health age not saturated
+caught (failed checks)                   health 'never polled' sentinel removed
+caught (failed checks)                   health future stamp wraps (O-1 broken)
+caught (failed checks)                   health skip_count not saturated at 255
+caught (failed checks)                   health init_ok bit missing
+caught (failed checks)                   health starved bit wrong
+caught (failed checks)                   health p3a reads the wrong field
+caught (failed checks)                   health age in ticks instead of ms
+caught (compile-time static assertion)   G7 struct loses its 64-byte alignment
+caught (compile-time static assertion)   timeout counter shares a line with G7
+caught (compile-time static assertion)   lock shares a cache line
+caught (compile-time static assertion)   D_req not below H
+caught (compile-time static assertion)   traffic timeout below period + jitter (the old 50 ms)
+caught (compile-time static assertion)   lock budget not 1 ms
+caught (compile-time static assertion)   event record grows to 32 bytes
+caught (compile-time static assertion)   event type count changes
+caught 35 of 37; survivors: ["no 'now < t0' term (unsigned wrap fails closed anyway)", 'init does not clear the lock explicitly (memset already zeroes it)']

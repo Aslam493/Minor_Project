@@ -1,0 +1,3 @@
+can0_check_timestamp_fresh
+rpi3_can_fiq_process_pending_frame
+secure_can_validate_frame

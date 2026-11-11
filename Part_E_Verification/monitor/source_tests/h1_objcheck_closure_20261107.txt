@@ -1,0 +1,12 @@
+RPI3_MON_CRIT functions declared in the source: 11
+  inlined (no symbol)  rpi3_mon_expired
+  ok       rpi3_mon_ev_append.constprop.0           calls: none
+  inlined (no symbol)  rpi3_mon_traffic_refresh
+  ok       rpi3_mon_evaluate.constprop.0            calls: ['rpi3_mon_ev_append.constprop.0']
+  inlined (no symbol)  rpi3_mon_hb_issue_if_due
+  inlined (no symbol)  rpi3_mon_frame_equal
+  inlined (no symbol)  rpi3_mon_frame_store
+  inlined (no symbol)  rpi3_mon_frame_apply
+  inlined (no symbol)  rpi3_mon_frame_record
+  inlined (no symbol)  rpi3_mon_build_proj0
+  inlined (no symbol)  rpi3_mon_build_proj1

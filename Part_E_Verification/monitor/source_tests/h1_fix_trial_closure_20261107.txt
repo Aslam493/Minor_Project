@@ -1,0 +1,3 @@
+method: ON build's own compile command (with -finstrument-functions etc.) applied to temporary copies outside the tree
+current: compiled; memcpy/memset/memcmp call relocations per function: {'rpi3_mon_init': ['memset'], 'rpi3_mon_cmd17': ['memcpy', 'memcpy'], 'rpi3_mon_cmd18': ['memcpy'], 'rpi3_mon_cmd20': ['memcpy', 'memcpy']}
+candidate_volatile: compiled; memcpy/memset/memcmp call relocations per function: {'rpi3_mon_init': ['memset'], 'rpi3_mon_cmd17': ['memcpy'], 'rpi3_mon_cmd18': ['memcpy'], 'rpi3_mon_cmd20': ['memcpy', 'memcpy']}

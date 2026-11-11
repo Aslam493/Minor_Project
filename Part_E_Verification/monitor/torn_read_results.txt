@@ -1,0 +1,15 @@
+# torn_read, 2026-11-06, Raspberry Pi 3 Model B (BCM2837, 4 x Cortex-A53), Linux user space (Normal, Write-Back, Inner Shareable memory)
+# tool: Part_E_Verification/tools/torn_read/torn_read.c  (sha256 44ec91fc0c6290ff...), run from /tmp on the Pi
+# CPU governor powersave, 600 MHz; CPU mask 0,2-3 (Core 1 is Secure World and cannot run Linux code)
+
+CONTROLS (the detector must see tearing)
+two32     writer cpu0 -> reader cpu2: 30000000 writes, 15518624 reads | saw all-zero 10941113  all-ones 4534350  TORN 43161   first torn 0x00000000ffffffff
+crossline writer cpu0 -> reader cpu2: 30000000 writes, 7340610 reads  | saw all-zero 1310758   all-ones 1060725  TORN 4969127 first torn 0x00000000ffffffff
+within16  writer cpu0 -> reader cpu2: 30000000 writes, 9772344 reads  | saw all-zero 1160967   all-ones 8611377  TORN 0
+
+CASE UNDER TEST: aligned 64-bit relaxed atomic store and load
+aligned64 writer cpu0 -> reader cpu2: 300000000 writes, 141818123 reads | saw all-zero 79472938 all-ones 62345185 TORN 0
+aligned64 writer cpu2 -> reader cpu0: 300000000 writes, 140687504 reads | saw all-zero 78797903 all-ones 61889601 TORN 0
+aligned64 writer cpu2 -> reader cpu3: 300000000 writes, 144151847 reads | saw all-zero 80411455 all-ones 63740392 TORN 0
+aligned64 writer cpu3 -> reader cpu0: 300000000 writes, 141926031 reads | saw all-zero 79606495 all-ones 62319536 TORN 0
+total: 1,200,000,000 writes, 568,583,504 reads, 0 torn

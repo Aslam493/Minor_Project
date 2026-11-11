@@ -1,0 +1,46 @@
+SURVIVED                 equivalent mutant: unsigned wrap already fails closed (expected to survive)
+caught (failed checks)   faithful OLD R-A2 test (now>=t0 && elapsed>budget)
+caught (hang/timeout)    no attempt cap in the loop
+caught (failed checks)   budget is fresh per acquisition
+caught (failed checks)   increment counter on success too
+caught (failed checks)   unmask before unlock
+caught (failed checks)   timeout event not guarded (fires every evaluation)
+caught (failed checks)   late answer resets miss count (old path)
+caught (failed checks)   skip_total reset on success
+caught (failed checks)   STARVED event below K
+caught (failed checks)   Core 1 reads protected state before locking
+caught (failed checks)   Core 1 failed attempt writes a protected member
+caught (failed checks)   cmd 18 allows 16 records
+caught (failed checks)   pinned entries can be overwritten
+caught (failed checks)   overflow not counted
+caught (failed checks)   rate limit shares ONE bucket across classes
+caught (failed checks)   rate limit never applied
+caught (failed checks)   rate limit off by one at the second boundary
+caught (failed checks)   suppressed events not counted exactly
+caught (failed checks)   evidence classes never limited after their quota (flood rule reverted)
+SURVIVED                 evidence limit also applies inside the pinned quota
+caught (failed checks)   cmd 20 page 2 accepted
+caught (failed checks)   cmd 20 reports the wrong page 1 length
+caught (failed checks)   cmd 20 checks buffer before init
+caught (failed checks)   BUSY reply leaks stale size
+caught (failed checks)   health read before unlock
+caught (failed checks)   mac guard never blocks
+caught (failed checks)   ack changes the lost counter
+caught (failed checks)   ack is not clamped
+caught (failed checks)   ack can move backwards
+caught (failed checks)   lease renewal is additive
+caught (failed checks)   returning to EXPECTED consumes a use
+caught (failed checks)   lease is not clamped to IDLE_MAX
+caught (failed checks)   lease cap not enforced
+caught (failed checks)   grant clears a raised timeout
+caught (failed checks)   return to EXPECTED does not restart the window
+caught (failed checks)   cmd 23 late answer resets the miss count
+caught (failed checks)   cmd 23 nonce comparison skipped
+caught (failed checks)   cmd 23 accepts a nonce that was never fetched
+caught (failed checks)   cmd 23 duplicate answer re-accepted
+caught (failed checks)   cmd 23 stale answer accepted
+caught (failed checks)   cmd 23 never-issued answer accepted
+caught (failed checks)   cmd 23 on-time answer does not clear the raised timeout
+caught (failed checks)   cmd 23 bad nonce changes state
+caught (failed checks)   new challenge keeps the old nonce valid
+caught 43 of 45

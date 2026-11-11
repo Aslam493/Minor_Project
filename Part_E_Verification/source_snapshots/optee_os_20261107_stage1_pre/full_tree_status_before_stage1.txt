@@ -1,0 +1,10 @@
+ M core/arch/arm/include/kernel/thread_arch.h
+ M core/arch/arm/include/sm/teesmc_opteed.h
+ M core/arch/arm/kernel/thread_optee_smc_a32.S
+ M core/arch/arm/kernel/thread_optee_smc_a64.S
+ M core/arch/arm/plat-rpi3/platform_config.h
+ M core/arch/arm/plat-rpi3/rpi3_can_fiq.c
+ M core/arch/arm/plat-rpi3/sub.mk
+ M core/pta/rpi3_can_spi_poc.c
+ M lib/libutee/include/pta_rpi3_can_spi_poc.h
+?? core/arch/arm/plat-rpi3/rpi3_can_server.c

@@ -1,0 +1,2057 @@
+--- a/core/pta/rpi3_can_spi_poc.c
++++ b/core/pta/rpi3_can_spi_poc.c
+@@ -45,6 +45,9 @@
+ void rpi3_route_fiq_to_primary_core(vaddr_t local);
+ #include <pta_rpi3_can_spi_poc.h>
+ #include <trace.h>
++#ifdef CFG_RPI3_CAN_MONITOR
++#include <rpi3_can_monitor.h>
++#endif
+ 
+ #define PTA_NAME "rpi3_can_spi_poc.pta"
+ 
+@@ -206,6 +209,17 @@
+ 	uint32_t value = 0;
+ 	TEE_Result res = TEE_SUCCESS;
+ 
++#ifdef CFG_RPI3_CAN_MONITOR
++	{
++		/* Secure CAN Monitor: dispatch, legacy-command policy and commands 17 to 23 (design 4k K1, K9) */
++		bool mon_handled = false;
++		TEE_Result mon_res = rpi3_mon_pta_invoke(cmd_id, param_types, params, &mon_handled);
++
++		if (mon_handled)
++			return mon_res;
++	}
++#endif
++
+ 	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_GET_LAST_FRAME) {
+ 		uint32_t exp_pt_frame = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
+ 							TEE_PARAM_TYPE_MEMREF_OUTPUT,
+@@ -468,6 +482,16 @@
+ 	return TEE_SUCCESS;
+ }
+ 
++/*
++ * The PTA must stay non-concurrent: OP-TEE's busy flag serialises PTA calls, and the monitor's single mac_pta HMAC
++ * context depends on it (design 4d S3). The monitor build asserts it at compile time.
++ */
++#define RPI3_CAN_SPI_POC_PTA_FLAGS PTA_DEFAULT_FLAGS
++#ifdef CFG_RPI3_CAN_MONITOR
++_Static_assert(!(RPI3_CAN_SPI_POC_PTA_FLAGS & TA_FLAG_CONCURRENT),
++	       "the monitor requires a non-concurrent PTA (mac_pta is one shared context)");
++#endif
++
+ pseudo_ta_register(.uuid = PTA_RPI3_CAN_SPI_POC_UUID, .name = PTA_NAME,
+-		   .flags = PTA_DEFAULT_FLAGS,
++		   .flags = RPI3_CAN_SPI_POC_PTA_FLAGS,
+ 		   .invoke_command_entry_point = invoke_command);
+--- a/lib/libutee/include/pta_rpi3_can_spi_poc.h
++++ b/lib/libutee/include/pta_rpi3_can_spi_poc.h
+@@ -249,4 +249,24 @@
+  */
+ #define PTA_RPI3_CAN_SPI_POC_CMD_GET_TIMESTAMP_DEBUG 16
+ 
++/*
++ * Secure CAN Monitor commands (Component 2.2). Only dispatched when the OP-TEE build has CFG_RPI3_CAN_MONITOR=y;
++ * otherwise these ids behave as unknown commands. Slots 2 and 3 are VALUE_OUTPUT in every monitor command and
++ * carry the health pair. Full contracts: Part_E_Verification/monitor/MONITOR_STATE_DESIGN.md, section 4k.
++ *   17 SUBMIT_FRAME     p0 VALUE_OUTPUT (a verdict, b detail), p1 MEMREF_INPUT (44-byte frame)
++ *   18 GET_EVENTS       p0 VALUE_INOUT (in a first seq, in b max entries 1..5; out a count|more<<8, out b ev_lost), p1 MEMREF_OUTPUT
++ *   19 ACK_EVENTS       p0 VALUE_INOUT (in a ack up to seq, in b 0; out a 0, out b effective ev_ack)
++ *   20 GET_STATUS       p0 VALUE_INOUT (in a page 0 or 1, in b 0; out a 128, out b layout version), p1 MEMREF_OUTPUT (>= 128)
++ *   21 SET_IDLE         p0 VALUE_INOUT (in a mode 0|1, in b ms; out a verdict, out b remaining ms)
++ *   22 GET_NONCE        p0 VALUE_OUTPUT (nonce lo, hi), p1 VALUE_OUTPUT (hb_seq, hb_state)
++ *   23 SUBMIT_HB_ANSWER p0 VALUE_INOUT (in a hb_seq, in b 0; out a verdict, out b detail), p1 VALUE_INPUT (nonce lo, hi)
++ */
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_FRAME 17
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_EVENTS 18
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_ACK_EVENTS 19
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_STATUS 20
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_SET_IDLE 21
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_NONCE 22
++#define PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_HB_ANSWER 23
++
+ #endif /* __PTA_RPI3_CAN_SPI_POC_H__ */
+--- a/core/arch/arm/plat-rpi3/rpi3_can_server.c
++++ b/core/arch/arm/plat-rpi3/rpi3_can_server.c
+@@ -52,6 +52,9 @@
+ #include <trace.h>
+ 
+ #include "platform_config.h"
++#ifdef CFG_RPI3_CAN_MONITOR
++#include <rpi3_can_monitor.h>
++#endif
+ 
+ struct rpi3_can_server_result;
+ 
+@@ -392,11 +395,30 @@
+  */
+ void __noreturn rpi3_can_server_loop(void)
+ {
++#ifdef CFG_RPI3_CAN_MONITOR
++	/*
++	 * Secure CAN Monitor build, decision D1 = Option B (design 4g C7): FIQ and IRQ stay masked for the WHOLE loop.
++	 * CPU_ON left every exception masked and nothing here unmasks any of them, so no FIQ can ever be taken on top
++	 * of the live loop frames (the O-01 stack overlap cannot occur). The legacy chip A frame path, which reaches
++	 * HMAC and the heap, is not run in this build (F27: Core 1 never calls HMAC or the shared heap).
++	 */
++	uint32_t mon_pass = 0;
++	bool mon_on;
++
++	rpi3_mon_core1_entry_check();		/* panics if FIQ or IRQ is unmasked */
++	mon_on = rpi3_mon_init_ok();		/* a failed monitor init leaves Core 1 doing nothing but the heartbeat */
++#else
+ 	thread_set_exceptions(thread_get_exceptions() & ~THREAD_EXCP_NATIVE_INTR);
++#endif
+ 
+ 	while (true) {
+ 		rpi3_can_server_heartbeat++;
++#ifdef CFG_RPI3_CAN_MONITOR
++		if (mon_on)
++			rpi3_mon_core1_pass(mon_pass++);	/* G7 update inline; one lock attempt per 256 passes */
++#else
+ 		rpi3_can_fiq_process_pending_frame();
++#endif
+ 		dsb();
+ 	}
+ }
+--- a/core/arch/arm/plat-rpi3/conf.mk
++++ b/core/arch/arm/plat-rpi3/conf.mk
+@@ -24,6 +24,24 @@
+ # directly over real SPI0, independent of Linux's own drivers.
+ CFG_RPI3_CAN_SPI_POC_PTA ?= y
+ 
++# Secure CAN Monitor (Component 2): OFF by default, so a default build is unchanged. It needs the PTA above.
++# CFG_RPI3_CAN_MONITOR_DEBUG (default n, build time only) selects the debug profile of the legacy-command policy.
++CFG_RPI3_CAN_MONITOR ?= n
++CFG_RPI3_CAN_MONITOR_DEBUG ?= n
++# CFG_RPI3_CAN_MONITOR_TEST_STATS (default n): TEST BUILDS ONLY. Adds lock-hold-time stamps, Core 1 attempt-interval statistics, a Core 1 lock-hold
++# request (check X9) and two test-only PTA commands (24 read, 25 control). Never use it for a release image.
++CFG_RPI3_CAN_MONITOR_TEST_STATS ?= n
++ifeq ($(CFG_RPI3_CAN_MONITOR_TEST_STATS),y)
++ifneq ($(CFG_RPI3_CAN_MONITOR),y)
++$(error CFG_RPI3_CAN_MONITOR_TEST_STATS=y requires CFG_RPI3_CAN_MONITOR=y)
++endif
++endif
++ifeq ($(CFG_RPI3_CAN_MONITOR),y)
++ifneq ($(CFG_RPI3_CAN_SPI_POC_PTA),y)
++$(error CFG_RPI3_CAN_MONITOR=y requires CFG_RPI3_CAN_SPI_POC_PTA=y)
++endif
++endif
++
+ arm32-platform-cflags += -Wno-error=cast-align
+ arm64-platform-cflags += -Wno-error=cast-align
+ 
+--- a/core/arch/arm/plat-rpi3/sub.mk
++++ b/core/arch/arm/plat-rpi3/sub.mk
+@@ -2,3 +2,4 @@
+ srcs-y += main.c
+ srcs-y += rpi3_can_fiq.c
+ srcs-y += rpi3_can_server.c
++srcs-$(CFG_RPI3_CAN_MONITOR) += rpi3_can_monitor.c
+--- a/core/pta/sub.mk
++++ b/core/pta/sub.mk
+@@ -15,6 +15,7 @@
+ srcs-$(CFG_RTC_PTA) += rtc.c
+ srcs-$(CFG_WIDEVINE_PTA) += widevine.c
+ srcs-$(CFG_RPI3_CAN_SPI_POC_PTA) += rpi3_can_spi_poc.c
++srcs-$(CFG_RPI3_CAN_MONITOR) += rpi3_can_monitor_pta.c
+ 
+ subdirs-y += bcm
+ subdirs-y += stm32mp
+--- /dev/null
++++ b/core/arch/arm/plat-rpi3/rpi3_can_monitor.c
+@@ -0,0 +1,1085 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Secure CAN Monitor: shared state, synchronisation, events and the logic of PTA commands 17 to 23.
++ *
++ * Authority: Part_E_Verification/monitor/MONITOR_STATE_DESIGN.md sections 4a to 4k.
++ *
++ * Rules honoured here (design):
++ *  - one lock, no nesting (G9 L8); PTA callers acquire with the bounded, fail-closed sequence of 4f; Core 1 makes one
++ *    non-spinning trylock per 256 passes (4g); the lock is never force-released (4e I5);
++ *  - nothing runs under the lock except small bounded work (CS1 to CS5): no HMAC, no heap, no printing, no caller
++ *    copy, no memcpy/memcmp/memset. Every helper that runs inside a hold is __nostackcheck (no compiler hook);
++ *  - caller buffers are copied once before the lock and out after it (R-A8);
++ *  - the HMAC runs outside the lock with the guarded mac_pta context (4d S3); Core 1 never calls HMAC or the heap (F27);
++ *  - G7 words and pta_lock_timeouts are touched only through the lock-free accessors / the atomic increment.
++ */
++#include <rpi3_can_monitor.h>
++#include <rpi3_can_monitor_keys.h>	/* the prototype keys are visible to this file only */
++
++struct rpi3_mon_state rpi3_mon;		/* zero-initialised in .bss; rpi3_mon_init() makes the state explicit */
++#ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
++struct rpi3_mon_tstats rpi3_mon_tstats;	/* TEST BUILDS ONLY */
++#endif
++
++#define RPI3_MON_CRIT	static __nostackcheck	/* runs inside a lock hold: no compiler hook, no forbidden call */
++
++static const uint8_t rpi3_mon_key_frame[RPI3_MON_KEY_LEN] = RPI3_MON_KEY_FRAME_INIT;
++static const uint8_t rpi3_mon_key_hb[RPI3_MON_KEY_LEN] = RPI3_MON_KEY_HB_INIT;
++
++/* ---------------------------------------------------------------- small helpers */
++
++RPI3_MON_CRIT bool rpi3_mon_expired(uint64_t now, uint64_t t0, uint64_t limit)
++{
++	return now >= t0 && now - t0 > limit;		/* strict >, never true for a backward clock (R-A4, deadlines only) */
++}
++
++static uint32_t rpi3_mon_le32(const uint8_t *p)
++{
++	return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
++}
++
++static void rpi3_mon_put_le32(uint8_t *p, uint32_t v)
++{
++	p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
++}
++
++static void rpi3_mon_put_le64(uint8_t *p, uint64_t v)
++{
++	rpi3_mon_put_le32(p, (uint32_t)v);
++	rpi3_mon_put_le32(p + 4, (uint32_t)(v >> 32));
++}
++
++static bool rpi3_mon_ct_equal(const uint8_t *a, const uint8_t *b, size_t n)
++{
++	uint8_t diff = 0;
++	size_t i;
++
++	for (i = 0; i < n; i++)
++		diff |= (uint8_t)(a[i] ^ b[i]);
++	return diff == 0;
++}
++
++/* ---------------------------------------------------------------- HMAC and the mac_pta guard (outside the lock only) */
++
++bool rpi3_mon_mac_enter(void)
++{
++	uint32_t expected = 0;
++
++	return __atomic_compare_exchange_n(&rpi3_mon.mac_pta_busy, &expected, 1U, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
++}
++
++void rpi3_mon_mac_leave(void)
++{
++	__atomic_store_n(&rpi3_mon.mac_pta_busy, 0U, __ATOMIC_RELEASE);
++}
++
++/* HMAC-SHA256 of msg with key, 32 bytes out. The caller holds the mac_pta guard (or is the single-threaded init). */
++static TEE_Result rpi3_mon_hmac(const uint8_t *key, const uint8_t *msg, size_t len, uint8_t *out32)
++{
++	TEE_Result res = MON_PLAT_MAC_INIT(rpi3_mon.mac_pta, key, RPI3_MON_KEY_LEN);
++
++	if (res == TEE_SUCCESS)
++		res = MON_PLAT_MAC_UPDATE(rpi3_mon.mac_pta, msg, len);
++	if (res == TEE_SUCCESS)
++		res = MON_PLAT_MAC_FINAL(rpi3_mon.mac_pta, out32, 32);
++	return res;
++}
++
++/* ---------------------------------------------------------------- init (design 4e) */
++
++bool rpi3_mon_init_ok(void)
++{
++	return MON_PLAT_LOAD_ACQUIRE32(&rpi3_mon.init_ok) != 0;
++}
++
++/* The steps that need the crypto layer: the mac_pta context and boot_id (DEC-IF-15). Primary core, single-threaded. */
++static TEE_Result rpi3_mon_init_crypto(void)
++{
++	uint8_t in[10];
++	uint8_t dig[32];
++	uint8_t prng[2];
++	TEE_Result res = MON_PLAT_MAC_ALLOC(&rpi3_mon.mac_pta);
++
++	if (res != TEE_SUCCESS)
++		return res;
++	res = MON_PLAT_RNG(prng, sizeof(prng));
++	if (res != TEE_SUCCESS)
++		return res;
++	rpi3_mon_put_le64(in, rpi3_mon.init_ticks);
++	in[8] = prng[0];
++	in[9] = prng[1];
++	res = rpi3_mon_hmac(rpi3_mon_key_hb, in, sizeof(in), dig);
++	if (res != TEE_SUCCESS)
++		return res;
++	rpi3_mon.boot_id = rpi3_mon_le32(dig);		/* the first four bytes of the HMAC, little endian */
++	return TEE_SUCCESS;
++}
++
++/*
++ * Runs on the primary core from driver_init(), before the Normal World bootloader and therefore before Linux and
++ * Core 1 exist. It never fails the OS boot: if a step fails the monitor stays unavailable (init_ok stays 0, so
++ * commands 17 to 23 return BAD_STATE) and legacy commands keep working. init_ok is published LAST.
++ */
++TEE_Result rpi3_mon_init(void)
++{
++	TEE_Result res = TEE_SUCCESS;
++
++	memset(&rpi3_mon, 0, sizeof(rpi3_mon));
++	rpi3_mon_lock = SPINLOCK_UNLOCK;		/* explicit, in addition to the .bss zero */
++
++	rpi3_mon.profile = MON_PLAT_PROFILE_DEBUG ? RPI3_MON_PROFILE_DEBUG : RPI3_MON_PROFILE_HARDENED;
++	rpi3_mon.init_ticks = MON_PLAT_TIMER();
++	rpi3_mon.l.mode = RPI3_MON_MODE_F;		/* Mode F; nothing in Component 2 writes it again (S5) */
++
++	res = rpi3_mon_init_crypto();
++	if (res == TEE_SUCCESS)
++		res = MON_PLAT_INIT_EXTRA();
++	if (res != TEE_SUCCESS) {
++		MON_PLAT_EMSG("rpi3_mon: init step failed (0x%x): the monitor stays unavailable for this boot",
++			      (unsigned int)res);
++		return TEE_SUCCESS;
++	}
++
++	MON_PLAT_STORE_RELEASE32(&rpi3_mon.init_ok, 1);
++	return TEE_SUCCESS;
++}
++
++MON_PLAT_REGISTER_INIT(rpi3_mon_init);
++
++/* ---------------------------------------------------------------- bounded PTA lock acquisition (design 4f) */
++
++void rpi3_mon_wait_init(struct rpi3_mon_wait *w)
++{
++	w->wait_ticks_used = 0;
++	w->attempts_used = 0;
++}
++
++/*
++ * Exactly the sequence of design section 4f B3. The wait state is shared by every acquisition in one PTA command:
++ * the budget counts time spent WAITING for the lock, not time since the command started.
++ */
++enum rpi3_mon_rc rpi3_mon_acquire(struct rpi3_mon_wait *w, uint32_t *exc)
++{
++	uint32_t e = 0;
++	uint64_t t0 = 0;
++	uint64_t t1 = 0;
++	uint64_t now = 0;
++
++	/* 1. pre-check, before masking anything */
++	if (w->wait_ticks_used >= RPI3_MON_BUDGET_TICKS || w->attempts_used >= RPI3_MON_ATTEMPT_CAP)
++		goto exhausted;
++
++	/* 2. mask every exception, then read the timer */
++	e = MON_PLAT_MASK_ALL();
++	t0 = MON_PLAT_TIMER();
++
++	for (;;) {
++		/* 3. one attempt */
++		if (MON_PLAT_TRYLOCK(&rpi3_mon_lock)) {
++			/* 5. success: charge the wait, keep exceptions masked until rpi3_mon_release() */
++			t1 = MON_PLAT_TIMER();
++			RPI3_MON_TS_LOCKED(t1);
++			w->wait_ticks_used += (t1 >= t0) ? (t1 - t0) : RPI3_MON_BUDGET_TICKS;
++			*exc = e;
++			return RPI3_MON_OK;
++		}
++
++		/* 4. failure: count the attempt and test the three independent bounds, fail closed */
++		w->attempts_used++;
++		now = MON_PLAT_TIMER();
++		if (now < t0 ||					/* frozen or backward timer: exhausted */
++		    w->wait_ticks_used + (now - t0) > RPI3_MON_BUDGET_TICKS ||
++		    w->attempts_used >= RPI3_MON_ATTEMPT_CAP)	/* timer-independent backstop */
++			break;
++	}
++
++	/* 6. exhausted after masking: the lock was never taken, so restore exceptions first */
++	RPI3_MON_TS_EXHAUSTED(now, t0, w->attempts_used);
++	MON_PLAT_UNMASK(e);
++
++exhausted:
++	/* 6/7. one increment per exhausted command, lock-free */
++	MON_PLAT_INC32(&rpi3_mon_pta_lock_timeouts);
++	return RPI3_MON_BUSY;
++}
++
++/* Unlock first, then restore exceptions: OP-TEE asserts that IRQ is never unmasked while a spinlock is held. */
++void rpi3_mon_release(uint32_t exc)
++{
++	RPI3_MON_TS_UNLOCKING(RPI3_MON_TS_CTX_PTA);
++	MON_PLAT_UNLOCK_RESTORE(&rpi3_mon_lock, exc);
++}
++
++/* ---------------------------------------------------------------- health pair (design 4k K1) */
++
++void rpi3_mon_health_zero(struct rpi3_mon_health_out *h)
++{
++	h->p2a = 0;
++	h->p2b = 0;
++	h->p3a = 0;
++	h->p3b = 0;
++}
++
++/* Lock-free and constant data only, so it can be filled on a BUSY reply. last_poll_ticks is loaded FIRST and the
++ * saturating age uses this caller's own clock read (rule O-1). */
++void rpi3_mon_health_fill(struct rpi3_mon_health_out *h)
++{
++	uint64_t lp = rpi3_mon_load_u64(&rpi3_mon.health.last_poll_ticks);
++	uint64_t now = MON_PLAT_TIMER();
++	uint32_t sk = rpi3_mon_load_u32(&rpi3_mon.health.skip_count);
++	uint32_t st = rpi3_mon_load_u32(&rpi3_mon.health.starved);
++	uint64_t age = 0;
++	uint32_t b = 0;
++
++	if (lp == 0) {
++		age = RPI3_MON_HP_AGE_NEVER;
++	} else if (now >= lp) {
++		age = (now - lp) / RPI3_MON_TICKS_PER_MS;
++		if (age > RPI3_MON_HP_AGE_NEVER)
++			age = RPI3_MON_HP_AGE_NEVER;
++	}
++
++	if (st)
++		b |= RPI3_MON_HP_STARVED;
++	if (rpi3_mon_init_ok())
++		b |= RPI3_MON_HP_INIT_OK;
++	b |= (sk > 255U ? 255U : sk) << RPI3_MON_HP_SKIP_SHIFT;
++
++	h->p2a = (uint32_t)age;
++	h->p2b = b;
++	h->p3a = rpi3_mon_load_u32(&rpi3_mon_pta_lock_timeouts);
++	h->p3b = rpi3_mon_load_u32(&rpi3_mon.health.skip_total);
++}
++
++/* ---------------------------------------------------------------- critical-section helpers (lock held, no hook, no call) */
++
++/* G8 and G8-6: first four events of an evidence class are pinned and never limited; every other event is limited
++ * to one per second PER CLASS; the exact counter is always incremented; an overwrite of an unread entry is counted. */
++RPI3_MON_CRIT void rpi3_mon_ev_append(struct rpi3_mon_lstate *l, unsigned int type, uint32_t counter, uint32_t detail,
++				      uint64_t now)
++{
++	struct rpi3_mon_event e;
++	uint32_t i;
++
++	l->ev_count[type]++;
++	if (l->ev_seq == 0xFFFFFFFFU)			/* seq space exhausted: counters keep counting, no more records */
++		return;
++	e.seq = 0;
++	e.type = (uint16_t)type;
++	e.flags = 0;
++	e.ticks = now;
++	e.counter = counter;
++	e.detail = detail;
++
++	if (type < RPI3_MON_EV_N_EVIDENCE && l->pinned_n[type] < RPI3_MON_PINNED_PER_CLASS) {
++		e.seq = ++l->ev_seq;
++		l->pinned[type * RPI3_MON_PINNED_PER_CLASS + l->pinned_n[type]] = e;
++		l->pinned_n[type]++;
++		l->pinned_used++;
++		return;
++	}
++
++	if (l->diag_have[type] && now >= l->diag_last_ticks[type] &&
++	    now - l->diag_last_ticks[type] < RPI3_MON_TICKS_PER_SEC)
++		return;					/* suppressed: counted, not recorded */
++	l->diag_have[type] = 1;
++	l->diag_last_ticks[type] = now;
++
++	e.seq = ++l->ev_seq;
++	i = l->ordinary_head % RPI3_MON_ORDINARY_SLOTS;
++	if (l->ordinary_used[i]) {
++		l->ev_lost++;				/* an unread entry is overwritten: always counted */
++		e.flags |= 1;
++	}
++	l->ordinary[i] = e;
++	l->ordinary_used[i] = 1;
++	l->ordinary_head++;
++}
++
++/* Traffic window refreshed by an accepted, gap or resync frame; clears a raised timeout exactly once. */
++RPI3_MON_CRIT void rpi3_mon_traffic_refresh(struct rpi3_mon_lstate *l, uint64_t now)
++{
++	l->tr_armed = true;
++	l->tr_last_valid_ticks = now;
++	if (l->tr_timeout_raised) {
++		l->tr_timeout_raised = false;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_TRAFFIC_RECOVERED, 0, 1, now);
++	}
++}
++
++/* Exactly-once evaluation of the lease, traffic deadline and heartbeat (design 4d S4, 4c G5 and G6). */
++RPI3_MON_CRIT void rpi3_mon_evaluate(struct rpi3_mon_lstate *l, uint64_t now)
++{
++	bool lease_active;
++
++	if (l->idle_until_ticks && now > l->idle_until_ticks) {	/* the lease expires by itself and the window restarts */
++		l->idle_until_ticks = 0;
++		l->tr_last_valid_ticks = now;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_MODE_CHANGED, 0, 0, now);
++	}
++	lease_active = l->idle_until_ticks && now <= l->idle_until_ticks;
++
++	if (l->tr_armed && !lease_active && !l->tr_timeout_raised &&
++	    rpi3_mon_expired(now, l->tr_last_valid_ticks, RPI3_MON_T_TRAFFIC_TICKS)) {
++		l->tr_timeout_raised = true;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_TIMEOUT, 0, 1, now);
++	}
++
++	if (l->hb_state == RPI3_MON_HB_OPEN && rpi3_mon_expired(now, l->hb_issue_ticks, RPI3_MON_D_REQ_TICKS)) {
++		l->hb_state = RPI3_MON_HB_MISSED;		/* one miss, counted once */
++		l->hb_miss_count++;
++	}
++	/* k misses, or never answered at all, after the boot grace G: raised once, cleared by an on-time answer */
++	if (!l->hb_timeout_raised && now >= rpi3_mon.init_ticks && now - rpi3_mon.init_ticks > RPI3_MON_G_TICKS &&
++	    (l->hb_miss_count >= RPI3_MON_K_MISS || l->hb_last_ok_ticks == 0)) {
++		l->hb_timeout_raised = true;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_TIMEOUT, 0, l->hb_last_ok_ticks == 0 ? 3 : 2, now);
++	}
++}
++
++/* Core 1 only: issue a challenge when one is due. Never a catch-up burst: the next one is H after NOW. */
++RPI3_MON_CRIT void rpi3_mon_hb_issue_if_due(struct rpi3_mon_lstate *l, uint64_t now)
++{
++	if (now < l->hb_next_issue)
++		return;
++	if (l->hb_seq == 0xFFFFFFFFU) {			/* never wraps (G6-5) */
++		if (l->ev_count[RPI3_MON_EV_HB_SEQ_EXHAUSTED] == 0)
++			rpi3_mon_ev_append(l, RPI3_MON_EV_HB_SEQ_EXHAUSTED, 0, 0, now);
++		return;
++	}
++	l->hb_seq++;
++	l->hb_issue_ticks = now;
++	l->hb_state = RPI3_MON_HB_OPEN;
++	l->hb_nonce_valid = false;			/* the previous nonce is invalid (G6-4) */
++	l->hb_next_issue = now + RPI3_MON_H_TICKS;
++}
++
++RPI3_MON_CRIT bool rpi3_mon_frame_equal(const uint8_t *a, const uint8_t *b)
++{
++	uint32_t i;
++
++	for (i = 0; i < RPI3_MON_FRAME_LEN; i++)
++		if (a[i] != b[i])
++			return false;
++	return true;
++}
++
++RPI3_MON_CRIT void rpi3_mon_frame_store(uint8_t *dst, const uint8_t *src)
++{
++	uint32_t i;
++
++	volatile uint8_t *vd = dst;	/* volatile: GCC may not turn this loop into a memcpy call inside the hold (design CS3, check H1) */
++
++	for (i = 0; i < RPI3_MON_FRAME_LEN; i++)
++		vd[i] = src[i];
++}
++
++/* Counter rules of command 17, in the approved order, direct unsigned comparisons, no delta variable. */
++RPI3_MON_CRIT void rpi3_mon_frame_apply(struct rpi3_mon_lstate *l, const uint8_t *buf, uint32_t counter, uint64_t now,
++					uint32_t *vd, uint32_t *det)
++{
++	struct rpi3_mon_ctr *c = &l->ctr_f;
++	bool accept = false;
++
++	*det = 0;
++	if (!c->have_last) {
++		*vd = RPI3_MON_V17_RESYNC;
++		accept = true;
++	} else if (counter < c->last_counter) {
++		*vd = RPI3_MON_V17_REPLAY;
++	} else if (counter == c->last_counter) {
++		*vd = rpi3_mon_frame_equal(buf, c->last_frame44) ? RPI3_MON_V17_DUPLICATE : RPI3_MON_V17_CONFLICT;
++	} else if (c->last_counter != 0xFFFFFFFFU && counter == c->last_counter + 1U) {
++		*vd = RPI3_MON_V17_ACCEPTED;
++		accept = true;
++	} else {
++		*vd = RPI3_MON_V17_GAP;			/* counter > last + 1 */
++		*det = counter - c->last_counter - 1U;
++		accept = true;
++	}
++	if (accept) {
++		c->have_last = true;
++		c->last_counter = counter;
++		rpi3_mon_frame_store(c->last_frame44, buf);
++		c->last_accept_ticks = now;
++		rpi3_mon_traffic_refresh(l, now);
++	}
++}
++
++/* Verdict to event (design K10) and the group verdict record. */
++RPI3_MON_CRIT void rpi3_mon_frame_record(struct rpi3_mon_lstate *l, uint32_t vd, uint32_t det, uint32_t counter,
++					 uint64_t now)
++{
++	l->verdict_frame.last_type = (uint8_t)vd;
++	l->verdict_frame.last_ticks = now;
++	l->verdict_frame.total++;
++	switch (vd) {
++	case RPI3_MON_V17_GAP:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_COUNTER_GAP, counter, det, now);
++		break;
++	case RPI3_MON_V17_RESYNC:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_COUNTER_RESYNC, counter, 0, now);
++		break;
++	case RPI3_MON_V17_MALFORMED:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_MALFORMED, counter, det, now);
++		break;
++	case RPI3_MON_V17_AUTH_FAIL:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_AUTH_FAIL, counter, 0, now);
++		break;
++	case RPI3_MON_V17_REPLAY:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_REPLAY, counter, 1, now);
++		break;
++	case RPI3_MON_V17_DUPLICATE:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_REPLAY, counter, 2, now);
++		break;
++	case RPI3_MON_V17_CONFLICT:
++		rpi3_mon_ev_append(l, RPI3_MON_EV_REPLAY, counter, 3, now);
++		break;
++	default:
++		break;
++	}
++}
++
++/* Command 20 page 0, locked part, written with explicit stores (no memset, no memcpy, no 128-byte struct copy). The
++ * words go out through a volatile pointer so the compiler cannot turn the loops into library calls. */
++/* word-wise view of a local projection struct; may_alias so the copy loop is legal C */
++typedef uint64_t __attribute__((__may_alias__)) mon_u64_alias;
++
++RPI3_MON_CRIT void rpi3_mon_build_proj0(volatile uint64_t *w, const struct rpi3_mon_lstate *l, uint64_t now,
++					uint32_t boot_id, uint8_t profile)
++{
++	struct rpi3_mon_proj0 p;
++	mon_u64_alias *q = (mon_u64_alias *)(void *)&p;
++	uint32_t i;
++	bool lease = l->idle_until_ticks && now <= l->idle_until_ticks;
++
++	for (i = 0; i < sizeof(p) / 8; i++)
++		w[i] = 0;
++	p.version = 1;
++	p.length = 128;
++	p.boot_id = boot_id;
++	p.flags = RPI3_MON_PFLAG_INIT_OK | (profile == RPI3_MON_PROFILE_HARDENED ? RPI3_MON_PFLAG_HARDENED : 0) |
++		  (l->tr_armed ? RPI3_MON_PFLAG_TR_ARMED : 0) | (l->tr_timeout_raised ? RPI3_MON_PFLAG_TR_TIMEOUT : 0) |
++		  (l->hb_timeout_raised ? RPI3_MON_PFLAG_HB_TIMEOUT : 0) | (lease ? RPI3_MON_PFLAG_LEASE : 0);
++	p.now_ticks = now;
++	p.core1_poll_age_ticks = 0;
++	p.poll_count = 0;
++	p.skip_count = 0;
++	p.skip_total = 0;
++	p.pta_lock_timeouts = 0;
++	p.pta_timeouts_seen = l->pta_timeouts_seen;
++	p.last_counter = l->ctr_f.last_counter;
++	p.hb_seq = l->hb_seq;
++	p.traffic_age_ticks = (l->tr_armed && now >= l->tr_last_valid_ticks) ? now - l->tr_last_valid_ticks : ~0ULL;
++	p.hb_last_ok_age_ticks = (l->hb_last_ok_ticks && now >= l->hb_last_ok_ticks) ? now - l->hb_last_ok_ticks : ~0ULL;
++	p.hb_miss_count = l->hb_miss_count;
++	p.idle_uses = l->idle_uses;
++	p.lease_remaining_ticks = lease ? l->idle_until_ticks - now : 0;
++	p.ev_seq = l->ev_seq;
++	p.ev_ack = l->ev_ack;
++	p.ev_lost = l->ev_lost;
++	p.pinned_used = l->pinned_used;
++	p.v_frame = l->verdict_frame.last_type;
++	p.v_hb = l->verdict_hb.last_type;
++	p.v_xcheck = l->verdict_xcheck.last_type;
++	p.hb_state = l->hb_state;
++	p.mode = l->mode;
++	p.rsv[0] = 0;
++	p.rsv[1] = 0;
++	p.rsv[2] = 0;
++	p.rsv2 = 0;
++	for (i = 0; i < sizeof(p) / 8; i++)
++		w[i] = q[i];
++}
++
++RPI3_MON_CRIT void rpi3_mon_build_proj1(volatile uint64_t *w, const struct rpi3_mon_lstate *l)
++{
++	struct rpi3_mon_proj1 p;
++	mon_u64_alias *q = (mon_u64_alias *)(void *)&p;
++	uint32_t i;
++
++	p.version = 1;
++	p.length = 128;
++	for (i = 0; i < RPI3_MON_EV_COUNT; i++)
++		p.ev_count[i] = l->ev_count[i];
++	p.v_frame_total = l->verdict_frame.total;
++	p.v_hb_total = l->verdict_hb.total;
++	p.v_xcheck_total = l->verdict_xcheck.total;
++	p.rsv = 0;
++	for (i = 0; i < sizeof(p) / 8; i++)
++		w[i] = q[i];
++}
++
++/* ---------------------------------------------------------------- common prologue for the PTA command logic */
++
++/* Take the lock for a command: fresh wait state; on exhaustion the caller returns BUSY. */
++static enum rpi3_mon_rc rpi3_mon_hold(struct rpi3_mon_wait *w, uint32_t *exc)
++{
++	rpi3_mon_wait_init(w);
++	return rpi3_mon_acquire(w, exc);
++}
++
++/* ---------------------------------------------------------------- command 17: submit frame (design K2) */
++
++enum rpi3_mon_res rpi3_mon_cmd17(const uint8_t *msg, size_t len, uint32_t *verdict, uint32_t *detail,
++				 struct rpi3_mon_health_out *h)
++{
++	uint8_t buf[RPI3_MON_FRAME_LEN];
++	uint8_t tag[32];
++	uint32_t vd = RPI3_MON_V17_ACCEPTED;
++	uint32_t det = 0;
++	uint32_t counter = 0;
++	uint32_t can_id = 0;
++	bool authentic = false;
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint64_t now;
++	size_t i;
++
++	rpi3_mon_health_zero(h);
++	*verdict = 0;
++	*detail = 0;
++	if (msg == NULL && len > 0)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++
++	if (len != RPI3_MON_FRAME_LEN) {
++		vd = RPI3_MON_V17_MALFORMED;
++		det = RPI3_MON_MAL_LENGTH;			/* the buffer is not read */
++	} else {
++		for (i = 0; i < RPI3_MON_FRAME_LEN; i++)	/* one copy, byte reads, before any lock (R-A8) */
++			buf[i] = msg[i];
++		can_id = rpi3_mon_le32(buf);
++		counter = rpi3_mon_le32(buf + 4);
++		if (can_id > RPI3_MON_CAN_ID_MAX) {
++			vd = RPI3_MON_V17_MALFORMED;
++			det = RPI3_MON_MAL_CAN_ID_RANGE;
++		} else if (can_id != RPI3_MON_STREAM_CAN_ID) {
++			vd = RPI3_MON_V17_MALFORMED;
++			det = RPI3_MON_MAL_UNLISTED;
++		} else {
++			TEE_Result r;
++
++			if (!rpi3_mon_mac_enter()) {		/* mac_pta in use: nothing has changed, resubmit */
++				rpi3_mon_health_fill(h);
++				return RPI3_MON_R_BUSY;
++			}
++			r = rpi3_mon_hmac(rpi3_mon_key_frame, buf, 12, tag);	/* outside the lock */
++			rpi3_mon_mac_leave();
++			if (r != TEE_SUCCESS)
++				return RPI3_MON_R_BAD_STATE;	/* cannot authenticate: fail closed, change nothing */
++			if (rpi3_mon_ct_equal(tag, buf + 12, 32))
++				authentic = true;
++			else
++				vd = RPI3_MON_V17_AUTH_FAIL;
++		}
++	}
++
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {		/* BUSY comes before any state change */
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	now = MON_PLAT_TIMER();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);
++	if (authentic)
++		rpi3_mon_frame_apply(l, buf, counter, now, &vd, &det);
++	rpi3_mon_frame_record(l, vd, det, counter, now);
++	rpi3_mon_release(exc);
++
++	*verdict = vd;
++	*detail = det;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 18: read events (K3) */
++
++enum rpi3_mon_res rpi3_mon_cmd18(uint32_t from_seq, uint32_t max_entries, uint8_t *out, size_t *len, uint32_t *oa,
++				 uint32_t *ob, struct rpi3_mon_health_out *h)
++{
++	struct rpi3_mon_event loc[5];
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint32_t n = 0;
++	uint32_t total = 0;
++	uint32_t i;
++	uint32_t j;
++	uint32_t lost;
++	uint64_t now;
++
++	rpi3_mon_health_zero(h);
++	if (max_entries < 1 || max_entries > 5)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (out == NULL && *len > 0)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++	if (*len < sizeof(struct rpi3_mon_event) * max_entries) {
++		*len = sizeof(struct rpi3_mon_event) * max_entries;
++		return RPI3_MON_R_SHORT_BUFFER;
++	}
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		*oa = 0;
++		*ob = 0;
++		*len = 0;
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	now = MON_PLAT_TIMER();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);
++	/* one scan of at most 64 slots: keep the five smallest seq at or above from_seq, in order */
++	for (i = 0; i < RPI3_MON_PINNED_SLOTS + RPI3_MON_ORDINARY_SLOTS; i++) {
++		const struct rpi3_mon_event *e;
++		struct rpi3_mon_event t;
++
++		if (i < RPI3_MON_PINNED_SLOTS) {
++			e = &l->pinned[i];
++			if (e->seq == 0)
++				continue;
++		} else {
++			e = &l->ordinary[i - RPI3_MON_PINNED_SLOTS];
++			if (!l->ordinary_used[i - RPI3_MON_PINNED_SLOTS])
++				continue;
++		}
++		if (e->seq < from_seq)
++			continue;
++		total++;
++		if (n < max_entries || e->seq < loc[n - 1].seq) {
++			t = *e;				/* 24-byte copy, inline */
++			if (n < max_entries)
++				n++;
++			for (j = n - 1; j > 0 && loc[j - 1].seq > t.seq; j--)
++				loc[j] = loc[j - 1];
++			loc[j] = t;
++		}
++	}
++	lost = l->ev_lost;
++	rpi3_mon_release(exc);
++
++	if (n)
++		memcpy(out, loc, sizeof(struct rpi3_mon_event) * n);	/* to the caller, after the unlock */
++	*len = sizeof(struct rpi3_mon_event) * n;
++	*oa = n | (total > n ? 0x100U : 0U);
++	*ob = lost;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 19: acknowledge, a bookmark only (K4) */
++
++enum rpi3_mon_res rpi3_mon_cmd19(uint32_t ack_upto, uint32_t b, uint32_t *oa, uint32_t *ob, struct rpi3_mon_health_out *h)
++{
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint32_t eff;
++
++	rpi3_mon_health_zero(h);
++	if (b != 0)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		*oa = 0;
++		*ob = 0;
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, MON_PLAT_TIMER());
++	if (ack_upto > l->ev_seq)			/* clamp */
++		ack_upto = l->ev_seq;
++	if (ack_upto > l->ev_ack)			/* monotonic; never touches ev_lost or the overwrite victim */
++		l->ev_ack = ack_upto;
++	eff = l->ev_ack;
++	rpi3_mon_release(exc);
++
++	*oa = 0;
++	*ob = eff;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 20: status (K5) */
++
++enum rpi3_mon_res rpi3_mon_cmd20(uint32_t page, uint32_t b, uint8_t *out, size_t *len, uint32_t *oa, uint32_t *ob,
++				 struct rpi3_mon_health_out *h)
++{
++	union { struct rpi3_mon_proj0 p0; struct rpi3_mon_proj1 p1; uint64_t w[16]; } loc;
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint64_t now;
++	uint64_t lp;
++
++	rpi3_mon_health_zero(h);
++	if (b != 0 || page >= 2)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (out == NULL && *len > 0)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++	if (*len < 128) {
++		*len = 128;
++		return RPI3_MON_R_SHORT_BUFFER;
++	}
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		*oa = 0;
++		*ob = 0;
++		*len = 0;
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	now = MON_PLAT_TIMER();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);
++	if (page == 0)
++		rpi3_mon_build_proj0((volatile uint64_t *)loc.w, l, now, rpi3_mon.boot_id, rpi3_mon.profile);
++	else
++		rpi3_mon_build_proj1((volatile uint64_t *)loc.w, l);
++	rpi3_mon_release(exc);
++
++	if (page == 0) {				/* the six lock-free fields, read only after the unlock */
++		lp = rpi3_mon_load_u64(&rpi3_mon.health.last_poll_ticks);
++		now = MON_PLAT_TIMER();
++		loc.p0.core1_poll_age_ticks = (lp == 0) ? ~0ULL : (now >= lp ? now - lp : 0);
++		loc.p0.poll_count = rpi3_mon_load_u64(&rpi3_mon.health.poll_count);
++		loc.p0.skip_count = rpi3_mon_load_u32(&rpi3_mon.health.skip_count);
++		loc.p0.skip_total = rpi3_mon_load_u32(&rpi3_mon.health.skip_total);
++		loc.p0.pta_lock_timeouts = rpi3_mon_load_u32(&rpi3_mon_pta_lock_timeouts);
++		if (rpi3_mon_load_u32(&rpi3_mon.health.starved))
++			loc.p0.flags |= RPI3_MON_PFLAG_STARVED;
++	}
++	memcpy(out, loc.w, 128);
++	*len = 128;
++	*oa = 128;
++	*ob = 1;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 21: idle lease (K6) */
++
++enum rpi3_mon_res rpi3_mon_cmd21(uint32_t mode, uint32_t req_ms, uint32_t *oa, uint32_t *ob, struct rpi3_mon_health_out *h)
++{
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint64_t now;
++	uint64_t rem;
++	bool active;
++	uint32_t v;
++
++	rpi3_mon_health_zero(h);
++	if (mode > 1 || (mode == 1 && req_ms == 0) || (mode == 0 && req_ms != 0))
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		*oa = 0;
++		*ob = 0;
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	now = MON_PLAT_TIMER();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);			/* a just-expired lease is already EXPECTED */
++	active = l->idle_until_ticks && now <= l->idle_until_ticks;
++	if (mode == 1) {
++		if (l->idle_uses >= RPI3_MON_IDLE_USES_MAX) {
++			v = RPI3_MON_V21_REFUSED_CAP;
++			rpi3_mon_ev_append(l, RPI3_MON_EV_LEASE_REFUSED, 0, 0, now);
++		} else {
++			if (req_ms > RPI3_MON_IDLE_MAX_MS)
++				req_ms = RPI3_MON_IDLE_MAX_MS;
++			l->idle_until_ticks = now + (uint64_t)req_ms * RPI3_MON_TICKS_PER_MS;	/* replaces, never additive */
++			l->idle_uses++;
++			if (active) {
++				v = RPI3_MON_V21_RENEWED;
++				rpi3_mon_ev_append(l, RPI3_MON_EV_LEASE_RENEWED, 0, req_ms, now);
++			} else {
++				v = RPI3_MON_V21_GRANTED;
++				rpi3_mon_ev_append(l, RPI3_MON_EV_LEASE_GRANTED, 0, req_ms, now);
++				rpi3_mon_ev_append(l, RPI3_MON_EV_MODE_CHANGED, 0, 1, now);
++			}
++		}
++	} else if (active) {
++		l->idle_until_ticks = 0;
++		l->tr_last_valid_ticks = now;		/* the traffic window restarts (G5-4) */
++		v = RPI3_MON_V21_RETURNED;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_MODE_CHANGED, 0, 0, now);
++	} else {
++		v = RPI3_MON_V21_NO_CHANGE;
++	}
++	rem = (l->idle_until_ticks && now <= l->idle_until_ticks) ? (l->idle_until_ticks - now) / RPI3_MON_TICKS_PER_MS : 0;
++	rpi3_mon_release(exc);
++
++	*oa = v;
++	*ob = rem > 0xFFFFFFFFULL ? 0xFFFFFFFFU : (uint32_t)rem;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 22: get nonce (K7) */
++
++enum rpi3_mon_res rpi3_mon_cmd22(uint32_t *nonce_lo, uint32_t *nonce_hi, uint32_t *hb_seq, uint32_t *hb_state,
++				 struct rpi3_mon_health_out *h)
++{
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint8_t in[16];
++	uint8_t dig[32];
++	uint64_t issue;
++	uint64_t nonce = 0;
++	uint32_t seq;
++	uint32_t st;
++	bool valid;
++	bool store_ok;
++	TEE_Result r;
++
++	rpi3_mon_health_zero(h);
++	*nonce_lo = 0;
++	*nonce_hi = 0;
++	*hb_seq = 0;
++	*hb_state = 0;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++
++	/* hold 1: evaluate and read the request */
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, MON_PLAT_TIMER());
++	seq = l->hb_seq;
++	st = l->hb_state;
++	issue = l->hb_issue_ticks;
++	valid = l->hb_nonce_valid;
++	nonce = l->hb_nonce;
++	rpi3_mon_release(exc);
++
++	if (st != RPI3_MON_HB_OPEN && st != RPI3_MON_HB_MISSED) {	/* not answerable: state only, zero nonce */
++		nonce = 0;
++		goto out;
++	}
++	if (!valid) {
++		if (!rpi3_mon_mac_enter()) {		/* mac_pta in use: nothing changed, retry */
++			rpi3_mon_health_fill(h);
++			return RPI3_MON_R_BUSY;
++		}
++		rpi3_mon_put_le32(in, rpi3_mon.boot_id);
++		rpi3_mon_put_le32(in + 4, seq);
++		rpi3_mon_put_le64(in + 8, issue);
++		r = rpi3_mon_hmac(rpi3_mon_key_hb, in, sizeof(in), dig);	/* outside the lock */
++		rpi3_mon_mac_leave();
++		if (r != TEE_SUCCESS)
++			return RPI3_MON_R_BAD_STATE;
++		nonce = (uint64_t)rpi3_mon_le32(dig) | ((uint64_t)rpi3_mon_le32(dig + 4) << 32);
++
++		/* hold 2, with the remaining budget of the same command */
++		if (rpi3_mon_acquire(&w, &exc) != RPI3_MON_OK) {
++			rpi3_mon_health_fill(h);
++			return RPI3_MON_R_BUSY;
++		}
++		l = rpi3_mon_l();
++		store_ok = l->hb_seq == seq && (l->hb_state == RPI3_MON_HB_OPEN || l->hb_state == RPI3_MON_HB_MISSED);
++		if (store_ok) {
++			l->hb_nonce = nonce;
++			l->hb_nonce_valid = true;
++		}
++		seq = l->hb_seq;			/* report the CURRENT request */
++		st = l->hb_state;
++		rpi3_mon_release(exc);
++		if (!store_ok)				/* a new challenge arrived meanwhile: zero nonce, the caller retries */
++			nonce = 0;
++	}
++out:
++	*nonce_lo = (uint32_t)nonce;
++	*nonce_hi = (uint32_t)(nonce >> 32);
++	*hb_seq = seq;
++	*hb_state = st;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- command 23: heartbeat answer (K8) */
++
++enum rpi3_mon_res rpi3_mon_cmd23(uint32_t seq, uint32_t b, uint32_t nonce_lo, uint32_t nonce_hi, uint32_t *oa,
++				 uint32_t *ob, struct rpi3_mon_health_out *h)
++{
++	struct rpi3_mon_wait w;
++	struct rpi3_mon_lstate *l;
++	uint32_t exc = 0;
++	uint64_t now;
++	uint64_t given = ((uint64_t)nonce_hi << 32) | nonce_lo;
++	uint32_t v;
++	uint32_t detail = 0;
++
++	rpi3_mon_health_zero(h);
++	if (b != 0)
++		return RPI3_MON_R_BAD_PARAMETERS;
++	if (!rpi3_mon_init_ok())
++		return RPI3_MON_R_BAD_STATE;
++	if (rpi3_mon_hold(&w, &exc) != RPI3_MON_OK) {
++		*oa = 0;
++		*ob = 0;
++		rpi3_mon_health_fill(h);
++		return RPI3_MON_R_BUSY;
++	}
++	now = MON_PLAT_TIMER();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);			/* before the comparison: the deadline boundary uses this clock */
++	if (l->hb_state == RPI3_MON_HB_NONE || seq > l->hb_seq) {
++		v = RPI3_MON_V23_UNISSUED;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_UNISSUED_ANSWER, seq, 0, now);
++	} else if (seq < l->hb_seq) {
++		v = RPI3_MON_V23_STALE;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_STALE_ANSWER, seq, 0, now);
++	} else if (l->hb_state == RPI3_MON_HB_ANSWERED || l->hb_state == RPI3_MON_HB_LATE_ANSWERED) {
++		v = RPI3_MON_V23_DUPLICATE;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_DUP_ANSWER, seq, 0, now);
++	} else if (!l->hb_nonce_valid || l->hb_nonce != given) {
++		v = RPI3_MON_V23_BAD_NONCE;
++		detail = l->hb_nonce_valid ? 2U : 1U;		/* 1 never fetched, 2 different */
++		rpi3_mon_ev_append(l, RPI3_MON_EV_BAD_NONCE, seq, detail, now);
++	} else if (l->hb_state == RPI3_MON_HB_OPEN) {
++		v = RPI3_MON_V23_ON_TIME;
++		l->hb_state = RPI3_MON_HB_ANSWERED;
++		l->hb_last_ok_ticks = now;
++		l->hb_miss_count = 0;
++		if (l->hb_timeout_raised) {
++			l->hb_timeout_raised = false;
++			rpi3_mon_ev_append(l, RPI3_MON_EV_HB_RECOVERED, seq, 0, now);
++		}
++	} else {
++		v = RPI3_MON_V23_LATE;				/* MISSED: recorded, repairs nothing (G6-3) */
++		l->hb_state = RPI3_MON_HB_LATE_ANSWERED;
++		rpi3_mon_ev_append(l, RPI3_MON_EV_LATE_ANSWER, seq, 0, now);
++	}
++	l->verdict_hb.last_type = (uint8_t)v;
++	l->verdict_hb.last_ticks = now;
++	l->verdict_hb.total++;
++	rpi3_mon_release(exc);
++
++	*oa = v;
++	*ob = detail;
++	rpi3_mon_health_fill(h);
++	return RPI3_MON_R_OK;
++}
++
++/* ---------------------------------------------------------------- legacy-command event (K9): best effort, never waits */
++
++void rpi3_mon_note_legacy(uint32_t cmd_id, bool refused)
++{
++	uint32_t e;
++	struct rpi3_mon_lstate *l;
++
++	if (!rpi3_mon_init_ok())
++		return;
++	e = MON_PLAT_MASK_ALL();
++	if (MON_PLAT_TRYLOCK(&rpi3_mon_lock)) {			/* ONE attempt; if the lock is busy the event is dropped */
++		l = rpi3_mon_l();
++		rpi3_mon_ev_append(l, refused ? RPI3_MON_EV_LEGACY_REFUSED : RPI3_MON_EV_LEGACY_USED, 0, cmd_id,
++				   MON_PLAT_TIMER());
++		MON_PLAT_UNLOCK_RESTORE(&rpi3_mon_lock, e);
++	} else {
++		MON_PLAT_UNMASK(e);
++	}
++}
++
++/* ---------------------------------------------------------------- Core 1 (design 4g, D1 = Option B) */
++
++void rpi3_mon_core1_entry_check(void)
++{
++	if (!MON_PLAT_EXC_FIQ_IRQ_MASKED())
++		MON_PLAT_PANIC("rpi3_mon: the Core 1 monitor loop was entered with FIQ or IRQ unmasked");
++}
++
++/*
++ * One lock attempt per 256 passes. Never spins, never waits. On failure only G7 changes (the skip counters and the
++ * starvation flag). On success: evaluate, issue a due challenge, observe pta_lock_timeouts, close a starvation
++ * episode, unlock. Core 1 never calls HMAC and never touches the heap here (F27).
++ */
++void rpi3_mon_core1_attempt(void)
++{
++	struct rpi3_mon_lstate *l;
++	uint64_t now;
++	uint32_t count;
++	uint32_t delta;
++	uint32_t sk;
++
++	RPI3_MON_TS_ATTEMPT();
++	if (!MON_PLAT_TRYLOCK(&rpi3_mon_lock)) {
++		sk = rpi3_mon_load_u32(&rpi3_mon.health.skip_count) + 1U;
++		rpi3_mon_store_u32(&rpi3_mon.health.skip_count, sk);
++		rpi3_mon_store_u32(&rpi3_mon.health.skip_total, rpi3_mon_load_u32(&rpi3_mon.health.skip_total) + 1U);
++		if (sk >= RPI3_MON_K_STARVE)
++			rpi3_mon_store_u32(&rpi3_mon.health.starved, 1U);
++		return;
++	}
++	now = MON_PLAT_TIMER();
++	RPI3_MON_TS_LOCKED(now);
++	RPI3_MON_TS_CORE1_HOLD();
++	l = rpi3_mon_l();
++	rpi3_mon_evaluate(l, now);
++	rpi3_mon_hb_issue_if_due(l, now);
++
++	count = rpi3_mon_load_u32(&rpi3_mon_pta_lock_timeouts);		/* S2: read under the lock, then compare */
++	delta = count - l->pta_timeouts_seen;
++	if (delta) {
++		l->pta_timeouts_seen = count;
++		l->ev_count[RPI3_MON_EV_LOCK_TIMEOUT] += delta - 1U;	/* the append below adds one: the exact total is delta */
++		rpi3_mon_ev_append(l, RPI3_MON_EV_LOCK_TIMEOUT, 0, delta, now);
++	}
++	sk = rpi3_mon_load_u32(&rpi3_mon.health.skip_count);
++	if (sk >= RPI3_MON_K_STARVE)					/* one MON_STARVED event per episode that reached K */
++		rpi3_mon_ev_append(l, RPI3_MON_EV_MON_STARVED, 0, sk, now);
++	rpi3_mon_store_u32(&rpi3_mon.health.skip_count, 0U);		/* skip_total is cumulative and never reset */
++	rpi3_mon_store_u32(&rpi3_mon.health.starved, 0U);
++	l->last_eval_ticks = now;
++	RPI3_MON_TS_UNLOCKING(RPI3_MON_TS_CTX_CORE1);
++	MON_PLAT_UNLOCK(&rpi3_mon_lock);
++}
++
++#ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
++/* ---------------------------------------------------------------- TEST-ONLY: statistics access (not in a hold) */
++size_t rpi3_mon_ts_copy(uint8_t *out, size_t room)
++{
++	struct rpi3_mon_tstats snap;
++	volatile const mon_u64_alias *src = (volatile const mon_u64_alias *)(const void *)&rpi3_mon_tstats;
++	mon_u64_alias *dst = (mon_u64_alias *)(void *)&snap;
++	size_t i;
++
++	if (room < sizeof(snap))
++		return 0;
++	for (i = 0; i < sizeof(snap) / 8; i++)		/* lock-free snapshot: values may be a little skewed against each other */
++		dst[i] = src[i];
++	memcpy(out, &snap, sizeof(snap));
++	return sizeof(snap);
++}
++
++uint32_t rpi3_mon_ts_ctrl(uint32_t op, uint64_t arg, uint32_t *done)
++{
++	volatile mon_u64_alias *w = (volatile mon_u64_alias *)(void *)&rpi3_mon_tstats;
++	size_t i;
++
++	if (op == 0) {					/* reset the counters (do this while the system is quiet) */
++		for (i = 0; i < sizeof(rpi3_mon_tstats) / 8; i++)
++			w[i] = 0;
++	} else if (op == 1) {
++		rpi3_mon_tstats.hold_req_ticks = arg > RPI3_MON_TS_HOLD_MAX_TICKS ? RPI3_MON_TS_HOLD_MAX_TICKS : arg;
++	} else if (op != 2) {
++		return 1;				/* unknown op */
++	}
++	*done = rpi3_mon_tstats.hold_req_done;
++	return 0;
++}
++#endif
++
+--- /dev/null
++++ b/core/arch/arm/plat-rpi3/rpi3_can_monitor.h
+@@ -0,0 +1,390 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++/*
++ * Secure CAN Monitor: shared state, synchronisation and health (Component 2.2, stage 1).
++ *
++ * Authority: Part_E_Verification/monitor/MONITOR_STATE_DESIGN.md (sections 4a to 4k) and
++ * INTERFACE_DECISION_REGISTER.md. It holds the shared state, the lock, bounded PTA lock acquisition, the Core 1
++ * lock attempt, the exactly-once evaluation, the event ring, and the logic of PTA commands 17 to 23. The PTA glue
++ * that maps TEE_Param to these functions is core/pta/rpi3_can_monitor_pta.c.
++ *
++ * Ownership classes used below (design section 3.2):
++ *   C = constant after init (written by rpi3_mon_init on the primary core before Linux and Core 1 run)
++ *   L = read and written only while holding the monitor lock
++ *   A = lock-free atomic access through the accessors below (G7 words and pta_lock_timeouts)
++ */
++#ifndef __RPI3_CAN_MONITOR_H
++#define __RPI3_CAN_MONITOR_H
++
++#include <rpi3_can_monitor_plat.h>
++
++/* ---- provisional constants (design 4k K11; Component 4 measures the real values) ---- */
++#define RPI3_MON_TICKS_PER_MS		19200ULL
++#define RPI3_MON_TICKS_PER_SEC		19200000ULL
++#define RPI3_MON_BUDGET_TICKS		19200ULL	/* PTA lock-wait budget per command: 1 ms */
++#define RPI3_MON_ATTEMPT_CAP		2000U		/* PTA trylock attempts per command (provisional) */
++#define RPI3_MON_T_TRAFFIC_MS		300ULL
++#define RPI3_MON_H_MS			1000ULL
++#define RPI3_MON_D_REQ_MS		500ULL
++#define RPI3_MON_G_MS			60000ULL
++#define RPI3_MON_K_MISS			3U
++#define RPI3_MON_K_STARVE		8U
++#define RPI3_MON_IDLE_MAX_MS		60000U
++#define RPI3_MON_IDLE_USES_MAX		16U
++#define RPI3_MON_SENDER_PERIOD_MS	100ULL
++#define RPI3_MON_SENDER_JITTER_MS	50ULL
++
++#define RPI3_MON_T_TRAFFIC_TICKS	(RPI3_MON_T_TRAFFIC_MS * RPI3_MON_TICKS_PER_MS)
++#define RPI3_MON_H_TICKS		(RPI3_MON_H_MS * RPI3_MON_TICKS_PER_MS)
++#define RPI3_MON_D_REQ_TICKS		(RPI3_MON_D_REQ_MS * RPI3_MON_TICKS_PER_MS)
++#define RPI3_MON_G_TICKS		(RPI3_MON_G_MS * RPI3_MON_TICKS_PER_MS)
++#define RPI3_MON_FRAME_LEN		44U		/* can_id(4) | counter(4) | payload(4) | tag(32), no padding */
++#define RPI3_MON_STREAM_CAN_ID		0x123U		/* the single monitored stream (design K2) */
++#define RPI3_MON_CAN_ID_MAX		0x1FFFFFFFU
++#define RPI3_MON_CORE1_CADENCE		256U		/* one lock attempt per 256 Core 1 passes */
++
++_Static_assert(RPI3_MON_D_REQ_MS < RPI3_MON_H_MS, "TM1: only one heartbeat request may be outstanding (D_req < H)");
++_Static_assert(RPI3_MON_T_TRAFFIC_MS > RPI3_MON_SENDER_PERIOD_MS + RPI3_MON_SENDER_JITTER_MS,
++	       "TM1: the traffic timeout must exceed the sender period plus jitter");
++_Static_assert(RPI3_MON_BUDGET_TICKS == 1 * RPI3_MON_TICKS_PER_MS, "the approved initial PTA lock budget is 1 ms");
++
++/* ---- events (design 4k K10): 6 evidence classes, then 19 diagnostic classes ---- */
++enum rpi3_mon_event_type {
++	RPI3_MON_EV_AUTH_FAIL = 0, RPI3_MON_EV_REPLAY, RPI3_MON_EV_TIMEOUT,
++	RPI3_MON_EV_ALTERED, RPI3_MON_EV_UNACCOUNTED, RPI3_MON_EV_CHIPB_FAULT,
++	RPI3_MON_EV_EVIDENCE_END,
++	RPI3_MON_EV_MALFORMED = 6, RPI3_MON_EV_COUNTER_GAP, RPI3_MON_EV_COUNTER_RESYNC,
++	RPI3_MON_EV_TRAFFIC_RECOVERED, RPI3_MON_EV_HB_RECOVERED, RPI3_MON_EV_MODE_CHANGED,
++	RPI3_MON_EV_LEASE_GRANTED, RPI3_MON_EV_LEASE_RENEWED, RPI3_MON_EV_LEASE_REFUSED,
++	RPI3_MON_EV_LOCK_TIMEOUT, RPI3_MON_EV_MON_STARVED, RPI3_MON_EV_HB_SEQ_EXHAUSTED,
++	RPI3_MON_EV_LEGACY_REFUSED, RPI3_MON_EV_LEGACY_USED, RPI3_MON_EV_BAD_NONCE,
++	RPI3_MON_EV_STALE_ANSWER, RPI3_MON_EV_UNISSUED_ANSWER, RPI3_MON_EV_DUP_ANSWER,
++	RPI3_MON_EV_LATE_ANSWER, RPI3_MON_EV_COUNT
++};
++#define RPI3_MON_EV_N_EVIDENCE		6U
++#define RPI3_MON_PINNED_PER_CLASS	4U
++#define RPI3_MON_PINNED_SLOTS		(RPI3_MON_EV_N_EVIDENCE * RPI3_MON_PINNED_PER_CLASS)	/* 24 */
++#define RPI3_MON_ORDINARY_SLOTS		40U
++_Static_assert((unsigned int)RPI3_MON_EV_EVIDENCE_END == RPI3_MON_EV_N_EVIDENCE, "EV1: six evidence classes");
++_Static_assert((unsigned int)RPI3_MON_EV_COUNT == 25U, "EV1: 25 event types");
++
++struct rpi3_mon_event {			/* 24 bytes */
++	uint32_t seq; uint16_t type; uint16_t flags;
++	uint64_t ticks; uint32_t counter; uint32_t detail;
++};
++_Static_assert(sizeof(struct rpi3_mon_event) == 24, "event record is 24 bytes");
++_Static_assert(5 * sizeof(struct rpi3_mon_event) <= 128, "Q2: five records fit the 128-byte copy limit (CS3, H5)");
++
++enum rpi3_mon_hb_state { RPI3_MON_HB_NONE = 0, RPI3_MON_HB_OPEN, RPI3_MON_HB_ANSWERED, RPI3_MON_HB_MISSED,
++			 RPI3_MON_HB_LATE_ANSWERED };
++enum rpi3_mon_profile { RPI3_MON_PROFILE_HARDENED = 0, RPI3_MON_PROFILE_DEBUG = 1 };
++enum rpi3_mon_mode { RPI3_MON_MODE_F = 0, RPI3_MON_MODE_D2 = 1 };
++
++struct rpi3_mon_verdict { uint8_t last_type; uint64_t last_ticks; uint32_t total; };
++struct rpi3_mon_ctr {
++	bool have_last; uint32_t last_counter;
++	uint8_t last_frame44[44];		/* exactly the 44-byte wire message, no padding */
++	uint64_t last_accept_ticks;
++};
++
++/* Class L: every member below is touched only while holding the monitor lock (design rule R-A1). */
++struct rpi3_mon_lstate {
++	uint8_t mode;				/* G1: written by rpi3_mon_init only (S5) */
++	struct rpi3_mon_ctr ctr_f;		/* G3 */
++	struct rpi3_mon_verdict verdict_frame, verdict_hb, verdict_xcheck;	/* G4 */
++	uint32_t ev_count[RPI3_MON_EV_COUNT];	/* G4/G8: exact per-type counters */
++	bool tr_armed; uint64_t tr_last_valid_ticks; bool tr_timeout_raised;	/* G5 */
++	uint64_t idle_until_ticks; uint32_t idle_uses; uint64_t last_eval_ticks;
++	uint32_t hb_seq; uint64_t hb_issue_ticks; uint64_t hb_nonce; bool hb_nonce_valid;	/* G6 */
++	uint8_t hb_state; uint64_t hb_last_ok_ticks; uint32_t hb_miss_count; bool hb_timeout_raised;
++	uint64_t hb_next_issue;
++	struct rpi3_mon_event pinned[RPI3_MON_PINNED_SLOTS];	/* G8 */
++	uint8_t pinned_n[RPI3_MON_EV_N_EVIDENCE];
++	struct rpi3_mon_event ordinary[RPI3_MON_ORDINARY_SLOTS];
++	uint8_t ordinary_used[RPI3_MON_ORDINARY_SLOTS];
++	uint32_t ordinary_head;
++	uint64_t diag_last_ticks[RPI3_MON_EV_COUNT];	/* G8-6: one entry per event type */
++	uint8_t diag_have[RPI3_MON_EV_COUNT];
++	uint32_t ev_seq, ev_ack, ev_lost, pinned_used;
++	uint32_t pta_timeouts_seen;		/* S2: lock-protected */
++};
++
++/* G7 health: lock-free, ONE writer (Core 1). 64-byte aligned and a multiple of 64 bytes, so it shares no cache
++ * line with lock-protected data (design 4a, rule 4). Access only through the accessors below. */
++struct rpi3_mon_health {
++	uint64_t poll_count;
++	uint64_t last_poll_ticks;
++	uint32_t skip_count;
++	uint32_t skip_total;
++	uint32_t starved;			/* 0 or 1, not bool */
++	uint32_t reserved[9];
++} __aligned(64);
++
++struct rpi3_mon_state {
++	struct { unsigned int lock; uint8_t pad[60]; } lockline __aligned(64);	/* G9: the one lock, on its own line */
++	uint32_t init_ok;			/* C: published LAST by rpi3_mon_init (release store) */
++	uint32_t boot_id;			/* C: set by a later stage (DEC-IF-15); 0 in stage 1 */
++	uint64_t init_ticks;			/* C: secure-timer value at init */
++	uint8_t profile;			/* C: enum rpi3_mon_profile */
++	void *mac_pta;				/* C: G2 contexts, allocated by a later stage; NULL in stage 1 */
++	void *mac_core1;
++	uint32_t mac_pta_busy;			/* A: in-use guard for mac_pta (4d S3), used by a later stage */
++	struct rpi3_mon_lstate l;		/* L */
++	struct rpi3_mon_health health;		/* A: G7 */
++	struct { uint32_t pta_lock_timeouts; uint8_t pad[60]; } timeouts __aligned(64);	/* A: multi-writer (4d S1), own line */
++} __aligned(64);
++
++/* The state is exported (not static) only because the Core 1 loop (a later stage) must update G7 inline. Every
++ * other file uses the functions below. */
++extern struct rpi3_mon_state rpi3_mon;
++#define rpi3_mon_lock		(rpi3_mon.lockline.lock)
++#define rpi3_mon_pta_lock_timeouts	(rpi3_mon.timeouts.pta_lock_timeouts)
++
++#define RPI3_MON_CACHE_LINE	64U
++_Static_assert(sizeof(long) == 8, "G7: 64-bit words");
++_Static_assert(_Alignof(uint64_t) == 8, "G7: natural 64-bit alignment");
++_Static_assert(offsetof(struct rpi3_mon_state, health) % RPI3_MON_CACHE_LINE == 0, "G7 starts on a cache line");
++_Static_assert(sizeof(struct rpi3_mon_health) % RPI3_MON_CACHE_LINE == 0, "G7 is padded to whole cache lines");
++_Static_assert(offsetof(struct rpi3_mon_health, poll_count) % 8 == 0 &&
++	       offsetof(struct rpi3_mon_health, last_poll_ticks) % 8 == 0, "G7 64-bit words are 8-byte aligned");
++_Static_assert(offsetof(struct rpi3_mon_state, lockline) % RPI3_MON_CACHE_LINE == 0 &&
++	       sizeof(rpi3_mon.lockline) == RPI3_MON_CACHE_LINE, "V1/G9: the lock is alone on its cache line");
++_Static_assert(offsetof(struct rpi3_mon_state, timeouts) % RPI3_MON_CACHE_LINE == 0 &&
++	       sizeof(rpi3_mon.timeouts) == RPI3_MON_CACHE_LINE, "V1: pta_lock_timeouts is alone on its cache line");
++_Static_assert(offsetof(struct rpi3_mon_state, health) + sizeof(struct rpi3_mon_health) <=
++	       offsetof(struct rpi3_mon_state, timeouts), "G7 and the timeout counter do not share a line");
++
++/* ---- G7 accessors: forced inline and hook-free; a plain read of these words is a review failure (design 4a) ---- */
++static inline __attribute__((always_inline)) __nostackcheck
++uint64_t rpi3_mon_load_u64(const uint64_t *p) { return MON_PLAT_LOAD64(p); }
++static inline __attribute__((always_inline)) __nostackcheck
++void rpi3_mon_store_u64(uint64_t *p, uint64_t v) { MON_PLAT_STORE64(p, v); }
++static inline __attribute__((always_inline)) __nostackcheck
++uint32_t rpi3_mon_load_u32(const uint32_t *p) { return MON_PLAT_LOAD32(p); }
++static inline __attribute__((always_inline)) __nostackcheck
++void rpi3_mon_store_u32(uint32_t *p, uint32_t v) { MON_PLAT_STORE32(p, v); }
++
++/* Lock-protected state: the caller MUST hold the monitor lock (checked by the host mock, free in OP-TEE). */
++static inline __attribute__((always_inline)) __nostackcheck
++struct rpi3_mon_lstate *rpi3_mon_l(void) { MON_PLAT_LOCK_HELD_CHECK(); return &rpi3_mon.l; }
++
++/* ---- bounded PTA lock acquisition (design 4f) ---- */
++enum rpi3_mon_rc { RPI3_MON_OK = 0, RPI3_MON_BUSY = 1 };
++
++/* One of these per PTA command, shared by every acquisition in the command (B1). */
++struct rpi3_mon_wait { uint64_t wait_ticks_used; uint32_t attempts_used; };
++
++/* The health pair that every monitor command returns in slots 2 and 3 (design 4k K1). */
++struct rpi3_mon_health_out { uint32_t p2a, p2b, p3a, p3b; };
++#define RPI3_MON_HP_STARVED	0x1U
++#define RPI3_MON_HP_INIT_OK	0x2U
++#define RPI3_MON_HP_SKIP_SHIFT	8
++#define RPI3_MON_HP_AGE_NEVER	0xFFFFFFFFU
++
++TEE_Result rpi3_mon_init(void);			/* registered with driver_init; never fails the OS boot */
++bool rpi3_mon_init_ok(void);
++void rpi3_mon_wait_init(struct rpi3_mon_wait *w);
++/* RPI3_MON_OK: lock held and exceptions masked; give *exc to rpi3_mon_release(). RPI3_MON_BUSY: budget, attempt cap
++ * or timer fault; the lock was NOT taken, exceptions are restored and pta_lock_timeouts was incremented once. */
++enum rpi3_mon_rc rpi3_mon_acquire(struct rpi3_mon_wait *w, uint32_t *exc);
++void rpi3_mon_release(uint32_t exc);		/* unlock first, then restore exceptions */
++void rpi3_mon_health_fill(struct rpi3_mon_health_out *h);	/* lock-free reads only; call after unlock or unmask */
++void rpi3_mon_health_zero(struct rpi3_mon_health_out *h);
++
++
++/* ---- results and verdicts (design 4k K1 to K8) ---- */
++enum rpi3_mon_res {
++	RPI3_MON_R_OK = 0, RPI3_MON_R_BAD_PARAMETERS, RPI3_MON_R_BAD_STATE, RPI3_MON_R_SHORT_BUFFER, RPI3_MON_R_BUSY
++};
++enum rpi3_mon_v17 {	/* command 17 verdicts */
++	RPI3_MON_V17_ACCEPTED = 0, RPI3_MON_V17_GAP, RPI3_MON_V17_RESYNC, RPI3_MON_V17_MALFORMED,
++	RPI3_MON_V17_AUTH_FAIL, RPI3_MON_V17_REPLAY, RPI3_MON_V17_DUPLICATE, RPI3_MON_V17_CONFLICT
++};
++enum { RPI3_MON_MAL_LENGTH = 1, RPI3_MON_MAL_CAN_ID_RANGE = 2, RPI3_MON_MAL_UNLISTED = 3 };
++enum rpi3_mon_v21 {	/* command 21 verdicts */
++	RPI3_MON_V21_GRANTED = 0, RPI3_MON_V21_RENEWED, RPI3_MON_V21_RETURNED, RPI3_MON_V21_REFUSED_CAP,
++	RPI3_MON_V21_NO_CHANGE
++};
++enum rpi3_mon_v23 {	/* command 23 verdicts */
++	RPI3_MON_V23_ON_TIME = 0, RPI3_MON_V23_LATE, RPI3_MON_V23_STALE, RPI3_MON_V23_UNISSUED,
++	RPI3_MON_V23_BAD_NONCE, RPI3_MON_V23_DUPLICATE
++};
++
++/* ---- command 20 projections, layout version 1, exactly 128 bytes (design 4k K5) ---- */
++struct rpi3_mon_proj0 {
++	uint32_t version, length;			/* 0x00 */
++	uint32_t boot_id, flags;			/* 0x08 */
++	uint64_t now_ticks;				/* 0x10 */
++	uint64_t core1_poll_age_ticks;			/* 0x18 lock-free */
++	uint64_t poll_count;				/* 0x20 lock-free */
++	uint32_t skip_count, skip_total;		/* 0x28 lock-free */
++	uint32_t pta_lock_timeouts;			/* 0x30 lock-free */
++	uint32_t pta_timeouts_seen;			/* 0x34 */
++	uint32_t last_counter, hb_seq;			/* 0x38 */
++	uint64_t traffic_age_ticks;			/* 0x40 */
++	uint64_t hb_last_ok_age_ticks;			/* 0x48 */
++	uint32_t hb_miss_count, idle_uses;		/* 0x50 */
++	uint64_t lease_remaining_ticks;			/* 0x58 */
++	uint32_t ev_seq, ev_ack;			/* 0x60 */
++	uint32_t ev_lost, pinned_used;			/* 0x68 */
++	uint8_t v_frame, v_hb, v_xcheck, hb_state, mode, rsv[3];	/* 0x70 */
++	uint64_t rsv2;					/* 0x78 */
++};
++struct rpi3_mon_proj1 {
++	uint32_t version, length;			/* 0x00 */
++	uint32_t ev_count[RPI3_MON_EV_COUNT];		/* 0x08 .. 0x6B */
++	uint32_t v_frame_total, v_hb_total, v_xcheck_total;	/* 0x6C 0x70 0x74 */
++	uint64_t rsv;					/* 0x78 */
++};
++#define RPI3_MON_PO(f) offsetof(struct rpi3_mon_proj0, f)
++_Static_assert(sizeof(struct rpi3_mon_proj0) == 128 && _Alignof(struct rpi3_mon_proj0) == 8, "N5: page 0 is 128 bytes, 8-aligned");
++_Static_assert(RPI3_MON_PO(version) == 0x00 && RPI3_MON_PO(boot_id) == 0x08 && RPI3_MON_PO(now_ticks) == 0x10 &&
++	       RPI3_MON_PO(core1_poll_age_ticks) == 0x18 && RPI3_MON_PO(poll_count) == 0x20 && RPI3_MON_PO(skip_count) == 0x28 &&
++	       RPI3_MON_PO(pta_lock_timeouts) == 0x30 && RPI3_MON_PO(pta_timeouts_seen) == 0x34 && RPI3_MON_PO(last_counter) == 0x38 &&
++	       RPI3_MON_PO(traffic_age_ticks) == 0x40 && RPI3_MON_PO(hb_last_ok_age_ticks) == 0x48 && RPI3_MON_PO(hb_miss_count) == 0x50 &&
++	       RPI3_MON_PO(lease_remaining_ticks) == 0x58 && RPI3_MON_PO(ev_seq) == 0x60 && RPI3_MON_PO(ev_lost) == 0x68 &&
++	       RPI3_MON_PO(v_frame) == 0x70 && RPI3_MON_PO(rsv2) == 0x78, "N5: every page 0 field offset matches the approved table");
++_Static_assert(sizeof(struct rpi3_mon_proj1) == 128 && offsetof(struct rpi3_mon_proj1, ev_count) == 0x08 &&
++	       offsetof(struct rpi3_mon_proj1, v_frame_total) == 0x6C && offsetof(struct rpi3_mon_proj1, v_xcheck_total) == 0x74 &&
++	       offsetof(struct rpi3_mon_proj1, rsv) == 0x78, "EV5: page 1 layout matches the approved table");
++#define RPI3_MON_PFLAG_INIT_OK		0x01U
++#define RPI3_MON_PFLAG_HARDENED		0x02U
++#define RPI3_MON_PFLAG_TR_ARMED		0x04U
++#define RPI3_MON_PFLAG_TR_TIMEOUT	0x08U
++#define RPI3_MON_PFLAG_HB_TIMEOUT	0x10U
++#define RPI3_MON_PFLAG_LEASE		0x20U
++#define RPI3_MON_PFLAG_STARVED		0x40U
++_Static_assert(RPI3_MON_HP_SKIP_SHIFT == 8 && (RPI3_MON_HP_STARVED | RPI3_MON_HP_INIT_OK) < 0x100U, "HP6: health word bit layout");
++
++/* ---- shared-state logic ---- */
++bool rpi3_mon_mac_enter(void);			/* in-use guard of mac_pta (4d S3); false = busy */
++void rpi3_mon_mac_leave(void);
++void rpi3_mon_note_legacy(uint32_t cmd_id, bool refused);	/* best effort: one non-spinning trylock, event dropped if busy */
++
++/* ---- PTA command logic (plain C, no TEE_Param; the glue maps parameters) ---- */
++enum rpi3_mon_res rpi3_mon_cmd17(const uint8_t *msg, size_t len, uint32_t *verdict, uint32_t *detail,
++				 struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd18(uint32_t from_seq, uint32_t max_entries, uint8_t *out, size_t *len,
++				 uint32_t *oa, uint32_t *ob, struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd19(uint32_t ack_upto, uint32_t b, uint32_t *oa, uint32_t *ob, struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd20(uint32_t page, uint32_t b, uint8_t *out, size_t *len, uint32_t *oa, uint32_t *ob,
++				 struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd21(uint32_t mode, uint32_t req_ms, uint32_t *oa, uint32_t *ob, struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd22(uint32_t *nonce_lo, uint32_t *nonce_hi, uint32_t *hb_seq, uint32_t *hb_state,
++				 struct rpi3_mon_health_out *h);
++enum rpi3_mon_res rpi3_mon_cmd23(uint32_t seq, uint32_t b, uint32_t nonce_lo, uint32_t nonce_hi, uint32_t *oa, uint32_t *ob,
++				 struct rpi3_mon_health_out *h);
++
++/* ---- Core 1 (design 4g; D1 = Option B: FIQ and IRQ stay masked for the whole loop) ---- */
++void rpi3_mon_core1_entry_check(void);		/* panics if FIQ or IRQ is unmasked at loop entry */
++void rpi3_mon_core1_attempt(void);		/* one non-spinning trylock attempt; see rpi3_can_monitor.c */
++
++/* Per-pass Core 1 update, inline and hook-free (G7 rule 6): the pass counter is local to the caller. */
++static inline __attribute__((always_inline)) __nostackcheck
++void rpi3_mon_core1_pass(uint32_t pass)
++{
++	rpi3_mon_store_u64(&rpi3_mon.health.poll_count, rpi3_mon_load_u64(&rpi3_mon.health.poll_count) + 1);
++	if ((pass & (RPI3_MON_CORE1_CADENCE - 1U)) == 0) {
++		rpi3_mon_store_u64(&rpi3_mon.health.last_poll_ticks, MON_PLAT_TIMER());
++		rpi3_mon_core1_attempt();
++	}
++}
++_Static_assert((RPI3_MON_CORE1_CADENCE & (RPI3_MON_CORE1_CADENCE - 1U)) == 0, "the cadence is a power of two");
++
++/* PTA glue entry (core/pta/rpi3_can_monitor_pta.c): dispatch, legacy policy and parameter mapping. */
++TEE_Result rpi3_mon_pta_invoke(uint32_t cmd_id, uint32_t param_types, TEE_Param params[TEE_NUM_PARAMS], bool *handled);
++
++/* ---------------------------------------------------------------- TEST-ONLY statistics (CFG_RPI3_CAN_MONITOR_TEST_STATS=y)
++ * Not part of any release build. The hooks below expand to nothing when the flag is off. When on they are forced-inline, hook-free
++ * and bounded, so they add no instrumented call to a lock hold (their own timer reads are part of the measured hold and are small). */
++#ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
++#define RPI3_MON_TS_HOLD_MAX_TICKS	192000ULL	/* a Core 1 hold request is clamped to 10 ms */
++#define RPI3_MON_TS_HIST		16U
++enum { RPI3_MON_TS_CTX_PTA = 0, RPI3_MON_TS_CTX_CORE1 = 1 };
++
++struct rpi3_mon_tstats {
++	uint64_t hold_start;				/* written by the current lock holder only */
++	uint64_t hold_count, hold_sum, hold_max;	/* every hold of PTA and Core 1, in timer ticks */
++	uint64_t hold_max_ctx[2];			/* per context: PTA, Core 1 */
++	uint32_t hold_hist[RPI3_MON_TS_HIST];		/* bucket k: floor(log2(ticks)) = k, last bucket: 2^15 ticks and more */
++	uint64_t wait_last_ticks;			/* last exhausted PTA acquire: ticks spent waiting and attempts made */
++	uint32_t wait_last_attempts, wait_exhausted;
++	uint64_t att_prev, att_count, att_sum, att_min, att_max;	/* ticks between successive Core 1 lock attempts */
++	uint64_t hold_req_ticks;			/* test control: the next Core 1 attempt holds the lock this long */
++	uint32_t hold_req_done, rsv;
++} __aligned(64);
++extern struct rpi3_mon_tstats rpi3_mon_tstats;
++
++#define RPI3_MON_TS_INLINE static inline __attribute__((always_inline)) __nostackcheck
++
++RPI3_MON_TS_INLINE void rpi3_mon_ts_locked(uint64_t t) { rpi3_mon_tstats.hold_start = t; }
++
++RPI3_MON_TS_INLINE void rpi3_mon_ts_unlocking(unsigned int ctx)
++{
++	uint64_t now = MON_PLAT_TIMER();
++	uint64_t d = (now >= rpi3_mon_tstats.hold_start) ? now - rpi3_mon_tstats.hold_start : 0;
++	uint64_t x = d;
++	unsigned int k = 0;
++
++	while (x > 1 && k < RPI3_MON_TS_HIST - 1U) { x >>= 1; k++; }
++	rpi3_mon_tstats.hold_hist[k]++;
++	rpi3_mon_tstats.hold_count++;
++	rpi3_mon_tstats.hold_sum += d;
++	if (d > rpi3_mon_tstats.hold_max) rpi3_mon_tstats.hold_max = d;
++	if (d > rpi3_mon_tstats.hold_max_ctx[ctx]) rpi3_mon_tstats.hold_max_ctx[ctx] = d;
++}
++
++RPI3_MON_TS_INLINE void rpi3_mon_ts_exhausted(uint64_t now, uint64_t t0, uint32_t attempts)
++{
++	rpi3_mon_tstats.wait_last_ticks = (now >= t0) ? now - t0 : 0;
++	rpi3_mon_tstats.wait_last_attempts = attempts;
++	rpi3_mon_tstats.wait_exhausted++;
++}
++
++RPI3_MON_TS_INLINE void rpi3_mon_ts_attempt(void)
++{
++	uint64_t now = MON_PLAT_TIMER();
++	uint64_t d;
++
++	if (rpi3_mon_tstats.att_prev && now >= rpi3_mon_tstats.att_prev) {
++		d = now - rpi3_mon_tstats.att_prev;
++		rpi3_mon_tstats.att_count++;
++		rpi3_mon_tstats.att_sum += d;
++		if (!rpi3_mon_tstats.att_min || d < rpi3_mon_tstats.att_min) rpi3_mon_tstats.att_min = d;
++		if (d > rpi3_mon_tstats.att_max) rpi3_mon_tstats.att_max = d;
++	}
++	rpi3_mon_tstats.att_prev = now;
++}
++
++/* Called by Core 1 right after it took the lock: if a hold was requested, keep the lock for that long (bounded by the clamp), then clear it. */
++RPI3_MON_TS_INLINE void rpi3_mon_ts_core1_hold(void)
++{
++	uint64_t req = rpi3_mon_tstats.hold_req_ticks;
++	uint64_t t0;
++
++	if (req) {
++		if (req > RPI3_MON_TS_HOLD_MAX_TICKS) req = RPI3_MON_TS_HOLD_MAX_TICKS;
++		t0 = MON_PLAT_TIMER();
++		while (MON_PLAT_TIMER() - t0 < req) { }
++		rpi3_mon_tstats.hold_req_ticks = 0;
++		rpi3_mon_tstats.hold_req_done++;
++	}
++}
++
++#define RPI3_MON_TS_LOCKED(t)			rpi3_mon_ts_locked(t)
++#define RPI3_MON_TS_UNLOCKING(ctx)		rpi3_mon_ts_unlocking(ctx)
++#define RPI3_MON_TS_EXHAUSTED(now, t0, att)	rpi3_mon_ts_exhausted((now), (t0), (att))
++#define RPI3_MON_TS_ATTEMPT()			rpi3_mon_ts_attempt()
++#define RPI3_MON_TS_CORE1_HOLD()		rpi3_mon_ts_core1_hold()
++
++/* Not in a hold; lock-free reads/writes of the statistics for the two test commands. */
++size_t rpi3_mon_ts_copy(uint8_t *out, size_t room);			/* returns sizeof(struct), or 0 if room is too small (then *needed* is sizeof) */
++uint32_t rpi3_mon_ts_ctrl(uint32_t op, uint64_t arg, uint32_t *done);	/* op 0 reset, 1 request a Core 1 hold of arg ticks, 2 read only */
++#else
++#define RPI3_MON_TS_LOCKED(t)			do { } while (0)
++#define RPI3_MON_TS_UNLOCKING(ctx)		do { } while (0)
++#define RPI3_MON_TS_EXHAUSTED(now, t0, att)	do { } while (0)
++#define RPI3_MON_TS_ATTEMPT()			do { } while (0)
++#define RPI3_MON_TS_CORE1_HOLD()		do { } while (0)
++#endif
++
++#endif /* __RPI3_CAN_MONITOR_H */
+--- /dev/null
++++ b/core/arch/arm/plat-rpi3/rpi3_can_monitor_plat.h
+@@ -0,0 +1,87 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++/*
++ * Platform bindings for rpi3_can_monitor.c (OP-TEE build).
++ *
++ * The monitor logic is written once and uses only the MON_PLAT_* names below. The host test harness
++ * (Part_E_Verification/monitor/source_tests) provides a mock header with the SAME NAME, so the same
++ * rpi3_can_monitor.c compiles on the host and in OP-TEE.
++ *
++ * Design: Part_E_Verification/monitor/MONITOR_STATE_DESIGN.md, sections 4a to 4k.
++ */
++#ifndef __RPI3_CAN_MONITOR_PLAT_H
++#define __RPI3_CAN_MONITOR_PLAT_H
++
++#ifndef ARM64
++#error "rpi3_can_monitor requires an AArch64 core: lock-free G7 words rely on 64-bit single-copy atomic loads and stores"
++#endif
++
++#include <arm.h>
++#include <atomic.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <initcall.h>
++#include <kernel/panic.h>
++#include <kernel/spinlock.h>
++#include <kernel/thread.h>
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++#include <tee_api_defines.h>
++#include <tee_api_types.h>
++#include <trace.h>
++
++/* Exceptions: mask everything while trying for the lock, restore on release (design 4f B3). */
++#define MON_PLAT_MASK_ALL()		thread_mask_exceptions(THREAD_EXCP_ALL)
++#define MON_PLAT_UNMASK(e)		thread_unmask_exceptions(e)
++
++/* The 64-bit secure counter, 19.2 MHz. barrier_read_counter_timer() is __noprof (no compiler hook). */
++#define MON_PLAT_TIMER()		barrier_read_counter_timer()
++
++/* The one monitor lock (OP-TEE spinlock). cpu_spin_trylock() asserts that IRQ is masked. */
++#define MON_PLAT_TRYLOCK(l)		cpu_spin_trylock(l)
++#define MON_PLAT_UNLOCK_RESTORE(l, e)	cpu_spin_unlock_xrestore((l), (e))
++/* Core 1 never changes the exception mask around the lock (D1 = Option B), so it uses the plain unlock. */
++#define MON_PLAT_UNLOCK(l)		cpu_spin_unlock(l)
++
++/* D1 = Option B: the Core 1 loop keeps FIQ and IRQ masked for ever. */
++#define MON_PLAT_EXC_FIQ_IRQ_MASKED() \
++	((thread_get_exceptions() & (THREAD_EXCP_FOREIGN_INTR | THREAD_EXCP_NATIVE_INTR)) == \
++	 (THREAD_EXCP_FOREIGN_INTR | THREAD_EXCP_NATIVE_INTR))
++#define MON_PLAT_PANIC(msg)		panic(msg)
++
++/* HMAC-SHA256 through the OP-TEE crypto layer (one context, allocated once at init; used outside the lock only). */
++#define MON_PLAT_MAC_ALLOC(ctxp)	crypto_mac_alloc_ctx((ctxp), TEE_ALG_HMAC_SHA256)
++#define MON_PLAT_MAC_INIT(ctx, k, kl)	crypto_mac_init((ctx), (k), (kl))
++#define MON_PLAT_MAC_UPDATE(ctx, d, l)	crypto_mac_update((ctx), (d), (l))
++#define MON_PLAT_MAC_FINAL(ctx, o, ol)	crypto_mac_final((ctx), (o), (ol))
++#define MON_PLAT_RNG(buf, len)		crypto_rng_read((buf), (len))
++
++/* Atomics. atomic_inc32() is hand-written assembly (ldaxr/stxr loop), not instrumented. The relaxed
++ * load/store forms are the same operation atomic_load_u32()/atomic_store_u32() perform, written as
++ * builtins so that no compiler hook call is added (design 4a, rule 2). */
++#define MON_PLAT_INC32(p)		((void)atomic_inc32(p))
++#define MON_PLAT_LOAD32(p)		__atomic_load_n((p), __ATOMIC_RELAXED)
++#define MON_PLAT_STORE32(p, v)		__atomic_store_n((p), (v), __ATOMIC_RELAXED)
++#define MON_PLAT_LOAD64(p)		__atomic_load_n((p), __ATOMIC_RELAXED)
++#define MON_PLAT_STORE64(p, v)		__atomic_store_n((p), (v), __ATOMIC_RELAXED)
++#define MON_PLAT_LOAD_ACQUIRE32(p)	__atomic_load_n((p), __ATOMIC_ACQUIRE)
++#define MON_PLAT_STORE_RELEASE32(p, v)	__atomic_store_n((p), (v), __ATOMIC_RELEASE)
++
++#define MON_PLAT_EMSG(...)		EMSG(__VA_ARGS__)
++#define MON_PLAT_REGISTER_INIT(fn)	driver_init(fn)
++
++/* Host mock only: checks that lock-protected state is touched with the lock held. No cost here. */
++#define MON_PLAT_LOCK_HELD_CHECK()	((void)0)
++
++/* Extra initialisation steps run by rpi3_mon_init() before init_ok is published. Stage 1 has none; later
++ * stages (mac contexts, boot_id) add their steps here or next to it, always BEFORE the publication. */
++#define MON_PLAT_INIT_EXTRA()		TEE_SUCCESS
++
++#ifdef CFG_RPI3_CAN_MONITOR_DEBUG
++#define MON_PLAT_PROFILE_DEBUG		1
++#else
++#define MON_PLAT_PROFILE_DEBUG		0
++#endif
++
++#endif /* __RPI3_CAN_MONITOR_PLAT_H */
+--- /dev/null
++++ b/core/arch/arm/plat-rpi3/rpi3_can_monitor_keys.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++/*
++ * PROTOTYPE KEYS for the Secure CAN Monitor (design 4k K13, decision DEC-IF-14).
++ *
++ * These are random development constants, committed like the existing can0_hmac_key. They end up in the secure
++ * image, so anyone with this repository, or root on the Pi (the image is in the boot partition), can read them.
++ * That is a documented limit of the prototype; do not reuse these values anywhere that matters.
++ * They are never returned by any command, event or debug read. K_frame is shared with the CAN frame sender,
++ * K_hb is Secure World only, K_test is for the Linux-side test tools only: it is defined here for them and is NOT
++ * compiled into the secure image.
++ */
++#ifndef __RPI3_CAN_MONITOR_KEYS_H
++#define __RPI3_CAN_MONITOR_KEYS_H
++#define RPI3_MON_KEY_LEN 32U
++#define RPI3_MON_KEY_FRAME_INIT { \
++	0x8d, 0x0a, 0x80, 0x84, 0x9b, 0xbb, 0x86, 0x3f, \
++	0x1f, 0x97, 0x8b, 0x34, 0x62, 0xab, 0xec, 0xec, \
++	0x24, 0x79, 0xd2, 0x00, 0xd1, 0x23, 0x70, 0x69, \
++	0xa0, 0x53, 0x81, 0xbc, 0xe1, 0xce, 0x24, 0x39, \
++}
++#define RPI3_MON_KEY_HB_INIT { \
++	0x92, 0x1d, 0xfb, 0xe1, 0x47, 0x9d, 0x76, 0x00, \
++	0xe4, 0xc8, 0x50, 0x47, 0xdd, 0x4c, 0x4b, 0xc3, \
++	0x2d, 0xf0, 0x21, 0x63, 0x4e, 0xc2, 0xda, 0x44, \
++	0x57, 0x3b, 0xbb, 0x1a, 0xfe, 0xe4, 0x00, 0xf4, \
++}
++#define RPI3_MON_KEY_TEST_INIT { \
++	0x2b, 0x7f, 0x44, 0x18, 0xba, 0xcf, 0xab, 0xcf, \
++	0x6d, 0x2f, 0xe7, 0x6d, 0xc4, 0xa8, 0x29, 0x06, \
++	0x20, 0x85, 0x2e, 0x2a, 0x4c, 0x4d, 0x80, 0xe9, \
++	0x8b, 0x9c, 0x2f, 0x08, 0x27, 0x1b, 0x82, 0x28, \
++}
++#endif
+--- /dev/null
++++ b/core/pta/rpi3_can_monitor_pta.c
+@@ -0,0 +1,285 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Secure CAN Monitor: PTA glue (design 4k K1 and K9). Dispatch, the legacy-command policy and the mapping of
++ * TEE_Param to the plain-C command logic in plat-rpi3/rpi3_can_monitor.c. It holds no monitor state of its own.
++ *
++ * Called by invoke_command() in rpi3_can_spi_poc.c, only in builds with CFG_RPI3_CAN_MONITOR=y. Dispatch order:
++ *  (1) an id outside 0 to 23 returns NOT_SUPPORTED before any parameter check;
++ *  (2) a refused legacy id returns NOT_SUPPORTED before any parameter check, plus a best-effort event;
++ *  (3) ids 17 to 23 are handled here (exact param_types, then the logic);
++ *  (4) everything else (including 1, 2, 12) is left to the unchanged legacy path (handled = false).
++ */
++#include <pta_rpi3_can_spi_poc.h>
++#include <rpi3_can_monitor.h>
++
++#define PT(a, b, c, d)	TEE_PARAM_TYPES(TEE_PARAM_TYPE_##a, TEE_PARAM_TYPE_##b, TEE_PARAM_TYPE_##c, TEE_PARAM_TYPE_##d)
++
++static TEE_Result rpi3_mon_to_tee(enum rpi3_mon_res r)
++{
++	switch (r) {
++	case RPI3_MON_R_OK:
++		return TEE_SUCCESS;
++	case RPI3_MON_R_BAD_PARAMETERS:
++		return TEE_ERROR_BAD_PARAMETERS;
++	case RPI3_MON_R_BAD_STATE:
++		return TEE_ERROR_BAD_STATE;
++	case RPI3_MON_R_SHORT_BUFFER:
++		return TEE_ERROR_SHORT_BUFFER;
++	case RPI3_MON_R_BUSY:
++		return TEE_ERROR_BUSY;
++	default:
++		break;
++	}
++	return TEE_ERROR_BAD_STATE;
++}
++
++#ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
++#define RPI3_MON_TEST_CMD_STATS	24	/* p0 MEMREF_OUTPUT (>= sizeof(struct rpi3_mon_tstats)) */
++#define RPI3_MON_TEST_CMD_CTRL	25	/* p0 VALUE_INOUT: a op (0 reset, 1 hold request, 2 read), b ticks; p1 VALUE_INPUT: b high word; out a done count */
++
++static TEE_Result rpi3_mon_pta_test_stats(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	size_t n;
++
++	if (pt != PT(MEMREF_OUTPUT, NONE, NONE, NONE))
++		return TEE_ERROR_BAD_PARAMETERS;
++	n = rpi3_mon_ts_copy(params[0].memref.buffer, params[0].memref.size);
++	if (!n) {
++		params[0].memref.size = sizeof(struct rpi3_mon_tstats);
++		return TEE_ERROR_SHORT_BUFFER;
++	}
++	params[0].memref.size = n;
++	return TEE_SUCCESS;
++}
++
++static TEE_Result rpi3_mon_pta_test_ctrl(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	uint32_t done = 0;
++
++	if (pt != PT(VALUE_INOUT, VALUE_INPUT, NONE, NONE))
++		return TEE_ERROR_BAD_PARAMETERS;
++	if (rpi3_mon_ts_ctrl(params[0].value.a, (uint64_t)params[0].value.b | ((uint64_t)params[1].value.a << 32), &done))
++		return TEE_ERROR_BAD_PARAMETERS;
++	params[0].value.a = done;
++	return TEE_SUCCESS;
++}
++#endif
++
++/* Slots 2 and 3 are the health pair in every monitor command (zero for every result except SUCCESS and BUSY). */
++static void rpi3_mon_put_health(TEE_Param params[TEE_NUM_PARAMS], const struct rpi3_mon_health_out *h)
++{
++	params[2].value.a = h->p2a;
++	params[2].value.b = h->p2b;
++	params[3].value.a = h->p3a;
++	params[3].value.b = h->p3b;
++}
++
++static bool rpi3_mon_has_values(enum rpi3_mon_res r)
++{
++	return r == RPI3_MON_R_OK || r == RPI3_MON_R_BUSY;
++}
++
++static TEE_Result rpi3_mon_pta_cmd17(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t v = 0;
++	uint32_t d = 0;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_OUTPUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	r = rpi3_mon_cmd17(params[1].memref.buffer, params[1].memref.size, &v, &d, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = v;
++		params[0].value.b = d;
++	}
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd18(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t oa = 0;
++	uint32_t ob = 0;
++	size_t len;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	len = params[1].memref.size;
++	r = rpi3_mon_cmd18(params[0].value.a, params[0].value.b, params[1].memref.buffer, &len, &oa, &ob, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = oa;
++		params[0].value.b = ob;
++	}
++	if (rpi3_mon_has_values(r) || r == RPI3_MON_R_SHORT_BUFFER)
++		params[1].memref.size = len;
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd19(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t oa = 0;
++	uint32_t ob = 0;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_INOUT, NONE, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	r = rpi3_mon_cmd19(params[0].value.a, params[0].value.b, &oa, &ob, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = oa;
++		params[0].value.b = ob;
++	}
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd20(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t oa = 0;
++	uint32_t ob = 0;
++	size_t len;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	len = params[1].memref.size;
++	r = rpi3_mon_cmd20(params[0].value.a, params[0].value.b, params[1].memref.buffer, &len, &oa, &ob, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = oa;
++		params[0].value.b = ob;
++	}
++	if (rpi3_mon_has_values(r) || r == RPI3_MON_R_SHORT_BUFFER)
++		params[1].memref.size = len;
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd21(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t oa = 0;
++	uint32_t ob = 0;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_INOUT, NONE, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	r = rpi3_mon_cmd21(params[0].value.a, params[0].value.b, &oa, &ob, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = oa;
++		params[0].value.b = ob;
++	}
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd22(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t lo = 0;
++	uint32_t hi = 0;
++	uint32_t seq = 0;
++	uint32_t st = 0;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	r = rpi3_mon_cmd22(&lo, &hi, &seq, &st, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = lo;
++		params[0].value.b = hi;
++		params[1].value.a = seq;
++		params[1].value.b = st;
++	}
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++static TEE_Result rpi3_mon_pta_cmd23(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
++{
++	struct rpi3_mon_health_out h;
++	uint32_t oa = 0;
++	uint32_t ob = 0;
++	enum rpi3_mon_res r;
++
++	if (pt != PT(VALUE_INOUT, VALUE_INPUT, VALUE_OUTPUT, VALUE_OUTPUT))
++		return TEE_ERROR_BAD_PARAMETERS;
++	r = rpi3_mon_cmd23(params[0].value.a, params[0].value.b, params[1].value.a, params[1].value.b, &oa, &ob, &h);
++	if (rpi3_mon_has_values(r)) {
++		params[0].value.a = oa;
++		params[0].value.b = ob;
++	}
++	rpi3_mon_put_health(params, &h);
++	return rpi3_mon_to_tee(r);
++}
++
++TEE_Result rpi3_mon_pta_invoke(uint32_t cmd_id, uint32_t param_types, TEE_Param params[TEE_NUM_PARAMS], bool *handled)
++{
++	*handled = true;
++
++#ifdef CFG_RPI3_CAN_MONITOR_TEST_STATS
++	/* TEST BUILDS ONLY: commands 24 (read statistics) and 25 (control) */
++	if (cmd_id == RPI3_MON_TEST_CMD_STATS)
++		return rpi3_mon_pta_test_stats(param_types, params);
++	if (cmd_id == RPI3_MON_TEST_CMD_CTRL)
++		return rpi3_mon_pta_test_ctrl(param_types, params);
++#endif
++
++	/* (1) the known set is 0 to 23 */
++	if (cmd_id > PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_HB_ANSWER)
++		return TEE_ERROR_NOT_SUPPORTED;
++
++	/* (3) the monitor commands */
++	switch (cmd_id) {
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_FRAME:
++		return rpi3_mon_pta_cmd17(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_EVENTS:
++		return rpi3_mon_pta_cmd18(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_ACK_EVENTS:
++		return rpi3_mon_pta_cmd19(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_STATUS:
++		return rpi3_mon_pta_cmd20(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_SET_IDLE:
++		return rpi3_mon_pta_cmd21(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_NONCE:
++		return rpi3_mon_pta_cmd22(param_types, params);
++	case PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_HB_ANSWER:
++		return rpi3_mon_pta_cmd23(param_types, params);
++
++	/* (2) refused in both profiles: raw SPI access, FIQ arming, transmit, Core 1 wake */
++	case PTA_RPI3_CAN_SPI_POC_CMD_READ_OSC_REG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_ARM_FIQ:
++	case PTA_RPI3_CAN_SPI_POC_CMD_READ_REG32:
++	case PTA_RPI3_CAN_SPI_POC_CMD_TRANSMIT_TEST_FRAME:
++	case PTA_RPI3_CAN_SPI_POC_CMD_WAKE_CORE1:
++	case PTA_RPI3_CAN_SPI_POC_CMD_WRITE_REG32:
++		rpi3_mon_note_legacy(cmd_id, true);
++		return TEE_ERROR_NOT_SUPPORTED;
++
++	/* chip A debug readers: refused in the hardened profile, allowed with an event in the debug profile */
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_LAST_FRAME:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_RXIF_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_BDIAG1_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_TX_FAIL_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_GPIO_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_VALIDATION_DEBUG:
++	case PTA_RPI3_CAN_SPI_POC_CMD_GET_TIMESTAMP_DEBUG:
++		if (MON_PLAT_PROFILE_DEBUG) {
++			rpi3_mon_note_legacy(cmd_id, false);
++			*handled = false;
++			return TEE_SUCCESS;
++		}
++		rpi3_mon_note_legacy(cmd_id, true);
++		return TEE_ERROR_NOT_SUPPORTED;
++
++	default:
++		/* (4) 1, 2 and 12 (used by verify_boot) stay on the unchanged legacy path */
++		*handled = false;
++		return TEE_SUCCESS;
++	}
++}

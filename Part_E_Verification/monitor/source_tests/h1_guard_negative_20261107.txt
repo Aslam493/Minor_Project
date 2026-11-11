@@ -1,0 +1,5 @@
+static_checks: final monitor code (stages 1-6)
+  FAIL     H1 object code: no memcpy/memset/memcmp/crypto call sits inside a lock hold (hold_memcpy_check.py on final_on.dis)
+     rpi3_mon_cmd17             memcpy   at 101101bc : INSIDE a hold
+  PASS     H1 object code: critical-section helpers that exist as symbols call no memcpy/hook/crypto/trace
+static_checks: 54 pass, 1 FAIL

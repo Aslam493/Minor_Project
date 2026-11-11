@@ -1,0 +1,13 @@
+== test build check (W1 command answers) ==
+W1 verdict: PASS (lock memory is Normal, cacheable, inner-shareable on both cores; MMU and D-cache on)
+== wrong-confirmation guard ==
+w7 forces a Core 1 panic; run: tstats_probe w7 I-ACCEPT-FORCED-PANIC
+== baseline status (t=0) ==
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 10531400998 core1_poll_age_ticks 10456 poll_count 14825569118
+  skip_count 0 skip_total 0 pta_lock_timeouts 0 pta_timeouts_seen 0
+== baseline status (t=2 s) ==
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 10570668052 core1_poll_age_ticks 8985 poll_count 14882747090
+  skip_count 0 skip_total 0 pta_lock_timeouts 0 pta_timeouts_seen 0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0

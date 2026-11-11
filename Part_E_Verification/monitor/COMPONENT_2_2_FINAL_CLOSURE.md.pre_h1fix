@@ -1,0 +1,158 @@
+# COMPONENT_2_2_FINAL_CLOSURE.md (Component 2.2, Synchronization)
+
+Date: 2026-11-07. Scope: independent re-check of the reported 2.2 results, evidence mapping, documentation corrections, debug-profile build, board-readiness preparation.
+**No board action was taken. No OP-TEE source file was changed in this closure pass** (all 7 source hashes equal those in `IMPLEMENTATION_STAGES2-6.md`; `git status` of `optee_os` still shows the same 17 entries).
+
+## 1. Overall status
+
+**PARTIALLY COMPLETE.** Everything that could be closed without the board or a source change is closed, but the audit found one real defect that blocks a clean closure:
+
+> **Original check H1 FAILS.** In the compiled Monitor-ON image, `rpi3_mon_cmd17` calls `memcpy` (44 bytes) *inside* the lock hold. GCC turned the byte loop in `rpi3_mon_frame_store` into a `memcpy` call. Design rule CS3 says "never `memcpy` under the lock". The earlier report (`IMPLEMENTATION_STAGES2-6.md`, E8) said the `memcpy` calls in cmd17/18/20 were all outside the hold; **that statement was wrong for cmd17** and has been corrected there. A tested candidate fix exists (section 8) but changing source needs your approval.
+
+| Area | State |
+|---|---|
+| Reported results reproduced | **Yes**: 406/406 host checks, 53/53 static checks, 137/140 mutants (same 3 equivalent survivors), call graph clean. Section 4 |
+| Lock-cost documentation | **Corrected** in the design document (section 4b.1). Section 3 |
+| 53-row inventory | **Mapped**: 43 PASS, 1 FAIL (H1), 9 NOT RUN, 0 NOT VERIFIED. `COMPONENT_2_2_INVENTORY.md` |
+| Debug-profile build | **Done**: exit 0, 0 warnings. Section 5 |
+| Board-validation readiness | **Prepared**, not run. `BOARD_VALIDATION_READINESS.md` |
+| Key provisioning limits | **Documented**. Section 7 |
+| Board validation, hold-time measurement, production keys | **Pending** (not done, not claimed) |
+
+## 2. Stage A: audit of the implementation against the report
+
+Method: I read the source and the compiled code myself instead of relying on the report. Evidence in the right-hand column is a file under `source_tests/` or `build_scratch/`.
+
+| Item | Result | Evidence |
+|---|---|---|
+| Report matches the tree | **Yes.** The sha256 prefixes of all 7 source files and their line counts equal the report; the five new files in `FINAL_DIFF.patch` equal the current files line for line; the three modified-file diffs are contained verbatim in the patch | checked with a script on 2026-11-07 |
+| Repository state | HEAD `a7ccc63e4`, branch `secure-can-spi-poc`, 17 status entries (11 modified tracked files, 6 untracked files: the five new monitor files and the pre-existing `rpi3_can_server.c`); no stash, reset, checkout or clean was used | `git status --short` |
+| Shared-state ownership and layout | Lock, health words and timeout counter each on their own 64-byte line (compile-time asserts); one direct `rpi3_mon.l.` access in the whole logic file, in init before publication | `inventory_probes_closure_20261107.txt`; header asserts V1 |
+| Lock init and `init_ok` publication | Release store is the last statement of `rpi3_mon_init`; acquire load on read; init failure returns `TEE_SUCCESS` | static check INIT-4 (3 checks) |
+| PTA bounded acquisition | Budget, cap, fail-closed timer, one increment per exhausted command, unlock before unmask | harness X1..X6 and the acquisition mutants (bounded-acquire group in `mutation_closure_20261107.txt`) all caught |
+| Core 1 non-blocking acquisition | One `cpu_spin_trylock` per 256 passes, failed attempt touches only the health words; `rpi3_mon_core1_pass` is inlined into the loop (not in the call graph) so no instrumented call per pass | read `rpi3_can_monitor.h`; `callgraph_core1.txt` |
+| **Critical-section restrictions** | **One violation:** `memcpy` in the cmd17 hold. HMAC (cmd17, cmd22) is outside every hold, cmd18/cmd20 copy-out is outside the hold, `rpi3_mon_evaluate` and `rpi3_mon_ev_append` call nothing but each other | `hold_memcpy_closure_20261107.txt`, `h1_objcheck_closure_20261107.txt` |
+| Commands 17 to 23 and glue | Dispatch order, exact parameter types, health pair, legacy refusals: read `rpi3_mon_pta_invoke`; known set ends at 23; 6 ids refused always, 8 debug readers refused when hardened | harness DS1, LG1..LG4, HP1, GLUE |
+| **D1 Option B** | The monitor branch of `rpi3_can_server_loop` has no unmask; `rpi3_mon_core1_entry_check` panics if FIQ or IRQ is unmasked; the only `~THREAD_EXCP_NATIVE_INTR` is in the `#else` branch, as is the legacy frame call | read `rpi3_can_server.c` lines 396 to 425; static checks Y7 and F27/Y7 |
+| Legacy-command policy | Matches DEC-IF-8 to 10 | read glue; harness LG1..LG4 |
+| Event ring and rate limits | 25 types, 24 pinned + 40 ordinary slots, one event per class per second | harness EV2, EV3, Q5, G8; mutants |
+| Health counters and starvation | K = 8 consecutive failed attempts, one `MON_STARVED` per episode | harness Y3..Y5; mutants |
+
+### Discrepancies between the report and reality (no code changed)
+
+| # | Report statement | Reality | Handling |
+|---|---|---|---|
+| D-1 | E8: "`memcpy` in cmd17/18/20 is outside the hold" | **False for cmd17** (see section 1) | Corrected in `IMPLEMENTATION_STAGES2-6.md` |
+| D-2 | Finding 1: "a real lock cycle has 7 instrumented entries, not about four" | True for the **PTA** lock cycle. The design's "about four" is the count of the **OP-TEE primitives** and is correct for a Core 1 attempt (4 lock entries, 5 with the attempt function). So the earlier summary overstated the design's error | Refined in the design document (4b.1) and in the report |
+| D-3 | E6: "the other differing bytes are the 4 build-date characters" | Final OFF vs baseline: **10 differing bytes** = 5 date/time characters + 5 bytes inside **3** `mov w1,#<line>` instructions (trace line numbers in `rpi3_can_spi_poc.c`: 186 to 189, 380 to 394, 411 to 425) | Corrected in the report |
+| D-4 | "static checks 53/53" next to "the original 53 checks" | The two sets are unrelated; only the size matches | Explained in `COMPONENT_2_2_INVENTORY.md` |
+| D-5 | Design inventory table says all 53 NOT RUN | That column is design-time status, left unchanged on purpose | Pointer added; per-row evidence is in the new inventory file |
+
+## 3. Stage B: lock-cost correction (design document)
+
+Done in `MONITOR_STATE_DESIGN.md` (backup `MONITOR_STATE_DESIGN.md.bak12`, sha256 verified equal to the original before editing). New subsection **4b.1**, annotations on the G9 evidence row, **L4**, **C9** and **F26**, and a checklist entry. Nothing was deleted: the diff against the backup is 5 existing table rows with appended bracketed notes, one new subsection and one new checklist line.
+
+The correction separates three things:
+
+1. **Verified entry counts** (from the Monitor-ON `tee.elf`, `lockcost_check.py` -> `lockcost_closure_20261107.txt`): OP-TEE primitives 4; Core 1 successful attempt 4 (5 with the attempt function), failed attempt 1 (2); **PTA lock cycle 7** (9 with `rpi3_mon_hold` and `rpi3_mon_wait_init`). Entries while the lock is held, from call order: Core 1 2 of 4, PTA 4 of 7 (`spinlock_count_decr` runs after the release), which also corrects "three of the four inside the hold".
+2. **Estimated overhead:** the 2.4 us per call, 10 us per cycle, 1.6 percent figures are unmeasured inferences and were **not recomputed** (that would present arithmetic as a measurement).
+3. **Hardware hold time:** maximum and p99 are **PENDING** a Raspberry Pi measurement (H3, X9, Y10). CS5's "under 100 us" remains a design target.
+
+Note on the evidence file: `cpu_spin_unlock` and `cpu_spin_trylock` are `static inline` in an OP-TEE header, so every translation unit has its own out-of-line copy; `lockcost_closure_20261107.txt` therefore lists repeated call sequences for those names. The instrumentation result is the same in every copy.
+
+## 4. Stage E: reproduction of the reported verification
+
+All runs on 2026-11-07 on the final tree; logs have new names, nothing was overwritten.
+
+| Check | Command | Result | Log |
+|---|---|---|---|
+| Host tests (real monitor source + real glue, `-Wall -Wextra -Werror`, ASan + UBSan, independent Python HMAC vectors, 2 stress tests) | `make -s` in `source_tests` | **406 checks, 0 failed** | `run_closure_20261107.txt` |
+| Mutation testing | `python3 mutation_real.py -j 6` | **137 of 140 caught**; survivors: "no `now < t0` term", "init does not clear the lock explicitly", "counter wrap guard removed". Each is equivalent (the unsigned wrap already fails closed; init's `memset` already zeroes the lock; `counter == 0xFFFFFFFF + 1` is already REPLAY). 0 skipped, 0 compile errors | `mutation_closure_20261107.txt` |
+| Static checks | `./static_checks.sh` | **53 pass, 0 FAIL** | `static_closure_20261107.txt` |
+| Core 1 call graph, Monitor ON | `callgraph.py final_on.dis rpi3_can_server_loop '<forbidden set>'` | 72 reachable functions; no `crypto_*`, HMAC/MAC, `malloc/calloc/realloc/free`, `mempool`, `nex_*`; `trace_printf` only via `__do_panic`; negative control (cmd17) reaches 6 forbidden symbols | `callgraph_core1_f27.txt`, `callgraph_core1.txt` |
+| Same call graph, debug profile | same, on `final_on_debug` | 72 functions, none forbidden | (section 5) |
+| Build, Monitor OFF / ON | `scripts/build_optee_scratch.sh ... CFG_RPI3_CAN_MONITOR=n / y` | both exit 0, 0 warnings | `build_scratch/final_off.log`, `final_on.log` |
+| OFF vs baseline | `cmp`, `objdump -d` diff | same size; differs only by 5 date characters and 3 trace line-number immediates | section 2, D-3 |
+| New negative test (V11): add `TA_FLAG_CONCURRENT` | ON build's compile command on a temporary copy | unmodified copy compiles (exit 0); modified copy fails with `static assertion failed: "the monitor requires a non-concurrent PTA (mac_pta is one shared context)"` | `concurrent_negative_closure_20261107.txt` |
+| New object-code checks | `hold_memcpy_check.py`, `h1_objcheck.py` | **1 violation: cmd17 `memcpy` inside a hold** (H1 FAIL) | `hold_memcpy_closure_20261107.txt`, `h1_objcheck_closure_20261107.txt` |
+
+No test was changed to make it pass. Two things were **added**: the object-code tools above, and `make_inventory.py`. The existing `static_checks.sh` was not edited in this pass; it cannot see the H1 defect because it works on source text (see section 8, item 3).
+
+Why the host tests and mutation testing missed H1: they compile the source for x86 with a mock `memcpy`-free platform and judge behavior, not the AArch64 object code. A `memcpy` in a hold changes neither a result nor a counter. Only the disassembly shows it.
+
+## 5. Stage D: debug-profile build
+
+| Item | Value |
+|---|---|
+| Command | `scripts/build_optee_scratch.sh /home/aslam/Minor_Project/Part_E_Verification/build_scratch/final_on_debug CFG_RPI3_CAN_MONITOR=y CFG_RPI3_CAN_MONITOR_DEBUG=y` (recorded in `build_scratch/final_on_debug.cmd.txt`) |
+| Isolation | New directory (did not exist before); `optee_os/out/arm` untouched (mtime unchanged, Sep 20 02:37); 31 GB free |
+| Always passed | `PLATFORM=rpi3`, the project's exact variables, `CFG_CORE_DEBUG_CHECK_STACKS=y` (DEC-BUILD-1) |
+| Exit code / warnings | **0 / 0 warnings, 0 errors** (`final_on_debug.log`) |
+| Config check | `final_on_debug/conf.mk`: `CFG_RPI3_CAN_MONITOR=y`, `CFG_RPI3_CAN_MONITOR_DEBUG=y`, `CFG_CORE_DEBUG_CHECK_STACKS=y`, `PLATFORM=rpi3`, `CFG_RPI3_CAN_SPI_POC_PTA=y` |
+| Artifacts | `build_scratch/final_on_debug/core/tee.elf`, `tee.bin` (749,412 bytes, same size as the hardened ON image), disassembly `build_scratch/final_on_debug.dis` |
+| Debug vs hardened | Differ because `rpi3_mon_init` grows from 0xb4 to 0xc4 bytes and `rpi3_mon_pta_invoke` from 0x120 to 0x16c (profile-dependent branches), which shifts all later code; equal total size is padding |
+| Audits on the debug image | Core 1 call graph: 72 functions, no forbidden symbol; lock path counts unchanged (7 / 9 / 5 / 2); **same cmd17 `memcpy` inside the hold**; frame and heartbeat keys once each, test key absent |
+| Not done | Behavior of the debug profile on hardware; the host tests exercise it only through the mock profile flag |
+
+## 6. Stage C and Stage F summaries
+
+- **Inventory:** `COMPONENT_2_2_INVENTORY.md`: 53 rows with the original IDs and texts parsed from the design table; **43 PASS, 1 FAIL (H1), 9 NOT RUN, 0 NOT VERIFIED**. By original kind: host-side 25/25 PASS; static/review 17 PASS + 1 FAIL; on-board 0/9 (all NOT RUN); deferred (Z8) 1 PASS. Overlaps and superseded rows are listed, not deleted. All 39 `harness.c:NNN` references were checked by script against the file.
+- **Board readiness:** `BOARD_VALIDATION_READINESS.md`: preconditions P1 to P8 (none of P1 to P5 currently met: no external backup copy, no spare card, a restore never executed, no UART, no approval; the monitor image and the 17 to 23 client do not exist), the nine checks with purpose, tools, expected output, failure handling, approval and UART need, a phased order and the rollback rules. W7 requires its own approval and is recommended not to run without UART and a recovery card.
+
+## 7. Stage G: key provisioning limitations
+
+The frame key (K_frame) and heartbeat key (K_hb) are **prototype keys**. This section describes the arrangement as it is; no key was generated, replaced or printed.
+
+| Question | Answer (verified 2026-11-07) |
+|---|---|
+| Where are the keys stored? | In plaintext as C initializers in `optee_os/core/arch/arm/plat-rpi3/rpi3_can_monitor_keys.h`, which only `rpi3_can_monitor.c` includes. They are compiled into read-only data of the Secure World image: **K_frame and K_hb each appear exactly once in the raw bytes** of `tee.elf`, `tee.bin` and `rpi3_can_monitor.o` of the Monitor-ON and debug builds (and twice in the host test binary); in the Monitor-OFF build they appear **zero** times. K_test (for Linux-side test tools) is defined in the header but is **not** instantiated in the logic file and does not appear in any binary (0 occurrences); its macro text appears only in debug-info macro data of the `.elf` and `.o` files |
+| Who can read them? | Anyone who can read this working tree or its build outputs: the header, `FINAL_DIFF.patch` (contains the whole header), every scratch build under `build_scratch/`, and the host test binary. Files are mode `rw-rw-r--` (readable by every local user), the tree is not encrypted, and nothing is access controlled. Any future backup or copy of `Part_E_Verification/` also copies them. They are **not in git history**: the repository tracks none of these files, but a careless `git add -A` would add them |
+| Why does repository or root access expose them? | A key that is a compile-time constant is part of the source and of every image built from it. Whoever holds the source, a build output, or a flashed image owns both HMAC keys and can forge any frame tag or heartbeat answer. On the board the image is in the FAT boot partition (`armstub8.bin`), which a root user on Linux can read from the card |
+| Is Secure World memory a protection on this board? | **No.** The Raspberry Pi 3 has no TZASC, so a compromised Normal World can read Secure World RAM directly, regardless of where the keys came from. This is the already-recorded limit (no hardware isolation claim; detection only) and it applies to the keys too |
+| Why is this not production-grade provisioning? | Same key in every build and every device; keys in the source tree; no per-device uniqueness; no rotation or revocation; no protected storage; no authenticated key injection; HMAC is symmetric so the CAN sender must also hold K_frame |
+| What future provisioning work is required? | Not designed or done here. A minimum list for a later component: per-device random keys generated off-tree and injected at flash time (or derived from a hardware-unique source if the platform has one, which the Pi 3 does not have in a secure form); removal of keys from the repository and build outputs; a defined sender-side key distribution; rotation and revocation rules; and an honest statement of what an attacker with Normal-World root can read on this hardware |
+
+## 8. Proposed fix for the H1 defect (NOT applied; needs your approval)
+
+1. **Change:** in `rpi3_mon_frame_store` (`rpi3_can_monitor.c`), copy through a volatile destination pointer so the compiler cannot convert the loop into `memcpy`: add `volatile uint8_t *vd = dst;` and write `vd[i] = src[i];`. This is the same technique `rpi3_mon_build_proj0/1` already use (their loops did not become `memset`).
+2. **Trial already done on a temporary copy outside the tree** (`source_tests/h1_fix_trial_closure_20261107.txt`): compiled with the ON build's own flags, `rpi3_mon_cmd17` then contains exactly **one** `memcpy` (the copy-in before the lock) instead of two. Source hash unchanged after the trial.
+3. **Then:** rebuild ON, OFF and debug in scratch directories, rerun `hold_memcpy_check.py` (expect no call inside a hold), the 406 host tests, mutation testing and the static checks, and **add the object-code check to `static_checks.sh`** so the problem cannot return silently (`frame_equal`, the 44-byte compare, did not become `memcmp`, but nothing guards it either).
+4. **Alternative if you prefer not to touch the loop:** `__attribute__((optimize("no-tree-loop-distribute-patterns")))` on the function. Slightly more fragile across compiler versions.
+5. **Risk of the defect as it stands:** functionally harmless (44 bytes, bounded, no allocation); it adds one instrumented call to the cmd17 hold and breaks the rule written for exactly this reason. Nothing is claimed about its microsecond cost.
+
+## 9. Files created and modified in this pass
+
+**New documents** (all in `Part_E_Verification/monitor/`): `COMPONENT_2_2_FINAL_CLOSURE.md` (this), `COMPONENT_2_2_INVENTORY.md`, `BOARD_VALIDATION_READINESS.md`.
+
+**Modified documents** (each backed up and checked before editing): `MONITOR_STATE_DESIGN.md` (backup `.bak12`), `IMPLEMENTATION_STAGES2-6.md` (backup `.bak1`), `Secure_CAN_Monitor_Plan_8_Components.md` (backup `.bak_closure`).
+
+**New tools** (`source_tests/`): `make_inventory.py`, `lockcost_check.py`, `hold_memcpy_check.py`, `h1_objcheck.py`.
+
+**New evidence logs** (`source_tests/`): `run_closure_20261107.txt`, `static_closure_20261107.txt`, `mutation_closure_20261107.txt`, `lockcost_closure_20261107.txt`, `hold_memcpy_closure_20261107.txt`, `h1_objcheck_closure_20261107.txt`, `h1_fix_trial_closure_20261107.txt`, `inventory_probes_closure_20261107.txt`, `concurrent_negative_closure_20261107.txt`.
+
+**New build output** (`build_scratch/`): `final_on_debug/`, `final_on_debug.log`, `final_on_debug.cmd.txt`, `final_on_debug.dis`, plus `final_on.dis` and `final_off.dis` regenerated from the existing builds.
+
+**Not modified:** every OP-TEE, TF-A and application source file; the Pi; the SD card; `SD_Card_Backups/`.
+
+## 10. Outstanding work
+
+| Category | Items |
+|---|---|
+| Source (needs your approval) | H1 fix (section 8) and the guarding static check |
+| Documentation / evidence | The 86 interface checks are not mapped to evidence (outside the 53); the design's own inventory column still says NOT RUN by intent; per-row mapping of the 86 would be the next documentation step |
+| Build verification | Rebuild of the three configurations after the H1 fix; the full SD image pipeline with the monitor enabled has not been run |
+| Board validation | All 9 on-board checks; preconditions P1 to P8 (external backup, spare card, tested restore, UART decision, client programs, approval) |
+| Hardware measurement | Lock-hold maximum and p99 (H3), wait calibration (X9), pass duration and collision rate (Y10), microsecond cost of an instrumented entry |
+| Production security | Real key provisioning (section 7) |
+
+## 11. Risks
+
+- The board has never run this code. The host tests prove logic, not timing, memory attributes, or the behavior of the Linux TEE driver on error returns (V14).
+- Object-code properties (like H1) are only caught by inspecting the AArch64 build; a compiler or flag change can reintroduce them. The new tools exist but are not yet part of `static_checks.sh`.
+- The call graph has unresolved indirect calls (console and `kprintf`) and a panic path that reaches `trace_printf`; both are accepted limits, not proofs of absence.
+- Rollback depends on one laptop disk and one working card; a disk failure loses every restore point.
+- The prototype keys are readable by anyone with the tree; Normal World can read Secure World memory on this board.
+
+## 12. Evidence index
+
+Under `Part_E_Verification/monitor/source_tests/`: the logs listed in section 9, plus the earlier `callgraph_core1.txt`, `callgraph_core1_f27.txt`, `objcalls_monitor.txt`, `mutation_real_last.txt`. Under `build_scratch/`: `final_off.log`, `final_on.log`, `final_on_debug.log` and their output directories. Patch: `monitor/FINAL_DIFF.patch`. Snapshots: `source_snapshots/optee_os_20261106_pre_monitor` (and the two stage snapshots).

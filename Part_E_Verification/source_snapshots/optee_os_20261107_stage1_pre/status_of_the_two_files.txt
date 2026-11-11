@@ -1,0 +1,1 @@
+ M core/arch/arm/plat-rpi3/sub.mk

@@ -1,0 +1,9 @@
+diff --git a/core/arch/arm/plat-rpi3/sub.mk b/core/arch/arm/plat-rpi3/sub.mk
+index c86fef2f9..e22add099 100644
+--- a/core/arch/arm/plat-rpi3/sub.mk
++++ b/core/arch/arm/plat-rpi3/sub.mk
+@@ -1,3 +1,4 @@
+ global-incdirs-y += .
+ srcs-y += main.c
+ srcs-y += rpi3_can_fiq.c
++srcs-y += rpi3_can_server.c

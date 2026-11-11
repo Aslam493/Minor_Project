@@ -1,0 +1,24 @@
+static_checks: stage 1 of the monitor
+  PASS     BG1 CFG_RPI3_CAN_MONITOR ?= n
+  PASS     BG1 CFG_RPI3_CAN_MONITOR_DEBUG ?= n
+  PASS     BG2 conf.mk errors when the monitor is on without the PTA
+  PASS     BG2 sub.mk compiles the monitor only when enabled
+  PASS     X8 no cpu_spin_lock / cpu_spin_lock_xsave / expired() in the monitor sources
+  PASS     W5 exactly one unlock call site (rpi3_mon_release), no force release
+  PASS     G9 exactly one trylock call site (no nested or second lock)
+  PASS     H2 no memcpy/memcmp/memset/heap/printing/crypto outside rpi3_mon_init
+  PASS     H2 the only memset is in rpi3_mon_init, outside any hold
+  PASS     F27 no HMAC / crypto / heap in the monitor sources (stage 1)
+  PASS     V3/V8 pta_lock_timeouts is touched only by MON_PLAT_INC32 and rpi3_mon_load_u32
+  PASS     Y8/Z2 G7 words are read only through rpi3_mon_load_u32/u64
+  PASS     INIT-4 init_ok is the last statement before the final return (release store)
+  PASS     INIT-4 init_ok is read with an acquire load
+  PASS     V1/N5/EV1/TM1/Q2 compile-time guards present in the header (15 static assertions)
+  PASS     bindings header refuses non-AArch64 builds
+  PASS     D1 the monitor sources never unmask FIQ or IRQ (no ~THREAD_EXCP_*)
+  PENDING  Y7 Core 1 loop unmask is not guarded yet: rpi3_can_server.c is unchanged in stage 1 (Core 1 integration stage)
+  PASS     BOUNDARY the other 8 modified files and rpi3_can_server.c are byte-identical to the pre-change snapshot
+  PASS     BOUNDARY sub.mk differs from the stage 1 snapshot by exactly one added line
+  PASS     BOUNDARY conf.mk only has additions (no line removed or changed)
+  PASS     BOUNDARY untracked files are exactly the 3 new monitor files and rpi3_can_server.c
+static_checks: 21 pass, 0 FAIL, 1 pending

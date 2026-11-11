@@ -1,0 +1,29 @@
+== test cmds (must be refused on hardened) ==
+not a test-statistics build (0xffff000a)
+== status ==
+page 0: version 1 length 128 boot_id 0xc20479d3 flags 0x13 mode 0
+  now_ticks 2537184888 core1_poll_age_ticks 1436 poll_count 4153395492
+  skip_count 0 skip_total 0 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 0 hb_seq 114 hb_state MISSED hb_miss_count 114 idle_uses 0
+  traffic_age_ticks 18446744073709551615 hb_last_ok_age_ticks 18446744073709551615 lease_remaining_ticks 0
+  ev_seq 1 ev_ack 0 ev_lost 0 pinned_used 1
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+== V14 ==
+SHORT_BUFFER (page 0, 64-byte buffer) result 0xffff0010 (origin 4) | memref size now 128 (was 64) | health pair 00000000 00000000 00000000 00000000 -> value outputs DELIVERED on this error
+BAD_PARAMETERS (page 5)            result 0xffff0006 (origin 4) | memref size now 128 (was 128) | health pair 00000000 00000000 00000000 00000000 -> value outputs DELIVERED on this error
+SUCCESS control (page 0, 128 bytes) result 0x00000000 (origin 4) | memref size now 128 (was 128) | health pair 00000000 00000002 00000000 00000000 -> value outputs DELIVERED on this error
+== V2 ==
+V2 atomic test: 3 threads x 2000000 increments, expected 6000000, got 6000000: PASS (no lost increments)
+== latency 5000 calls ==
+calls 5000 | BUSY 0 | other errors 0 | total 19.47 s | mean 3894 us | rate 257 calls/s
+latency us: min 3458 p50 3878 p90 3894 p99 4295 p99.9 4849 max 5584
+monitor counters during the run: skip_total 0 -> 119, pta_lock_timeouts 0 -> 0
+== soak 120 s ==
+soak: 120 s, period 100 ms, 1199 ticks
+frame verdicts: ACCEPTED 1198 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 120 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 76 p99 80 max 99
+frame submit latency (us): p50 8922 p99 9477 max 9958
+end state: flags 0x07 last_counter 2198 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +59 starved 0
+ls: /tmp/kf: No such file or directory
+ 00:04:20 up 4 min,  load average: 0.32, 0.26, 0.10

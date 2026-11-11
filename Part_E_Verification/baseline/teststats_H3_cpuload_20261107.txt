@@ -1,0 +1,7 @@
+calls 10000 | BUSY 0 | other errors 0 | total 54.41 s | mean 5441 us | rate 184 calls/s
+latency us: min 3468 p50 4349 p90 9527 p99 9980 p99.9 10917 max 12524
+monitor counters during the run: skip_total 47383 -> 52884, pta_lock_timeouts 200 -> 200
+---
+holds: count 2583485 | mean 0.15 us | max 125 ticks = 6.51 us | max by PTA 6.51 us | max by Core 1 0.21 us
+Core 1 attempt interval: count 2578987 | min 13.96 us | mean 21.53 us | max 22.45 us
+Core 1 hold requests done: 0 (pending 0 ticks) | cadence: 256 passes per lock attempt

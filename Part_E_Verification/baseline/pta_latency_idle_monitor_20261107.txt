@@ -1,0 +1,5 @@
+# PTA latency, idle, 100000 calls of command 20 (status), 1 session, Pi 3 B at 600 MHz (powersave), monitor candidate image, 2026-11-07
+load: 0.06 0.02 0.00 1/94 438
+calls 100000 | BUSY 0 | other errors 0 | total 389.47 s | mean 3895 us | rate 257 calls/s
+latency us: min 3458 p50 3878 p90 3895 p99 4297 p99.9 4763 max 6596
+monitor counters during the run: skip_total 1212 -> 61794, pta_lock_timeouts 0 -> 0

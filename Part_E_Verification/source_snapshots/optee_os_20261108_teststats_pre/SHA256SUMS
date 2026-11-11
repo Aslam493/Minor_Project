@@ -1,0 +1,7 @@
+c4de00bdfd7e5b3066845d01f0b48be8f2d01bc9e4537d21364065205c2c7579  ./files/core/arch/arm/plat-rpi3/conf.mk
+74ecb2d2704957759511b9375a43a850cfdd5afad144f1c4c33977492b84c135  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.c
+40e679be08530065642e4b99b70ca0624a3cb88952263289c504e4e35a023735  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.h
+dd467e866c49d9dd804c9590ed0cded97002a0099ed780b0501b2b2db17bec94  ./files/core/pta/rpi3_can_monitor_pta.c
+99df13180da8c95cdaa52c9b9f826d52bd5b556cf0d067eaca848d9bc7b9ec1d  ./harness.c
+eef1f0bc10782534a8c220eddf275531c2d71cd965f3d3e07d8e7e08acb4173c  ./Makefile
+dd887f943200ae4d5d31241fa9933d6e83d6983204834b7730beda7307fcddd0  ./static_checks.sh

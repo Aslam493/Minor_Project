@@ -1,0 +1,52 @@
+== TRIGGER (laptop time 16:20:03) ==
+w7 armed: 0x00000000 (0 = Core 1 will panic at its next lock attempt, within about 1 ms)
+trigger ssh rc=0
+-- t+1s --
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 11070002573 core1_poll_age_ticks 29780462 poll_count 15566487553
+  last_counter 0 hb_seq 557 hb_state MISSED hb_miss_count 557 idle_uses 0
+  health: core1 last poll 1551 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+rc=0
+-- t+2s --
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 11099411509 core1_poll_age_ticks 59189384 poll_count 15566487553
+  last_counter 0 hb_seq 557 hb_state MISSED hb_miss_count 557 idle_uses 0
+  health: core1 last poll 3082 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+rc=0
+-- t+3s --
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 11128226515 core1_poll_age_ticks 88004385 poll_count 15566487553
+  last_counter 0 hb_seq 557 hb_state MISSED hb_miss_count 557 idle_uses 0
+  health: core1 last poll 4583 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+rc=0
+-- t+4s --
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 11156830225 core1_poll_age_ticks 116615654 poll_count 15566487553
+  last_counter 0 hb_seq 557 hb_state MISSED hb_miss_count 557 idle_uses 0
+  health: core1 last poll 6073 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+rc=0
+-- t+5s --
+page 0: version 1 length 128 boot_id 0x184eb136 flags 0x13 mode 0
+  now_ticks 11185546907 core1_poll_age_ticks 145324782 poll_count 15566487553
+  last_counter 0 hb_seq 557 hb_state MISSED hb_miss_count 557 idle_uses 0
+  health: core1 last poll 7569 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+rc=0
+== linux ==
+ 00:09:24 up 9 min,  load average: 0.04, 0.02, 0.00
+0,2-3
+rc=0
+== PTA after the panic: 500 status calls ==
+sh: /tmp/latency_probe: not found
+latency_probe not on Pi
+== dmesg tail (Linux side) ==
+[   11.825843] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[   11.837779] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+[   11.852767] cfg80211: failed to load regulatory.db
+[   11.972296] smsc95xx 1-1.1:1.0 eth0: hardware isn't capable of remote wakeup
+[   11.989064] smsc95xx 1-1.1:1.0 eth0: Link is Up - 100Mbps/Full - flow control off
+0,2-3
+93
+== PTA after the panic: 500 status calls ==
+calls 500 | BUSY 0 | other errors 0 | total 1.92 s | mean 3841 us | rate 260 calls/s
+latency us: min 3450 p50 3865 p90 3879 p99 4309 p99.9 4669 max 4669
+monitor counters during the run: skip_total 0 -> 0, pta_lock_timeouts 0 -> 0

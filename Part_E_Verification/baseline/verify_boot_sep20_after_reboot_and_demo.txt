@@ -1,0 +1,31 @@
+# verify_boot after: real reboot, demo run in loopback, normal mode restored (2026-11-06)
+# image: SD_Card_Backups/pre-S0-sep20/rpi3-sdcard-sep20.img  sha256 014bb983...802d19
+
+verify_boot: 10.237.27.187  mode=--expect-core1-pinned
+  PASS  ssh reachable
+  info  uptime 209.57s, kernel 6.7.0-rc6-v8
+  PASS  kernel is 6.7.0-rc6
+  info  [    7.311472] optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS  OP-TEE reports its revision
+  PASS  OP-TEE driver initialised
+  PASS  no OP-TEE error in dmesg
+  PASS  /dev/tee0 and /dev/teepriv0 exist
+  PASS  tee-supplicant is running
+  info  CPU online=0,2-3 offline=1
+  PASS  CPU mask is 0,2-3 (Core 1 diverted)
+  PASS  CPU1 reported as failing to come online
+  info  Core 1 heartbeat 88116538 -> 89235587
+  PASS  Core 1 heartbeat is rising
+  info  FIQ_CONTROL=0x00000000
+  PASS  PTA answers (fiq-count)
+  PASS  FIQ is NOT armed after boot (FIQ_CONTROL 0x00000000)
+  PASS  can0 exists
+  PASS  can0 is up
+  PASS  mcp251xfd found the chip on can0
+  PASS  no SPI CRC errors from the CAN driver
+  info    nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  info    controller state       ERROR-ACTIVE (0)
+  info    ctrlmode ACTIVE        0x00000000  <>
+  PASS  can0 state ERROR-ACTIVE
+  PASS  TA and PTA round trip (ta_roundtrip)
+verify_boot: 18 pass, 0 FAIL, 0 skipped

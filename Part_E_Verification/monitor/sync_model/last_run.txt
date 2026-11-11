@@ -1,0 +1,25 @@
+Component 2.2 host reference model: logic tests (NOT the OP-TEE code)
+ok   X1/V7 free lock: first attempt, no increment           5 checks, all passed
+ok   X2/X6/V6 held lock: BUSY within budget, state restored   5 checks, all passed
+ok   X3 frozen timer: exits through the attempt cap         4 checks, all passed
+ok   X4 backward timer: exits at the first failed attempt   3 checks, all passed
+ok   X5 two acquisitions share the budget; HMAC time not counted   6 checks, all passed
+ok   X6 control: unmask-before-unlock is detected           2 checks, all passed
+ok   X7/Z4/HP3 BUSY path: no protected access, no copy      7 checks, all passed
+ok   V9 counter wraps modulo 2^32, delta stays correct      2 checks, all passed
+ok   V10/Y2 Core 1 observation: nothing consumed on a failed attempt   6 checks, all passed
+ok   Y1/Y9 one non-spinning attempt per 256 passes          3 checks, all passed
+ok   Y3/Y4/Y5 starvation episodes                           6 checks, all passed
+ok   V12/Z5 exactly-once timeout and heartbeat transitions   8 checks, all passed
+ok   G5 lease expiry restarts the window; no stale timeout   2 checks, all passed
+ok   N1-N8/HP2/HP4/HP5 command 20 contract                 20 checks, all passed
+ok   N6 lease_remaining and flags                           3 checks, all passed
+ok   cmd 18 five records, order, bounded scan, ring invariants  19 checks, all passed
+ok   Q5 per-class diagnostic rate limit (1 event per second per class)   8 checks, all passed
+ok   EV3 evidence flood cannot evict other unread evidence   5 checks, all passed
+ok   ACK1-4 command 19 is a bookmark only                  10 checks, all passed
+ok   L21-1..9 command 21 idle lease                        18 checks, all passed
+ok   N23 command 23 heartbeat answer (stored nonce, no HMAC)  18 checks, all passed
+ok   EV5 command 20 page 1 layout and content               5 checks, all passed
+ok   W3/Z1/V11 init gate, lock-held control, mac guard      5 checks, all passed
+total: 170 checks, 0 failed

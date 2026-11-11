@@ -1,0 +1,11 @@
+soak: 180 s, period 100 ms, 1799 ticks
+frame verdicts: ACCEPTED 1798 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 180 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 76 p99 77 max 85
+frame submit latency (us): p50 8946 p99 9425 max 9904
+end state: flags 0x07 last_counter 2798 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +2068 starved 0
+---
+holds: count 8346617 | mean 0.16 us | max 109 ticks = 5.68 us | max by PTA 5.68 us | max by Core 1 0.31 us
+Core 1 attempt interval: count 8344722 | min 13.96 us | mean 21.57 us | max 26.30 us
+Core 1 hold requests done: 0 (pending 0 ticks) | cadence: 256 passes per lock attempt
+ls: /tmp/kf: No such file or directory

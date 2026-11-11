@@ -1,0 +1,6 @@
+# PTA latency under CPU load: 3 busy loops (yes > /dev/null) on the Linux cores, 20000 calls of command 20, same setup as the idle run, 2026-11-07
+load: 1.02 0.76 0.37 5/97 451 | freq: 600000 kHz
+calls 20000 | BUSY 0 | other errors 0 | total 111.12 s | mean 5556 us | rate 180 calls/s
+latency us: min 3465 p50 4361 p90 9544 p99 9985 p99.9 10973 max 13018
+monitor counters during the run: skip_total 61795 -> 74058, pta_lock_timeouts 0 -> 0
+after: 3.67 1.82 0.80 2/94 457
