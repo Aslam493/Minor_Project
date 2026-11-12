@@ -17,25 +17,25 @@ Principle: a verified working state beats new features. The Pi runs a proven ima
 | D-B | "Possible PTA contention" hint | **A** your brief's BUSY/skip-based signal: would not have fired in the F24 data. **B** lock-free PTA call-rate counter at the glue entry; Core 1 sets a hint bit (0x100) in the traffic-TIMEOUT detail when the rate over the last second exceeds a threshold (about 100 calls/s; a legitimate consumer is about 12 to 25 calls/s). A heuristic ("possible"), detection only. **C** drop it. | **B** or C. Not A. |
 | D-C | UART `ALIVE` line | Leave the flag **off**, state "implemented, host-tested, object-code checked, NOT verified on hardware" in `RESULTS.md`. Needs an adapter wiring to verify. | Leave off (as you suggested). |
 | D-D | Number of images | One image bundling `IDLE_EXPIRED` plus whatever of D-A/D-B you approve. | One. |
-| D-E | Pushes | After each unit: top-level repo to `origin nov-2026-backup` (your instruction). Nested repos (`github`, `tfo` remotes) only on your explicit OK. | Top-level only; bundle refreshed. |
+| D-E | Pushes | After each unit: top-level repo to `origin nov-2026-backup` (your instruction). **Nested repos are NEVER pushed: their remotes are the public upstream projects (OP-TEE, TF-A); `source_backups/README.md` forbids it (CORRECTED, I had offered 'on your explicit OK').** Backup = the bundles in `source_backups/`, refreshed each unit. | Top-level only; bundles refreshed. |
 | D-F | Soaks use software-injected frames (no CAN sender) | They test the monitor, not the bus. Stated in `RESULTS.md`. | Accept. |
 
 ## 2. Units (each: files and functions, rule, host tests first, board test, pass criteria, risk, rollback)
 
-### U0. C5 formal close and status board (documentation only; no code, no board)
+### U0. C5 formal close and status board (documentation only; no code, no board). **DONE 2026-11-12, commit `aa7ce98`**
 - **Files:** `Secure_CAN_Monitor_Plan_8_Components.md` (board rows C3, C4, C5, C6; delete the stacked stale C4 text; add the missing 2026-11-12 progress-log entries for N-04, F24, C4 close, C5, C6; fill the C3-C8 "Progress log." placeholders with pointers); `monitor/COMPONENT_5_HEARTBEAT_AND_TRAFFIC_DEADLINE.md` (add the acceptance map in section 3 below; correct my wrong `T10b` label); `monitor/NEXT_STEPS.md` and `PROGRESS_REPORT_2026-11-11.md/.pdf` (regenerate, they are stale).
 - **Rule:** "never mark DONE because a document exists": every status cites a log or build output.
 - **Test:** a small script that extracts every path cited in the plan and the C-records and checks it exists (the audit found `RESULTS.md` missing, which is correct for now).
 - **Pass:** script reports 0 dangling references except the declared future files. **Risk:** none. **Rollback:** `git revert`.
 
-### U1. Host tests only: close the C5 gaps found in the audit (no Secure World source change)
+### U1. Host tests only: close the C5 gaps found in the audit (no Secure World source change). **DONE 2026-11-12, commit `5f5e7da`**
 - **Files:** `monitor/source_tests/harness.c` (+ `mutation_real.py` run). New tests, written to fail first against a mutated source: **T11b** answer at exactly `issue + D_req` is on time, at `+1 tick` late (strict `>`, rule R17/O-11); **T11a** explicit race: answer handler does OPEN->MISSED itself, logs one miss, then LATE, and Core 1's later pass adds no second miss; **T10b (plan meaning, audit O-10)**: `miss_count` already above `k` when G passes still raises TIMEOUT exactly once (`>=`, not `==`).
 - **Board test:** none new (T10 and T20 board data already show miss_count above k at the grace).
 - **Pass:** new checks pass on the real source; the mutants (flip `>` to `>=`, `>=` to `==`) are CAUGHT. **Risk:** none (test-only). **Rollback:** `git revert`.
 
-### U2. Board negative-test tool (no Secure World change; runs on the image that is on the Pi now)
+### U2. Board negative-test tool (no Secure World change; runs on the image that is on the Pi now). **DONE 2026-11-12: 12 PASS / 0 FAIL, `baseline/c6_negative_raw_run2_20261112.txt`; see `COMPONENT_6_HARDENING.md` section 5 (finding F29)**
 - **Files:** new `tools/monitor_client/c6_negative_raw.c` (raw `TEEC_InvokeCommand` with crafted parameter types and sizes), Makefile target.
-- **Cases:** (a) legacy ids 0, 3, 6, 7, 13, 14 with WRONG parameter types: expect `NOT_SUPPORTED` and exact `ev_count[LEGACY_CMD_REFUSED]` +6 (a `BAD_PARAMETERS` result = refusal missing = FAIL, harmless); (b) debug readers 4, 5, 8, 9, 10, 11, 15, 16: `NOT_SUPPORTED` in hardened; (c) ids 24 to 40: `NOT_SUPPORTED`; (d) commands 17 to 23 with wrong param types: `BAD_PARAMETERS`, state unchanged (`ev_seq`, counters, last_counter); too-small buffers for 18 and 20: `SHORT_BUFFER` with outputs delivered; (e) ids 1, 2, 12 still work.
+- **Cases:** (a) legacy ids 0, 3, 6, 7, 13, 14 with WRONG parameter types: expect `NOT_SUPPORTED` and `ev_count[LEGACY_CMD_REFUSED]` rising (best effort by design: dropped when the lock is busy; CORRECTED, I first wrote 'exact') (a `BAD_PARAMETERS` result = refusal missing = FAIL, harmless); (b) debug readers 4, 5, 8, 9, 10, 11, 15, 16: `NOT_SUPPORTED` in hardened; (c) ids 24 to 40: `NOT_SUPPORTED`; (d) commands 17 to 23 with wrong param types: `BAD_PARAMETERS`, state unchanged (`ev_seq`, counters, last_counter); too-small buffers for 18 and 20: `SHORT_BUFFER` with outputs delivered; (e) ids 1, 2, 12 still work.
 - **Host first:** the same matrix against the real glue in the harness (extend `LG1/LG4`).
 - **Pass:** all cases as expected, `verify_boot` still 16/0, monitor `starved=0`. **Risk:** low (wrong types prevent any action; checked in source). Needs your OK to run on the Pi (it changes RAM-only counters). **Rollback:** reboot clears RAM state; nothing persistent changes.
 

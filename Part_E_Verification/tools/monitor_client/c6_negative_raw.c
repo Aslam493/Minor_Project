@@ -6,9 +6,9 @@
  * SAFETY: every call that could act (legacy ids 0,3,6,7,13,14 and the chip-A debug readers) is sent with DELIBERATELY WRONG parameter
  * types. The legacy handlers check their parameter types before they do anything (pta/rpi3_can_spi_poc.c), so even if a refusal were
  * missing the call returns BAD_PARAMETERS and nothing is armed, written, transmitted or woken. Result codes tell the two apart:
- *   refused        -> TEE_ERROR_NOT_SUPPORTED (0xFFFF000A) plus an exact LEGACY_CMD_REFUSED count
+ *   refused        -> TEE_ERROR_NOT_SUPPORTED (0xFFFF000A) plus a BEST-EFFORT LEGACY_CMD_REFUSED count (one trylock; dropped if the lock is busy)
  *   NOT refused    -> TEE_ERROR_BAD_PARAMETERS (0xFFFF0006) = FAIL, but harmless.
- * Writes nothing persistent. RAM-side effect only: the exact LEGACY_CMD_REFUSED counter and its (rate-limited) events.
+ * Writes nothing persistent. RAM-side effect only: the best-effort LEGACY_CMD_REFUSED counter and its (rate-limited) events.
  * Prints PASS / FAIL / NOTE per check; exit 1 if any FAIL.
  */
 #define _GNU_SOURCE
@@ -75,14 +75,15 @@ int main(void)
 	ev_counts(e0); ok = 1; for (i = 0; i < 6; i++) { uint32_t r1 = raw(refused[i], PT_ALL_MEMREF), r2 = raw(refused[i], PT_NONE4);
 		if (r1 != NOT_SUPPORTED || r2 != NOT_SUPPORTED) { ok = 0; printf("     id %u: 0x%08x / 0x%08x\n", refused[i], r1, r2); } } ev_counts(e1);
 	PASSF(ok, "R1", "ids 0,3,6,7,13,14 x 2 patterns -> all NOT_SUPPORTED (a BAD_PARAMETERS would mean the refusal is missing)");
-	PASSF(e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED] == 12 && e1[EV_LEGACY_USED] == e0[EV_LEGACY_USED], "R1b", "LEGACY_CMD_REFUSED +%u (expected exactly 12: the counter is exact even though the ring limits events to 1/s), LEGACY_CMD_USED +%u (expected 0)", e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED], e1[EV_LEGACY_USED] - e0[EV_LEGACY_USED]);
+	{ uint32_t d = e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED];
+	  PASSF(d >= 1 && d <= 12 && e1[EV_LEGACY_USED] == e0[EV_LEGACY_USED], "R1b", "LEGACY_CMD_REFUSED +%u of 12 (best effort by design: one trylock, dropped when the monitor lock is busy; %u dropped), LEGACY_CMD_USED +%u (expected 0)", d, 12 - d, e1[EV_LEGACY_USED] - e0[EV_LEGACY_USED]); }
 
 	/* R2: chip-A debug readers: refused in the hardened profile */
 	printf("== chip-A debug readers 4,5,8,9,10,11,15,16\n");
 	if (hardened) {
 		ev_counts(e0); ok = 1; for (i = 0; i < 8; i++) { uint32_t r1 = raw(readers[i], PT_ALL_MEMREF), r2 = raw(readers[i], PT_NONE4); if (r1 != NOT_SUPPORTED || r2 != NOT_SUPPORTED) { ok = 0; printf("     id %u: 0x%08x / 0x%08x\n", readers[i], r1, r2); } } ev_counts(e1);
 		PASSF(ok, "R2", "8 readers x 2 patterns -> NOT_SUPPORTED in the hardened profile");
-		PASSF(e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED] == 16, "R2b", "LEGACY_CMD_REFUSED +%u (expected 16)", e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED]);
+		{ uint32_t d = e1[EV_LEGACY_REFUSED] - e0[EV_LEGACY_REFUSED]; PASSF(d >= 1 && d <= 16, "R2b", "LEGACY_CMD_REFUSED +%u of 16 (best effort by design; %u dropped)", d, 16 - d); }
 	} else NOTE("R2", "debug profile: the readers are allowed there; not run");
 
 	/* R3: ids beyond 23 */

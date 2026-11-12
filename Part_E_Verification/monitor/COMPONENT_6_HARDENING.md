@@ -34,3 +34,18 @@ Note: an oversize request is clamped to 60 s, so a lease cannot be made longer t
 
 ## 4. Design for the remaining C6 work
 See `COMPONENT_6_DESIGN.md`: IDLE_EXPIRED as `MODE_CHANGED detail 2`, the F27 correction (no code change), and the UART `ALIVE` line behind a build flag that defaults to off. Awaiting approval; nothing built.
+
+## 5. U2: board negative tests T25 and bad parameters (2026-11-12, hardened c16384 image, SSH only; nothing flashed)
+Tool: `tools/monitor_client/c6_negative_raw.c` (raw `TEEC_InvokeCommand`). Every call that could act is sent with DELIBERATELY WRONG parameter types: the legacy handlers check their parameter types first (`pta/rpi3_can_spi_poc.c`), so a missing refusal would give `BAD_PARAMETERS` and still arm, write, transmit and wake nothing. Host half already existed: `HP1`, `DS1`, `LG1`-`LG4` in `monitor/source_tests/harness.c`.
+**Result: 12 PASS, 0 FAIL** (`baseline/c6_negative_raw_run2_20261112.txt`; `verify_boot` 16/0 after).
+| Case | Result |
+|---|---|
+| R1 legacy ids 0, 3, 6, 7, 13, 14, two wrong patterns each | all 12 calls `NOT_SUPPORTED`; `LEGACY_CMD_REFUSED` +12 |
+| R2 chip-A debug readers 4, 5, 8, 9, 10, 11, 15, 16 (hardened) | all 16 calls `NOT_SUPPORTED`; counter +16 |
+| R3 ids 24-30, 40, 100, 0x1000, 0xFFFFFFFF | all `NOT_SUPPORTED`; no counter, verdict total or state changed |
+| R4 monitor commands 17-23 with wrong types | all `BAD_PARAMETERS`; nothing changed (events, verdict totals, last_counter, idle uses, ack) |
+| R5 short buffers | cmd 18 -> `SHORT_BUFFER`, required 120 B; cmd 20 -> `SHORT_BUFFER`, required 128 B |
+| R6 cmd 18 `max_entries` 0 and 6 | `BAD_PARAMETERS` |
+| R7 ids 1, 2, 12 with correct types | `SUCCESS` (legacy path intact) |
+**Run 1 (`..._run1_...txt`) had 1 FAIL, a wrong expectation of mine, kept:** I expected the `LEGACY_CMD_REFUSED` counter to be exact. It rose by 15 of 16 in the readers case. **By design** `rpi3_mon_note_legacy` makes ONE non-spinning trylock and drops the event, and with it the counter increment, when the monitor lock is busy ("best effort, never waits", header comment and approved design K9). The refusal itself held in every call (28 of 28 `NOT_SUPPORTED` across both runs). Run 2 uses the correct criterion (`1 <= delta <= N`, report the dropped count) and saw 0 dropped.
+**Finding F29:** the `LEGACY_CMD_REFUSED` / `LEGACY_CMD_USED` counts are **best-effort lower bounds**, not exact counts. A hostile caller who times calls against Core 1's lock attempts could see some of its refused calls go uncounted; the refusal is not affected. Documented limit, no change proposed. (Earlier text in the U2 plan that called this counter exact is corrected.)

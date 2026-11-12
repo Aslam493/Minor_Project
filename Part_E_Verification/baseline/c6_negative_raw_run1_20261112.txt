@@ -1,0 +1,22 @@
+c6_negative_raw: boot_id 0x2988a3c3 flags 0x13 profile HARDENED, init_ok=1 starved=0
+== legacy ids 0,3,6,7,13,14 (wrong parameter types: harmless even if a refusal were missing)
+  PASS  R1    ids 0,3,6,7,13,14 x 2 patterns -> all NOT_SUPPORTED (a BAD_PARAMETERS would mean the refusal is missing)
+  PASS  R1b   LEGACY_CMD_REFUSED +12 (expected exactly 12: the counter is exact even though the ring limits events to 1/s), LEGACY_CMD_USED +0 (expected 0)
+== chip-A debug readers 4,5,8,9,10,11,15,16
+  PASS  R2    8 readers x 2 patterns -> NOT_SUPPORTED in the hardened profile
+  FAIL  R2b   LEGACY_CMD_REFUSED +15 (expected 16)
+== unknown ids
+  PASS  R3    ids 24-30, 40, 100, 0x1000, 0xFFFFFFFF x 2 patterns -> NOT_SUPPORTED, monitor state unchanged
+== monitor commands 17-23 with wrong parameter types
+  PASS  R4    commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS
+  PASS  R4b   no counter, verdict total, event, last_counter, idle use or acknowledgement changed
+== short buffers
+  PASS  R5    command 18 with an 8-byte buffer for 5 events -> SHORT_BUFFER, required size 120 (expected 120)
+  PASS  R5b   command 20 with an 8-byte buffer -> SHORT_BUFFER, required size 128 (expected 128)
+  PASS  R6    command 18 with max_entries 0 and 6 -> BAD_PARAMETERS (0xffff0006, 0xffff0006)
+== legacy ids kept: 1, 2, 12
+  PASS  R7    ids 1 (FIQ count), 2 (FIQ control), 12 (Core 1 heartbeat) -> SUCCESS with VALUE_OUTPUT
+  PASS  H     monitor still healthy: init_ok=1 starved=0, Core 1 last poll 0 ms ago
+SUMMARY: 11 PASS, 1 FAIL, 0 note
+exit=1
+messages 

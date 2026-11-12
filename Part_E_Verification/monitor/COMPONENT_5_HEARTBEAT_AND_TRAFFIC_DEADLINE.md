@@ -78,7 +78,7 @@ Sources: board log `baseline/c5_board_tests_run2_full_20261112.txt` (BOARD), hos
 | T19 T20 T21 T22 | PASS | | T21: no separate IDLE_EXPIRED event on the flashed image (implemented, not flashed) |
 | T23 | NOT RUN | | needs UART |
 | T24 | PASS for the hardened profile (`verify_boot` 16/0) | | debug profile not re-run on the board |
-| T25 | NOT re-run on the board | LG1/LG4 (ids 0,3,6,7,13,14, both profiles) | board version planned as U2 (wrong parameter types, harmless) |
+| T25 | **PASS (2026-11-12, U2)**: ids 0,3,6,7,13,14 refused, `NOT_SUPPORTED` 12 of 12 calls (`baseline/c6_negative_raw_run2_20261112.txt`); counter is best effort (F29) | LG1/LG4 (both profiles) | covered |
 | stall of 3H | | `C5 stall of 3H` PASS | covered on the host |
 
 **Correction of my own labelling:** the board log lines `T10b` (and the one-line "T10b responder back" in `c5_board_tests`) mean "heartbeat recovered after silence", which is **not** the plan's T10b. The plan's T10b is the audit item O-10 row in the table above.
