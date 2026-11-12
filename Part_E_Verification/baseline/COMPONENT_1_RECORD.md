@@ -82,7 +82,7 @@ Working rules used throughout: read-only unless a change was approved first; one
 
 **Carry forward.** Physical bus and transceiver not proven (needs an external sender, 1.6); no Secure World path yet (1.3); FD needs `fd on` plus a data bit timing and BusyBox may not set the latter (Component 4); `can1` dead.
 
-**Files.** `CAN_CONTROLLER1_BASELINE.md`; tool `Part_E_Verification/tools/canmode/` (`canmode.c`, vendored `include/linux/can/netlink.h`); on the Pi, RAM only: `/tmp/canmode`.
+**Files.** `CAN_CONTROLLER1_BASELINE.md`; tool `Part_E_Verification/tools/canmode/` (`canmode.c`, vendored `include/uapi/linux/can/netlink.h`); on the Pi, RAM only: `/tmp/canmode`.
 
 ---
 

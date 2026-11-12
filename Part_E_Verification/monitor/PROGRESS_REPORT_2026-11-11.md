@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-11-12 by `PROGRESS_REPORT_2026-11-12.md`.** The statuses below are out of date (for example C4 partial, C5 not started). Kept for history.
+
 # Secure CAN Monitor: Progress Report (as of 2026-11-11)
 
 Sources: `Secure_CAN_Monitor_Plan_8_Components.md` (status board), `monitor/NEXT_STEPS.md` (handoff 2026-11-09), `COMPONENT_*` records in this folder. Last work session recorded: 2026-11-09. Nothing newer is recorded.

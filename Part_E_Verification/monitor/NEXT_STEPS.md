@@ -1,19 +1,15 @@
-# NEXT_STEPS.md (handoff written 2026-11-09; read this first)
+# NEXT_STEPS.md (rewritten 2026-11-12; the 2026-11-09 handoff it replaces is in git history and `source_snapshots/20261112_u0_pre/`)
 
-## State right now
-- Pi 3 B runs the hardened production-profile image `rpi3-sdcard-monitor-hardened-c16384.img` from the 8 GB spare card (address alternates between 10.237.27.187 and .215). The 32 GB original card was never written. Nothing is left on the Pi's /tmp.
-- Components: C1 gate met (hardware items open), C2 closed (51/53 PASS), C3 complete (deviations recorded), C4 PARTIAL (gate NOT met). C5 to C8 not started.
-- Mutation re-run finished: 141 of 144 caught, the same 3 equivalent survivors (`source_tests/mutation_final_20261109.txt`). Nothing to redo.
+## State right now (checked on the Pi 2026-11-12)
+- Pi 3 B at 10.237.27.187 runs the hardened c16384 monitor image from the **8 GB spare card** (`SD8GB`, serial 0x6d280b3c); the 32 GB original was never written. DTB = the N-04 version. `verify_boot` 16 pass / 0 FAIL / 2 skipped. `teeclnt` is empty.
+- Components: C1 done (hardware items open), C2 closed, C3 done with accepted deviations, C4 closed with limits, **C5 done with limits (accepted)**, **C6 partial**, C7 not started (blocked: no second CAN board, no sender), C8 not started.
+- Built and host-tested but **not flashed**: IDLE_EXPIRED and the UART ALIVE line (flag default off). Unit U1 (host tests T11a/T11b/T10b) done 2026-11-12.
 
-## Decisions needed from the user (they unblock C3/C4 closure)
-1. Define **R**, **grace** and **N_req** (plan rules `32T >= 1.25 (grace + R)` and `ring >= N_req`; derive_params.py reports both NOT CHECKED). Known: with grace = the 60 s boot grace the first rule cannot hold; with N_req = 128 the 64-slot ring fails.
-2. Ring size: keep 64 slots (24 pinned + 40 ordinary, decision G8) or move to the plan's 128.
-3. Confirm the **2048-byte stack margin** (C3.3) and accept the C3 deviations (single flag, 3 legacy symbols dropped by D1) and the C4 deviation (TEST_STATS build instead of CFG_RPI3_CAN_LOOP_STATS).
-4. A CAN sender or second board (floods, gap histogram), or accept them as NOT DONE.
-5. Make an external copy of `SD_Card_Backups/` (verify with `baseline/SD_Card_Backups_MANIFEST_20261109.sha256`).
+## What to read first
+`Secure_CAN_Monitor_Plan_8_Components.md` (board + dated log), then `monitor/PLAN_REMAINING_WORK_2026-11-12.md` (units U0-U8, decisions D-A to D-F, schedule, cut rule).
 
-## Suggested order tomorrow
-1. Read the mutation result. 2. Get decisions 1 to 3. 3. Start C5 (heartbeat + traffic deadline; most software and board tests already exist from the C2 work, the plan's T1-T25 list is still not found in the repository: ask for it). 4. Optional Q4: measure the hold time of command 18 (needs the test image and one swap).
+## Open decisions (from the plan)
+D-A F27 coalescing (the limiter already exists); D-B contention hint signal; D-C UART stays off; D-D one image; D-E pushes (top-level only, nested repos on explicit OK); D-F software-injected soaks accepted.
 
 ## Routine for any card swap
-`scripts/card_helper.sh check <image>` (refuses anything but the 8 GB spare, prints the dd/cmp commands for the user to run), `identify`, then `pi <ip>` after boot. Standing rules: never write the 32 GB original; board tests and any forced fault need explicit approval; always PLATFORM=rpi3; build in scratch directories; prototype keys are not production; detection only, no prevention claim.
+`scripts/card_helper.sh check <image>` (refuses anything but the 8 GB spare, prints the dd/cmp commands for the user to run), `identify`, then `pi <ip>` after boot. Standing rules: never write the 32 GB original; board tests and any forced fault need explicit approval; always `PLATFORM=rpi3`; build in scratch directories with an ABSOLUTE output path; prototype keys are not production; detection only, no prevention claim. Never trust an object-code check without first confirming the build finished and the disassembly is non-empty.

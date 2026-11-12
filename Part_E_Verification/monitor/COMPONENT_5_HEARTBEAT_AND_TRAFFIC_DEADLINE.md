@@ -55,3 +55,31 @@ Tool: `tools/monitor_client/c5_board_tests.c` (cross-built `-Werror` clean, runs
 ## 5. Gate and open items
 Plan gate: Mode-F tests T1-T25 subset plus T5b, T11a-c, T18e, heartbeat half of T18i; stall of 3H gives one MISS, one issue, no MON_STARVED.
 **Status: COMPLETE WITH LIMITS for software-injected frames (board, hardened profile).** Open: T23 (UART), T18b (20 reboots), T5b (chip-B path, Component 7), T4b/T11a/T11b/T18e (host-harness only), T25 (C2 evidence, not repeated), no CAN-bus traffic evidence, the IDLE_EXPIRED decision (proposal: `MODE_CHANGED detail 2`, see COMPONENT_6_DESIGN.md), `mon_catchup()` (behaviour covered, name absent).
+
+## 6. Acceptance map, added 2026-11-12 (plan C5 list: T1-T25 subset plus T5b, T10b, T11a-c, T18e, T18i heartbeat half)
+Sources: board log `baseline/c5_board_tests_run2_full_20261112.txt` (BOARD), host harness `monitor/source_tests/harness.c` (HOST, 434 checks, flag off), nothing (NOT RUN).
+| Item | BOARD | HOST | Status |
+|---|---|---|---|
+| T1 T2 T3 | PASS | C17-x | covered |
+| T4 | PASS (id 0x124, EFF flag) | C17-1 (length 43/45) | covered; length cases host only |
+| T5 T6 T7 T8 | PASS | yes | covered |
+| T5b | NOT RUN | n/a | chip-B padding row (Component 7); the 44-byte PTA message has no pad bytes |
+| T9 T12 T13 T14 T15 T16 | PASS | N22 / N23 | covered |
+| T10 | PASS (miss_count 0 -> 4, one TIMEOUT detail 2) | EV6/V12 | covered |
+| **T10b** (plan meaning, audit O-10: miss_count above k when the grace period ends still raises TIMEOUT once) | data only: T20 (miss_count 50+ at the grace) | **U1 test `T10b`**, mutant `== k` caught | host covered since 2026-11-12 |
+| T11 | PASS | N23 | covered |
+| **T11a** deadline race | NOT RUN | **U1 test `T11a`** (answer handler records the one miss, Core 1 adds none) | host covered since 2026-11-12 |
+| **T11b** exact boundary | NOT RUN | **U1 test `T11b`** (on time at issue+D_req, late at +1 tick), mutants `>=` and `> limit+1` caught | host covered since 2026-11-12 |
+| T11c | PASS (DUPLICATE x2, miss_count unchanged) | N23 | covered |
+| T17 T18 | PASS (2 real reboots) | | covered |
+| T18b | PARTIAL: 3 boot IDs, all distinct | | plan asks 20 or more |
+| T18e | NOT RUN | harness.c line about `hb_seq` exhaustion (`G6-5`, `EV6/V12`) | host only (needs the debug profile to set `hb_seq`) |
+| T18i heartbeat half | T19 PASS | STRESS Core 1 + 3 PTA contexts | covered |
+| T19 T20 T21 T22 | PASS | | T21: no separate IDLE_EXPIRED event on the flashed image (implemented, not flashed) |
+| T23 | NOT RUN | | needs UART |
+| T24 | PASS for the hardened profile (`verify_boot` 16/0) | | debug profile not re-run on the board |
+| T25 | NOT re-run on the board | LG1/LG4 (ids 0,3,6,7,13,14, both profiles) | board version planned as U2 (wrong parameter types, harmless) |
+| stall of 3H | | `C5 stall of 3H` PASS | covered on the host |
+
+**Correction of my own labelling:** the board log lines `T10b` (and the one-line "T10b responder back" in `c5_board_tests`) mean "heartbeat recovered after silence", which is **not** the plan's T10b. The plan's T10b is the audit item O-10 row in the table above.
+**Finding from the U1 work:** audit O-10 also asks for a *saturating* miss counter; `rpi3_mon_evaluate` does `hb_miss_count++` with no guard (a wrap needs about 136 years at one miss per second). Recorded, not changed.

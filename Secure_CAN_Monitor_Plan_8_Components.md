@@ -7,14 +7,14 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 | # | Component | Plan stages | Depends on | Gate | Status |
 |---|---|---|---|---|---|
-| C1 | Baseline and hardware readiness | H + S0 | none | Objective S0 acceptance list passes | **DONE for the software work (gate met 2026-11-06)**; hardware items open (UART, second board, sender) |
-| C2 | Secure monitor foundation | S1 | C1 | New-command probe, counter test vector, Step 2 regression clean | **CLOSED for software and hardware (2026-11-09):** 2.1 CLOSED; 2.2 COMPLETE (53-row inventory: 51 PASS, 2 PARTIAL [W2 literal boot log needs UART; Y10 real CAN traffic needs a sender], 0 FAIL, 0 NOT RUN); gate G1-G4 COMPLETE (`monitor/COMPONENT_2_GATE_CHECK.md`). Open outside the gate: production keys, CAN-bus (not PTA-injected) evidence |
-| C3 | Core 1 integration | S2a | C2 + FIQ stack decision (O-01) | Only new symbols in `nm`, regression clean | **COMPLETE (2026-11-09)** with recorded deviations: single flag `CFG_RPI3_CAN_MONITOR` instead of `_POLL`; 3 legacy symbols dropped by D1 (so 'only new symbols' is not literally true); stack margin 2048 B is a PROPOSAL awaiting the user. Stack: static 640 B (2000 B incl. panic path), board watermark 688 B of 4096 B |
-| C4 | Timing and measurement | S2b | C3 | Measured T, R, H, D_req, G, ring size; CNTPCT sane on Core 1 | **CLOSED WITH LIMITS for Mode F (2026-11-12):** derive_params.py fixed (frame period T separate; rules b,c are D2/C7); floods, C4.3 hardware sender and C4.4 histogram NOT DONE (accepted); rule (b) FAILS with the plan's provisional R/grace/T, to be settled in C7. Earlier note: **PARTIAL (2026-11-12 update: user decisions recorded: ring 64 kept, 2048 B margin and deviations accepted, floods/histogram accepted as NOT DONE; R/grace/N_req ARE defined in the original plan (D2 rules, belong to C7); fix + confirm pending):** earlier 2026-11-09 state: C4.1 loop model and C4.5 CNTPCT sanity (board, PASS) and C4.6 `derive_params.py` done; C4.2 idle/CPU latency done; floods, C4.3 CAN sender and C4.4 gap histogram BLOCKED (no sender/second board); derive rules b and c NOT CHECKED (R, grace, N_req undefined) |
-| C5 | Heartbeat and traffic deadline | S3 | C4 | Mode-F tests T1-T25 subset + heartbeat tests | **COMPLETE WITH LIMITS, ACCEPTED BY THE USER 2026-11-12 (board, hardened profile):** 26 PASS / 0 FAIL / 1 skip plus T17/T18/T20 over 2 real reboots; software-injected frames only (not CAN-bus evidence). Open: T23 (UART), T18b (20 reboots), D2-only rows, host-only T4b/T11a/T11b/T18e, IDLE_EXPIRED decision, F27. Record: `Part_E_Verification/monitor/COMPONENT_5_HEARTBEAT_AND_TRAFFIC_DEADLINE.md` |
-| C6 | Hardening | S4 | C5 | Negative tests, UART events, lock/FIQ checks. **Milestone M1** | **IN PROGRESS (2026-11-12):** inventory done; idle lease caps board-verified (6 PASS); legacy-command refusal verified in C2; UART ALIVE line NOT implemented (needs your decision, source change, card swap and UART). Record: `Part_E_Verification/monitor/COMPONENT_6_HARDENING.md` |
-| C7 | Independent CAN and cross-checking | S5 + S6 | C6 + second board | M5.1-M5.7 recorded, D2 tests pass | NOT STARTED |
-| C8 | Testing and final report | S7 | C5 (M1) / C7 (M2) | RESULTS.md, soaks done. **Milestone M2** | NOT STARTED |
+| C1 | Baseline and hardware readiness | H + S0 | none | Objective S0 acceptance list passes | **DONE (software gate met 2026-11-06).** Evidence: `Part_E_Verification/baseline/COMPONENT_1_RECORD.md` (subcomponents 1.1-1.7), `verify_boot` 16 pass / 0 FAIL on the 8 GB spare 2026-11-12 (`baseline/pi_check_10.237.27.187_20261112.md`). **N-04** (Linux did not reserve OP-TEE memory) found here and **resolved 2026-11-12**: DTB installed on the spare and verified (`monitor/N04_SECURE_MEMORY_RESERVATION.md` section 12); the build rule in `optee_full/build/rpi3.mk` is checked by reproducing its command, **not yet by a full image build**. Open (hardware): no UART connection, no second CAN board, no sender; `can1` dead; a restore onto the original card never run; no off-laptop copy of `SD_Card_Backups/` |
+| C2 | Secure monitor foundation | S1 | C1 | New-command probe, counter test vector, Step 2 regression clean | **CLOSED for software and hardware (2026-11-09).** 53-row inventory: 51 PASS, 2 PARTIAL (W2 literal boot log needs UART; Y10 real CAN traffic needs a sender), 0 FAIL (`monitor/COMPONENT_2_2_INVENTORY.md`); gate G1-G4 complete (`monitor/COMPONENT_2_GATE_CHECK.md`); mutation 141/144 caught, 3 equivalent (`monitor/source_tests/mutation_final_20261109.txt`, not re-run on the C6 changes). Open outside the gate: prototype keys only; no CAN-bus (non-injected) evidence; **F24** (any `/dev/tee0` user can delay PTA callers) measured 2026-11-12 (`monitor/F24_HEARTBEAT_STARVATION_ANALYSIS.md`), unprivileged route closed on the Pi only (`teeclnt` empty), not in the image build |
+| C3 | Core 1 integration | S2a | C2 + FIQ stack decision (O-01) | Only new symbols in `nm`, regression clean | **DONE with deviations (2026-11-09); the deviations and the 2048 B stack margin were ACCEPTED by the user 2026-11-12.** Deviations: single flag `CFG_RPI3_CAN_MONITOR` instead of `_POLL`; 3 legacy symbols dropped by D1 (so 'only new symbols' is not literally true). Stack: static 640 B normal path, 2000 B incl. panic path, board watermark 688 B of 4096 B. Evidence: `monitor/COMPONENT_3_CORE1_CALL_LIST_AND_SYMBOL_DIFF.md` |
+| C4 | Timing and measurement | S2b | C3 | Measured T, R, H, D_req, G, ring size; CNTPCT sane on Core 1 | **PARTIAL by the gate's wording; closed with limits for Mode F (2026-11-12).** Met: loop model (pass 26.6 ns, attempt 12.6 us, interval 448 us), CNTPCT sanity on Core 1 (3000 samples), PTA latency idle/CPU, `derive_params.py` fixed (frame period T separate), ring 64 kept (user decision). **Not done (accepted):** CAN/SPI floods, hardware sender (C4.3), gap histogram (C4.4). Rules (b) and (c) are Design-2 rules, deferred to C7; with the plan's provisional values rule (b) **FAILS** (1600 ms < 2000 ms, `monitor/derived/derive_params_20261112_plan_values.txt`). Record: `monitor/COMPONENT_4_TIMING_AND_MEASUREMENT.md` |
+| C5 | Heartbeat and traffic deadline | S3 | C4 | Mode-F tests T1-T25 subset + heartbeat tests | **DONE with limits, accepted by the user 2026-11-12 (board, hardened profile).** Board: 26 PASS / 0 FAIL / 1 skip (`baseline/c5_board_tests_run2_full_20261112.txt`) plus T17/T18/T20 over 2 real reboots and `verify_boot` 16/0 after (T24). Host: U1 (2026-11-12) added tests for T11a, T11b and the plan's T10b (harness 434 checks, 5 mutants caught; commit `5f5e7da`). **Open:** T23 (needs UART); T18b (3 boot IDs, plan asks 20+); T5b (chip-B row); T4b and T18e host-only; T25 board version (unit U2); software-injected frames only, no CAN-bus evidence. Record with the acceptance map: `monitor/COMPONENT_5_HEARTBEAT_AND_TRAFFIC_DEADLINE.md` |
+| C6 | Hardening | S4 | C5 | Negative tests, UART events, lock/FIQ checks. **Milestone M1** | **PARTIAL (in progress, 2026-11-12).** Done and evidenced: idle-lease caps on the board (6 PASS, `baseline/c6_negative_idle_caps_20261112.txt`); legacy-command refusal (board in C2 G4, host test LG1/LG4); FIQ masked (D1). **Written, host-tested and built but NOT flashed:** IDLE_EXPIRED (`MODE_CHANGED` detail 2) and the UART ALIVE line (flag `CFG_RPI3_CAN_MONITOR_UART`, default n; **unverified on hardware**): `monitor/COMPONENT_6_STAGE_AB_EVIDENCE.md`. F27 was a misreading: the limiter exists (`monitor/COMPONENT_6_DESIGN.md` section 1); coalescing is an optional design change (decision D-A). Remaining work and decisions: `monitor/PLAN_REMAINING_WORK_2026-11-12.md`. Milestone M1 depends on this |
+| C7 | Independent CAN and cross-checking | S5 + S6 | C6 + second board | M5.1-M5.7 recorded, D2 tests pass | **NOT STARTED, BLOCKED (hardware):** no second working CAN board (`can1` dead) and no external sender. Planned record: 'designed, not built' (plan unit U8). Not implemented |
+| C8 | Testing and final report | S7 | C5 (M1) / C7 (M2) | RESULTS.md, soaks done. **Milestone M2** | **NOT STARTED.** Inputs only: 10-minute and 180 s soaks, 60 s soaks, F24 flood runs. `Part_E_Verification/RESULTS.md` does not exist yet; 1-hour and overnight soaks not run (plan unit U7) |
 
 ## Rules that apply to every component
 
@@ -72,7 +72,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** New-command probe OK; R2 test vector (last=100: 90 REPLAY, 100 DUP/CONFLICT, 101 accept, 105 GAP(3), 0xFFFFFFFF then 0 REPLAY); build clean with CFG on and off; Step 2 regression clean.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -86,7 +86,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** `nm` diff shows only new symbols; regression clean; stack headroom >= stated margin and no frame overlap.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -98,7 +98,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** Recorded loop time, latency percentiles, jitter; parameters derived and asserted. Loopback numbers are not valid evidence.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -110,7 +110,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** Mode-F tests T1-T25 subset plus T5b, T10b, T11a-c, T18e, heartbeat half of T18i; stall 3H gives one MISS, one issue, no MON_STARVED.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -122,7 +122,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** Negative tests return the expected errors; events visible on UART; M1 = C1-C6 complete.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -136,7 +136,7 @@ Working method: for each component we (1) discuss, (2) record decisions here, (3
 
 **Acceptance.** Each M5.x recorded before the next; D2 tests T18c/d/f/g/h/j, T26-T47.
 
-**Progress log.**
+**Progress log.** See the dated `### Log` entries at the end of this file and the component record named in the status board row.
 
 ---
 
@@ -223,3 +223,22 @@ C3.1 hook (single flag `CFG_RPI3_CAN_MONITOR`, deviation from the planned `_POLL
 
 ### Log 2026-11-09 - Component 4 (Timing and measurement) started
 Done without a swap: C4.5 CNTPCT sanity on the board (PASS, 3000 samples/300 s); loop-time model (pass 26.6 ns, attempt 12.6 us, interval 448 us at cadence 16384; corrects the 75 ns figure); `derive_params.py` + generated `mon_params.h` (rules a and six timing relations pass, negative control fails as it should). NOT done: floods and gap histogram (BLOCKED: no CAN sender/second board); rules b and c NOT CHECKED because R, grace and N_req are undefined; plan flag `CFG_RPI3_CAN_LOOP_STATS` replaced by the existing TEST_STATS build (deviation). Record: `Part_E_Verification/monitor/COMPONENT_4_TIMING_AND_MEASUREMENT.md`.
+
+### Log 2026-11-12 - N-04 resolved (Component 1/2 finding)
+Linux did not reserve OP-TEE's secure memory (0x10000000-0x10FFFFFF). The one-node `no-map` DTB was installed on the 8 GB spare over SSH (user approved), read back (`e8ac38fa...`), rebooted; `/proc/iomem` shows `10000000-10ffffff : reserved`, kernel log `nomap`, `verify_boot` 16/0. Durable build rule added in `optee_full/build/rpi3.mk`, verified offline only. Record: `Part_E_Verification/monitor/N04_SECURE_MEMORY_RESERVATION.md` section 12.
+
+### Log 2026-11-12 - F24 heartbeat-starvation flood test and mitigation
+Four 60 s runs on the Pi (0, 3, 8, 24 PTA flooders) while a software sender and the heartbeat responder ran: worst frame-submit 10 ms / 271 ms / 553 ms / 1.18 s; false traffic TIMEOUTs and LATE_ANSWER events; Core 1 stayed healthy (`starved=0`, no lock timeouts). `test` removed from `teeclnt` on the Pi (not in the image build). The 'F27 not rate-limited' claim was withdrawn: the limiter exists. Records: `monitor/F24_HEARTBEAT_STARVATION_ANALYSIS.md`, `baseline/f24_*_20261112.txt`.
+
+### Log 2026-11-12 - Component 4 closed with limits
+`derive_params.py` fixed; user decisions recorded (ring 64, stack margin 2048 B, deviations accepted, floods/histogram accepted as not done). Rule (b) fails with the plan's provisional numbers; deferred to C7. Record: `monitor/COMPONENT_4_TIMING_AND_MEASUREMENT.md`.
+
+### Log 2026-11-12 - Component 5 board acceptance
+`tools/monitor_client/c5_board_tests.c`: 26 PASS / 0 FAIL / 1 skip; T17/T18/T20 over two reboots. Two of my test bugs (T22, T17c) found, fixed, kept in the record. User accepted C5 complete with limits. Record: `monitor/COMPONENT_5_HEARTBEAT_AND_TRAFFIC_DEADLINE.md`.
+
+### Log 2026-11-12 - Component 6 started
+Idle-lease caps verified on the board (6 PASS). Design (`monitor/COMPONENT_6_DESIGN.md`) approved by the user; IDLE_EXPIRED and the UART ALIVE line implemented behind a default-off flag, host-tested (422 / 1481 / 439 checks), built clean, object-code checked (`monitor/COMPONENT_6_STAGE_AB_EVIDENCE.md`). Not flashed. A false "61 pass" object-code run on empty disassembly files was found, discarded and redone.
+
+### Log 2026-11-12 - Audit, plan and unit U1
+Status audit written (board rows were stale for C3-C6; this entry and the rows above are the correction). Plan for the remaining work: `monitor/PLAN_REMAINING_WORK_2026-11-12.md`. **U1 done:** host tests for T11b (exact deadline boundary), T11a (deadline race, no second miss) and the plan's T10b (miss count above k when the grace period ends); harness 422 -> 434, five planted bugs caught, two of them (`>=` boundary, `== k`) only by the new tests (`monitor/source_tests/mutation_u1_20261112.txt`, commit `5f5e7da`). Also found: audit item O-10 asks for a saturating miss counter, the code uses a plain increment (a wrap needs about 136 years at one miss per second); recorded, not changed.
+
