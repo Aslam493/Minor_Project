@@ -9,8 +9,8 @@ SRC=/home/aslam/Minor_Project
 MNT=/mnt/pibackup
 
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
-[ "$(lsblk -dno TRAN "$DEV")" = usb ] || { echo "REFUSED: $DEV is not a USB disk"; exit 1; }
-[ "$(lsblk -dno RM "$DEV")" = 1 ] || { echo "REFUSED: $DEV is not removable"; exit 1; }
+[ "$(lsblk -dno TRAN "$DEV" | xargs)" = usb ] || { echo "REFUSED: $DEV is not a USB disk"; exit 1; }
+[ "$(lsblk -dno RM "$DEV" | xargs)" = 1 ] || { echo "REFUSED: $DEV is not removable"; exit 1; }
 SZ=$(blockdev --getsize64 "$DEV")
 if [ "$SZ" -lt 3400000000 ] || [ "$SZ" -gt 4300000000 ]; then
   echo "REFUSED: $DEV size $SZ is not a ~4 GB card"; exit 1; fi
