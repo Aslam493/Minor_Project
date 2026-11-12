@@ -53,7 +53,7 @@ All of the following were run on the Pi (`baseline/c5_board_tests_run2_full_2026
 | 1000 bad-tag frames | 15 events in the ring, 985 suppressed by the limiter; the earliest evidence survives |
 | four parallel callers, 8 s | 8 of 8 heartbeat answers on time, no BUSY, no starvation |
 | legacy debug and hardware commands (ids 0, 3, 6, 7, 13, 14 and the debug readers) | refused (`NOT_SUPPORTED`): 28 calls per run, 56 of 56 over two runs; counted best-effort |
-Host-side, on the real sources under ASan and UBSan: 434 checks (production configuration), 1493 (test-statistics build), 451 (UART flag on), 0 failed; static checks 58 on the source, 61 with object code; mutation testing 141 of 144 mutants caught (the other 3 are equivalent; run on the 2026-11-09 sources, **not re-run after the C6 source changes**, which are not in the flashed image), and five bugs planted for the 2026-11-12 host tests were all caught.
+Host-side, on the real sources under ASan and UBSan: 434 checks (production configuration), 1493 (test-statistics build), 451 (UART flag on), 0 failed; static checks 58 on the source, 61 with object code; mutation testing 141 of 144 mutants caught, re-run on the sources after the C6 changes on 2026-11-12 (`monitor/source_tests/mutation_c6_20261112.txt`; the other 3 survivors are the same 3 equivalent ones as on 2026-11-09; one mutant's anchor had to be updated because the `IDLE_EXPIRED` change rewrote that line; the new UART code has no mutants, only the 5 planted bugs of the host tests), and five bugs planted for the 2026-11-12 host tests were all caught.
 
 ## 5. Measurements
 | Quantity | Value | Evidence |
