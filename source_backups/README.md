@@ -61,3 +61,10 @@ directly (rather than a fresh clone), skip the `git clone`/`checkout
 checkout` from inside the existing checkout, provided it's still at the
 same pinned commit (these checkouts normally aren't moved off their
 pinned commit day-to-day).
+
+## Refreshed 2026-11-12 (Secure CAN Monitor work)
+
+- `optee_os-latest.bundle`: range `d5001fe0a..secure-can-spi-poc` (same pinned upstream base as above), head `6fe8ffad0` or later: contains the monitor (Components 2 to 6), IDLE_EXPIRED and the UART ALIVE line. Restore exactly as for the other bundle (`git bundle unbundle`, then `git checkout secure-can-spi-poc`).
+- `tfa-latest.bundle`: TF-A pinning / FIQ-routing changes (head `ce8b7cb0b`).
+- `../Build_Config_Patches/build-latest.patch`: `git diff --binary f441904 HEAD` of `optee_full/build` (rpi3 config, `br-ext/board/rpi3`, the N-04 device-tree overlay rule). It was an empty file before 2026-11-12.
+- **The nested repos' remotes are the public upstream projects (OP-TEE, TF-A). Never push project work to them.** These bundles and the patch are the backup.
