@@ -1,0 +1,36 @@
+# analyze_soak.py test, 2026-11-12: partial CSV (179 lines, 2.98 h) with the soak 1 -> 2 handoff marked
+file baseline/soak_watch_20261112.csv
+samples 179 (+0 UNREACHABLE, 0 malformed)  2026-11-12T12:47:36Z .. 2026-11-12T15:47:32Z  Pi uptime 1336s .. 12132s  covered 3.00 h
+
+PASS   C1 no sample lost: 0 UNREACHABLE
+PASS   C2 no reboot or panic: boot_ids ['0x2988a3c3'], uptime increasing: True
+PASS   C3 starved == 0: max starved 0
+PASS   C4 zero lock timeouts: max pta_lock_timeouts 0
+PASS   C5 heartbeat answered: states {'ANSWERED': 162, 'OPEN': 17} (OPEN = 9.5% of samples, a challenge awaiting its answer), max hb_miss 0
+PASS   C6 traffic keeps flowing: last_counter 1262 -> 109202, mean 10.00 frames/s (sender period 100 ms = 10/s), 0 pairs without progress
+
+PASS   C7 no alarm events after the first sample: baseline at first sample: TIMEOUT=1, LATE_ANSWER=1, AUTH_FAIL=0, REPLAY=0, COUNTER_GAP=0, TRAFFIC_RECOVERED=0, HEARTBEAT_RECOVERED=1; 0 rise(s) = false-positive candidates
+         2026-11-12T13:47:16Z  TIMEOUT +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  LATE_ANSWER +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  TRAFFIC_RECOVERED +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+PASS   C8 no ring loss: ev_lost at end 0
+PASS   C9 Core 1 poll age bounded: min 0 us, median 206 us, p99 449 us, max 449 us (limit 10000 us)
+
+OVERALL: ALL PASS
+
+# negative control: first 30 lines with planted faults (starved=1, lock timeouts=2, state LATE, hb_miss=1, one UNREACHABLE line)
+file /tmp/claude-1000/-home-aslam-Minor-Project/f112153c-b115-4166-bac3-5d10756ecfdb/scratchpad/neg.csv
+samples 29 (+1 UNREACHABLE, 0 malformed)  2026-11-12T12:47:36Z .. 2026-11-12T13:15:55Z  Pi uptime 1336s .. 3034s  covered 0.47 h
+
+FAIL   C1 no sample lost: 1 UNREACHABLE first at 2026-11-12T13:00:00Z
+PASS   C2 no reboot or panic: boot_ids ['0x2988a3c3'], uptime increasing: True
+FAIL   C3 starved == 0: max starved 1
+FAIL   C4 zero lock timeouts: max pta_lock_timeouts 2
+FAIL   C5 heartbeat answered: states {'ANSWERED': 25, 'OPEN': 3, 'LATE': 1} (OPEN = 10.3% of samples, a challenge awaiting its answer), max hb_miss 1
+PASS   C6 traffic keeps flowing: last_counter 1262 -> 18243, mean 10.00 frames/s (sender period 100 ms = 10/s), 0 pairs without progress
+
+PASS   C7 no alarm events after the first sample: baseline at first sample: TIMEOUT=1, LATE_ANSWER=1, AUTH_FAIL=0, REPLAY=0, COUNTER_GAP=0, TRAFFIC_RECOVERED=0, HEARTBEAT_RECOVERED=1; 0 rise(s) = false-positive candidates
+PASS   C8 no ring loss: ev_lost at end 0
+PASS   C9 Core 1 poll age bounded: min 47 us, median 230 us, p99 448 us, max 448 us (limit 10000 us)
+
+OVERALL: NOT all pass: read the lines marked FAIL / REVIEW; do not call this a clean soak
