@@ -27,7 +27,7 @@ mkdir -p "$MNT"; mount "$PART" "$MNT"
 
 echo "Copying ..."
 rsync -a --info=progress2 "$SRC/SD_Card_Backups" "$MNT/"
-rsync -a "$SRC/Part_E_Verification/source_backups" "$MNT/"
+rsync -a "$SRC/source_backups" "$MNT/"
 cp "$BUNDLE" "$MNT/minor_project_repo.bundle"
 sync
 
