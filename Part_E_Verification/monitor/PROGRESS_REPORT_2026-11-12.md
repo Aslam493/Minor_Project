@@ -21,7 +21,7 @@ A **detection-only** secure CAN monitor on Raspberry Pi 3 B (TF-A + OP-TEE 4.10 
 | C8 | Testing and final report | **Not started** (no `RESULTS.md`; no 1-hour or overnight soak yet) | |
 
 ## 4. Verified numbers
-Host harness (real sources, ASan + UBSan): 434 checks flag off, 1493 TEST_STATS, 451 with the UART flag, 0 failed. Static checks: 58 pass on source, 61 with object code on the built images. Mutation: 141/144 caught (2026-11-09, not re-run on the C6 source changes); the U1 planted bugs: 5 of 5 caught. Board: C5 26 PASS / 0 FAIL / 1 skip; C6 idle caps 6 PASS; F24 flood runs at 0/3/8/24 PTA flooders.
+Host harness (real sources, ASan + UBSan): 434 checks flag off, 1493 TEST_STATS, 451 with the UART flag, 0 failed. Static checks: 58 pass on source, 61 with object code on the built images. Mutation: 141/144 caught, re-run on the post-C6 sources on 2026-11-12 (monitor/source_tests/mutation_c6_20261112.txt; same 3 equivalent survivors); the U1 planted bugs: 5 of 5 caught. Board: C5 26 PASS / 0 FAIL / 1 skip; C6 idle caps 6 PASS; F24 flood runs at 0/3/8/24 PTA flooders.
 
 ## 5. Issues found and what happened
 | Issue | Status |
