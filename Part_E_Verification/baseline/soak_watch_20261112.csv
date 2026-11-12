@@ -1,2 +1,3 @@
 utc,uptime_s,boot_id,flags,last_counter,hb_seq,hb_state,hb_miss,ev_seq,ev_lost,skip_total,pta_lock_timeouts,poll_age_us,starved,v_frame,v_hb,n_TIMEOUT,n_LATE_ANSWER,n_AUTH_FAIL,n_REPLAY,n_COUNTER_GAP,n_COUNTER_RESYNC,n_TRAFFIC_RECOVERED,n_HEARTBEAT_RECOVERED
 2026-11-12T12:47:36Z,1336.19,0x2988a3c3,0x07,1262,1336,ANSWERED,0,6,0,15,0,208,0,264,27,1,1,0,0,0,1,0,1
+2026-11-12T12:48:37Z,1396.81,0x2988a3c3,0x07,1868,1397,ANSWERED,0,6,0,29,0,386,0,870,88,1,1,0,0,0,1,0,1
