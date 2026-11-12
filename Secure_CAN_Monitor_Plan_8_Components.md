@@ -250,3 +250,5 @@ The user delegated the open decisions ('according to you do that'): no coalescin
 
 
 2026-11-12 (late): off-laptop backup made on a 4 GB card (label PIBACKUP: SD_Card_Backups 42 files verified identical by SHA256, repo bundle, source_backups; card since removed); mutation test re-run on the post-C6 sources: 141 of 144 caught, same 3 equivalent survivors, one mutant anchor updated (`monitor/source_tests/mutation_c6_20261112.txt`); `tools/monitor_client/analyze_soak.py` written and tested on the partial soak CSV and on a faulted copy (`baseline/analyze_soak_selftest_20261112.txt`). Soak still running; no soak result yet.
+
+2026-11-13 (C8): soaks stopped by hand after 1 h + 6.3 h (planned 10 h) at the user's request. 7.27 h in the CSV, one boot, starved 0, lock timeouts 0, heartbeat never missed, no alarm event in steady state; the only events were start-up, the soak 1 -> 2 hand-over pause, and the stop. One of 432 monitoring samples was lost (SSH, cause unknown). Soak 2 has no tool summary (killed). `verify_boot` after: 16 pass, 0 FAIL, 2 skip. Pi /tmp cleaned. Evidence: `Part_E_Verification/RESULTS.md` sections 6 and 7, `baseline/soak_analysis_20261113.txt`.

@@ -96,8 +96,8 @@ Event list of the monitor after the run (`baseline/soak_events_after_stop_202611
 | Seq | Event | Cause |
 |---|---|---|
 | 1 | TIMEOUT detail 3 (consumer never started) | normal at boot, before any consumer |
-| 2, 3 | LEGACY_CMD_REFUSED | refused legacy calls from the earlier negative tests (before the soak) |
-| 4, 5, 6 | COUNTER_RESYNC, LATE_ANSWER, HEARTBEAT_RECOVERED | start of soak 1 (sender counter starts at 1,000; the first answer was late) |
+| 2, 3 | LEGACY_CMD_REFUSED | two refused legacy calls about 1,063 s and 1,094 s after boot, before the soak started; the caller was not recorded (probably the pre-soak checks) |
+| 4, 5, 6 | COUNTER_RESYNC, LATE_ANSWER, HEARTBEAT_RECOVERED | start of soak 1: the sender's first frames, and the first heartbeat answer was late (the LATE_ANSWER came 12 ms after the resync) |
 | 7, 8, 9 | TIMEOUT (traffic), TRAFFIC_RECOVERED, LATE_ANSWER | the hand-over from soak 1 to soak 2: the sender really stopped for about 2 s plus start-up. Correct detections. |
 | 10, 11 | TIMEOUT (traffic), TIMEOUT (heartbeat) | **I stopped the soak.** The traffic timeout fired, then the heartbeat timeout about 2.6 s later (after 3 misses). Correct detections, shown by `hb_miss_count 8` and flags 0x1f afterwards. |
 
@@ -106,7 +106,7 @@ After the stop I removed the test files from the Pi's `/tmp` and ran `verify_boo
 ## 7. False positives and missed detections
 From the soaks:
 - **No alarm event appeared during steady state.** Between the start-up of soak 1 and the stop, the only events were the start-up artefacts, the hand-over pause and my stop (all in the table above). That is no false positive in about 7.27 h of software-injected traffic at 10 frames/s, with nothing else loading the PTA. It is not a claim of "no false alarms": a different load can produce them.
-- **One late heartbeat answer at the start of soak 1** (also in earlier soaks). Likely the responder was not yet running when the first challenge was issued; this is not proven.
+- **One late heartbeat answer at the start of soak 1** (also in earlier soaks). The cause is not proven; it is the first answer of each run, so a start-up effect of the test tool is the likely reason.
 - The late answer at the hand-over has an obvious cause: the responder was not running for about 2 s.
 Known from earlier work:
 - **False traffic alarms under PTA contention** (F24): frames delayed beyond 300 ms produce `TIMEOUT` and `TRAFFIC_RECOVERED` although the sender was on time.
