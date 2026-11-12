@@ -20,6 +20,17 @@ Principle: a verified working state beats new features. The Pi runs a proven ima
 | D-E | Pushes | After each unit: top-level repo to `origin nov-2026-backup` (your instruction). **Nested repos are NEVER pushed: their remotes are the public upstream projects (OP-TEE, TF-A); `source_backups/README.md` forbids it (CORRECTED, I had offered 'on your explicit OK').** Backup = the bundles in `source_backups/`, refreshed each unit. | Top-level only; bundles refreshed. |
 | D-F | Soaks use software-injected frames (no CAN sender) | They test the monitor, not the bus. Stated in `RESULTS.md`. | Accept. |
 
+## 1a. Decisions taken 2026-11-12 (the user delegated them: 'according to you do that'; they can be overruled)
+| # | Decision | Why |
+|---|---|---|
+| D-A | **A: no coalescing change.** Documented limit: the limiter exists; the ring wraps only if events stay unread. | No defect found; a Secure World change this late costs a card swap and a full re-verification for no correctness gain. |
+| D-B | **C: drop the contention hint.** | A BUSY/skip-based hint would not have fired in the F24 data; the call-rate variant is a new heuristic inside Secure World. |
+| D-C | UART flag stays **off**; recorded as unverified on hardware. | No usable adapter connection. |
+| D-D | **No new image. The current proven hardened c16384 image (verified 2026-11-12) is frozen as the final one.** IDLE_EXPIRED stays built, host-tested, object-checked and NOT flashed (the T21 expiry-event wording remains a recorded deviation). | One fewer card swap the night before the evaluation; soaks start tonight on the final image. Reversible: a flash of the UART-off image can still be done if the user wants it. |
+| D-E | Top-level repo pushed to `origin nov-2026-backup` after each unit; nested repos never pushed. | README rule. |
+| D-F | Soaks use software-injected frames and a software heartbeat responder; stated in `RESULTS.md`. | No CAN sender. |
+**Consequence:** units U3, U4, U5 and U6 are NOT executed. Remaining: U7 (soaks, `RESULTS.md`) and U8 (C7 record).
+
 ## 2. Units (each: files and functions, rule, host tests first, board test, pass criteria, risk, rollback)
 
 ### U0. C5 formal close and status board (documentation only; no code, no board). **DONE 2026-11-12, commit `aa7ce98`**
