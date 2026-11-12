@@ -1,0 +1,10 @@
+M1 expired() uses >= (boundary off by one, early)
+    total: 434 checks, 2 failed | failing tests: 1 | caught by the NEW tests: ['T11b'] | all failing: ['FAIL T11b answer exactly at issue+D_req ']
+M2 expired() uses > limit+1 (boundary late by one tick)
+    total: 434 checks, 4 failed | failing tests: 2 | caught by the NEW tests: ['T11b', 'T11a'] | all failing: ['FAIL T11b answer exactly at issue+D_req ', 'FAIL T11a deadline race: Core 1 has not ']
+M3 heartbeat TIMEOUT only when miss_count == k
+    total: 434 checks, 2 failed | failing tests: 1 | caught by the NEW tests: ['T10b'] | all failing: ['FAIL T10b (audit O-10): miss_count alrea']
+M4 command 23 does not evaluate the deadline itself
+    total: 434 checks, 5 failed | failing tests: 3 | caught by the NEW tests: ['T11b', 'T11a'] | all failing: ['FAIL N23 command 23: stored-nonce compar', 'FAIL T11b answer exactly at issue+D_req ', 'FAIL T11a deadline race: Core 1 has not ']
+M5 a missed request is counted again by every Core 1 pass
+    total: 434 checks, 11 failed | failing tests: 6 | caught by the NEW tests: ['T11a'] | all failing: ['FAIL EV6/V12 heartbeat: k misses after t', 'FAIL N22 command 22: nonce against the i', 'FAIL N22-3 MISSED still returns the nonc', 'FAIL N23 command 23: stored-nonce compar']

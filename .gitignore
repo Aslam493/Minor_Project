@@ -28,3 +28,8 @@ SD_Card_Backups/
 Part_E_Verification/build_scratch/
 *.bak_*
 *.bak[0-9]*
+
+# compiled host-test binaries (rebuild with make in monitor/source_tests)
+Part_E_Verification/monitor/source_tests/harness
+Part_E_Verification/monitor/source_tests/harness_ts
+Part_E_Verification/monitor/source_tests/harness_uart

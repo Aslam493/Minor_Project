@@ -728,11 +728,54 @@ static void t_uart(void)
 }
 #endif
 
+/* ---- U1 (2026-11-12): C5 acceptance gaps found in the audit. Test-only: no source change.
+ * T11b exact deadline boundary (strict >, R17/O-11); T11a answer handler does the OPEN->MISSED step itself and Core 1 adds no second
+ * miss afterwards; T10b (plan meaning, audit O-10): misses already above k when the grace period ends still raise TIMEOUT once. */
+static void t_c5_gaps(void)
+{
+	uint32_t oa, ob; struct rpi3_mon_health_out h; uint32_t e; uint64_t t, N = 0x1122334455667788ull; uint32_t lo = (uint32_t)N, hi = (uint32_t)(N >> 32);
+	struct rpi3_mon_lstate *l;
+
+	begin("T11b answer exactly at issue+D_req is on time; one tick later is late (Core 1 and the answer handler use the same strict boundary)");
+	setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	e = take(); l = rpi3_mon_l(); rpi3_mon_hb_issue_if_due(l, t); l->hb_nonce = N; l->hb_nonce_valid = true; CHECK(l->hb_issue_ticks == t && l->hb_state == RPI3_MON_HB_OPEN);
+	rpi3_mon_evaluate(l, t + RPI3_MON_D_REQ_TICKS); CHECK(l->hb_state == RPI3_MON_HB_OPEN && l->hb_miss_count == 0);			/* Core 1 at exactly D_req: still open */
+	rpi3_mon_evaluate(l, t + RPI3_MON_D_REQ_TICKS + 1); CHECK(l->hb_state == RPI3_MON_HB_MISSED && l->hb_miss_count == 1); put(e);	/* one tick later: the miss */
+	setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	e = take(); l = rpi3_mon_l(); rpi3_mon_hb_issue_if_due(l, t); l->hb_nonce = N; l->hb_nonce_valid = true; put(e);
+	M.now = t + RPI3_MON_D_REQ_TICKS;
+	CHECK(rpi3_mon_cmd23(1, 0, lo, hi, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V23_ON_TIME && rpi3_mon.l.hb_state == RPI3_MON_HB_ANSWERED && rpi3_mon.l.hb_miss_count == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 0);
+	setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	e = take(); l = rpi3_mon_l(); rpi3_mon_hb_issue_if_due(l, t); l->hb_nonce = N; l->hb_nonce_valid = true; put(e);
+	M.now = t + RPI3_MON_D_REQ_TICKS + 1;
+	CHECK(rpi3_mon_cmd23(1, 0, lo, hi, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V23_LATE && rpi3_mon.l.hb_state == RPI3_MON_HB_LATE_ANSWERED && rpi3_mon.l.hb_miss_count == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 1);
+	end();
+
+	begin("T11a deadline race: Core 1 has not looked yet; the answer handler records the one miss, then LATE; Core 1 later adds no second miss");
+	setup(); M.daif = MON_DAIF_ALL; frozen(5000000000ull); t = M.now;
+	e = take(); l = rpi3_mon_l(); rpi3_mon_hb_issue_if_due(l, t); l->hb_nonce = N; l->hb_nonce_valid = true; CHECK(l->hb_state == RPI3_MON_HB_OPEN && l->hb_miss_count == 0); put(e);
+	M.now = t + RPI3_MON_D_REQ_TICKS + 1;										/* deadline passed, no Core 1 attempt has run */
+	CHECK(rpi3_mon_cmd23(1, 0, lo, hi, &oa, &ob, &h) == RPI3_MON_R_OK && oa == RPI3_MON_V23_LATE && rpi3_mon.l.hb_miss_count == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 1);
+	M.now = t + RPI3_MON_D_REQ_TICKS + 1000; rpi3_mon_core1_attempt(); M.now += 1000; rpi3_mon_core1_attempt();	/* Core 1 now evaluates, twice */
+	e = take(); l = rpi3_mon_l();
+	CHECK(l->hb_miss_count == 1 && l->hb_state == RPI3_MON_HB_LATE_ANSWERED && !l->hb_timeout_raised && l->ev_count[RPI3_MON_EV_TIMEOUT] == 0 && l->ev_count[RPI3_MON_EV_LATE_ANSWER] == 1); put(e);
+	CHECK(M.violations == 0); end();
+
+	begin("T10b (audit O-10): miss_count already above k when the grace period ends still raises TIMEOUT detail 2, exactly once");
+	setup(); M.daif = MON_DAIF_ALL; frozen(9000000000000ull); t = M.now;
+	rpi3_mon.init_ticks = t - RPI3_MON_G_TICKS + 10 * RPI3_MON_TICKS_PER_SEC;						/* the grace period ends 10 s from now */
+	e = take(); l = rpi3_mon_l(); l->hb_last_ok_ticks = 1; l->hb_miss_count = 55;						/* answered once, then 55 misses: far above k = 3 */
+	rpi3_mon_evaluate(l, t); CHECK(!l->hb_timeout_raised && l->ev_count[RPI3_MON_EV_TIMEOUT] == 0);			/* inside the grace period: nothing */
+	rpi3_mon_evaluate(l, t + 11 * RPI3_MON_TICKS_PER_SEC); CHECK(l->hb_timeout_raised && l->ev_count[RPI3_MON_EV_TIMEOUT] == 1 && l->pinned[RPI3_MON_EV_TIMEOUT * 4].detail == 2);
+	rpi3_mon_evaluate(l, t + 12 * RPI3_MON_TICKS_PER_SEC); rpi3_mon_evaluate(l, t + 40 * RPI3_MON_TICKS_PER_SEC); CHECK(l->ev_count[RPI3_MON_EV_TIMEOUT] == 1);	/* never repeated */
+	put(e); end();
+}
+
 int main(void)
 {
 	printf("Real-source host harness: rpi3_can_monitor.c + the PTA glue with a mock platform (NOT a board test)\n");
 	t_vectors(); t_init(); t_layout(); t_locks(); t_health(); t_events(); t_eval(); t_c17(); t_c18(); t_c19(); t_c20(); t_c21(); t_c22(); t_c23();
-	t_glue(); t_glue_cmds(); t_core1(); t_stall();
+	t_glue(); t_glue_cmds(); t_core1(); t_stall(); t_c5_gaps();
 #ifdef CFG_RPI3_CAN_MONITOR_UART
 	t_uart();
 #endif
