@@ -1,0 +1,11 @@
+soak: 3600 s, period 100 ms, 35999 ticks
+frame verdicts: ACCEPTED 35998 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 3599 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 75 p99 84 max 19912
+frame submit latency (us): p50 8916 p99 9786 max 85582
+end state: flags 0x07 last_counter 36998 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +1885 starved 0
+EXIT 0
+----
+Thu Jan  1 01:21:51 UTC 1970
+after kill: 1
+Thu Jan  1 07:38:38 UTC 1970

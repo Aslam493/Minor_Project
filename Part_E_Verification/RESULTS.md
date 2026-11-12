@@ -1,6 +1,6 @@
 # RESULTS: Secure CAN Monitor (detection only) on Raspberry Pi 3 B
 
-**Status: DRAFT of 2026-11-12 evening. Sections 6 and 7 are PENDING until the soak chain on the Pi finishes (expected about 05:20 IST on 2026-11-13). Nothing in them is a result yet.**
+**Status: 2026-11-13. All sections filled. The soaks were shorter than planned (1 h and 6.3 h), one monitoring sample was lost, and soak 2 has no tool summary; see section 6.**
 
 **Read this first.** This is a *detection-only* monitor. The Raspberry Pi 3 has no TZASC, so Secure World cannot stop Linux from doing anything. The keys are prototype values readable by root Linux. The event log is RAM-only, with no hash chain. **Every frame the monitor has judged so far was either CAN loopback or injected through the PTA by a software sender; no result here is evidence about a real CAN bus.** The independent second CAN path (Design 2, chip B) is **not built**.
 
@@ -32,7 +32,7 @@ Design 1 ("Mode F") only: Linux forwards frames to Secure World; Secure World ch
 | C5 | Heartbeat and traffic deadline | Board: 26 PASS, 0 FAIL, 1 skip; two real reboots | `baseline/c5_board_tests_run2_full_20261112.txt` |
 | C6 | Hardening | Idle caps 6 PASS; negative tests 12 PASS; two Secure World changes written but not flashed | `baseline/c6_negative_idle_caps_20261112.txt`, `baseline/c6_negative_raw_run2_20261112.txt` |
 | C7 | Independent CAN | **Designed, not built** | `monitor/COMPONENT_7_DESIGNED_NOT_BUILT.md` |
-| C8 | This report and the soaks | In progress | this file |
+| C8 | This report and the soaks | Done with deviations (soak 2 stopped at 6.3 h; 1 sample lost) | this file, `baseline/soak_analysis_20261113.txt` |
 
 ## 4. What the monitor detects (board-verified, software-injected frames)
 All of the following were run on the Pi (`baseline/c5_board_tests_run2_full_20261112.txt`):
@@ -73,13 +73,43 @@ F24, 60 s runs with a software sender, the heartbeat responder, and N loops call
 | 24 | 1.18 s | 8 of 92 | 149 |
 The monitor itself stayed healthy in all runs (`starved=0`, no lock timeouts). The effect is visible as false traffic alarms and late-answer events. At 24 flooders the sender process was also starved of CPU, so part of that run's lateness is Linux scheduling, not the PTA.
 
-## 6. Soak results: PENDING
-To be filled from `baseline/soak_watch_20261112.csv` (a sample every 60 s) and the end-of-run summaries on the Pi (`/tmp/soak_1.out`, `/tmp/soak_2.out`). Planned: 1 hour, then 10 hours; software sender (frames injected through the PTA, period 100 ms, **not CAN-bus traffic**) plus the heartbeat responder; no faults injected. Pass criteria fixed in advance: zero BUSY after retries, zero lock timeouts, `starved=0` throughout, no panic or reboot, every heartbeat answer on time except possibly the first one after the start, Core 1 poll age bounded.
+## 6. Soak results (2026-11-12 evening to 2026-11-13 night)
+Setup: a software sender (frames injected through the PTA, period 100 ms, **not CAN-bus traffic**) plus the heartbeat responder in one process on the Pi, no faults injected. A laptop sampled the monitor every 60 s over SSH (`baseline/soak_watch_20261112.csv`, 431 samples) and `analyze_soak.py` judged it against criteria fixed beforehand (`baseline/soak_analysis_20261113.txt`).
 
-## 7. False positives and missed detections: PENDING for the soak part
-Known already:
+**Deviation from the plan: the soaks were 1 h and 6.3 h, not 1 h and 10 h.** The 10-hour soak was stopped by hand after 22,607 s (Pi clock 01:21:51 to 07:38:38) because the user judged about 7 h enough. Total observed: 7.27 h, one boot, no reboot. Stopping the processes was the only intervention.
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| Frames flowing | counter 1,262 to 262,945 in the CSV, exactly 10.00 frames/s, no pair of samples without progress | analysis C6 |
+| Same boot, no panic or reboot | one boot_id, uptime increasing | C2 |
+| `starved == 0` in every sample | yes | C3 |
+| Zero PTA lock timeouts in every sample | yes (BUSY after retries was 0 in soak 1's own summary; for soak 2 the tool's summary was lost, see below, and a BUSY return would have raised this counter, so zero here implies zero BUSY: an inference, not a measurement) | C4 |
+| Heartbeat answered | 392 samples ANSWERED, 39 OPEN (a challenge awaiting its answer, 9.0%), `hb_miss` 0 in every sample | C5 |
+| Event ring | `ev_lost` 0 | C8 |
+| Core 1 poll age bounded | median 222 us, p99 448 us, max 449 us | C9 |
+| **No sample lost** | **FAIL: 1 of 432 sampling attempts (18:47:55Z) was UNREACHABLE.** The next sample, 70 s later, shows the counter advanced by 1,310 in 131 s, so the Pi and the soak kept running; the SSH sample failed. The cause is not known. | C1 |
+
+Soak 1 end-of-run summary from the tool (`baseline/soak_stop_and_soak1_summary_20261113.txt`): 3,600 s, 35,998 frames ACCEPTED, 1 RESYNC (start of the run), GAP, MALFORMED, AUTH_FAIL, REPLAY, DUPLICATE, CONFLICT all 0, BUSY 0, heartbeat answers 3,599 on time and 1 late; send lateness vs the absolute deadline p50 75 us, p99 84 us, max 19.9 ms; frame submit latency p50 8.9 ms, p99 9.8 ms, max 85.6 ms.
+**Soak 2 has no end-of-run summary.** `mon_client` has no signal handler, so killing it lost its summary. For soak 2 the CSV and the monitor's own event list are the only evidence.
+
+Event list of the monitor after the run (`baseline/soak_events_after_stop_20261113.txt`), 11 events, none lost:
+| Seq | Event | Cause |
+|---|---|---|
+| 1 | TIMEOUT detail 3 (consumer never started) | normal at boot, before any consumer |
+| 2, 3 | LEGACY_CMD_REFUSED | refused legacy calls from the earlier negative tests (before the soak) |
+| 4, 5, 6 | COUNTER_RESYNC, LATE_ANSWER, HEARTBEAT_RECOVERED | start of soak 1 (sender counter starts at 1,000; the first answer was late) |
+| 7, 8, 9 | TIMEOUT (traffic), TRAFFIC_RECOVERED, LATE_ANSWER | the hand-over from soak 1 to soak 2: the sender really stopped for about 2 s plus start-up. Correct detections. |
+| 10, 11 | TIMEOUT (traffic), TIMEOUT (heartbeat) | **I stopped the soak.** The traffic timeout fired, then the heartbeat timeout about 2.6 s later (after 3 misses). Correct detections, shown by `hb_miss_count 8` and flags 0x1f afterwards. |
+
+After the stop I removed the test files from the Pi's `/tmp` and ran `verify_boot` (`baseline/verify_boot_after_soak_20261113.txt`): 16 pass, 0 FAIL, 2 skipped. The monitor stays in its timed-out state until the next reboot.
+
+## 7. False positives and missed detections
+From the soaks:
+- **No alarm event appeared during steady state.** Between the start-up of soak 1 and the stop, the only events were the start-up artefacts, the hand-over pause and my stop (all in the table above). That is no false positive in about 7.27 h of software-injected traffic at 10 frames/s, with nothing else loading the PTA. It is not a claim of "no false alarms": a different load can produce them.
+- **One late heartbeat answer at the start of soak 1** (also in earlier soaks). Likely the responder was not yet running when the first challenge was issued; this is not proven.
+- The late answer at the hand-over has an obvious cause: the responder was not running for about 2 s.
+Known from earlier work:
 - **False traffic alarms under PTA contention** (F24): frames delayed beyond 300 ms produce `TIMEOUT` and `TRAFFIC_RECOVERED` although the sender was on time.
-- **One late heartbeat answer at the start of a soak** appears in earlier soaks (`ON_TIME 60 LATE 1`); to be confirmed or explained from the new soaks.
 - No claim of "no false alarms" is made.
 Missed detections by construction: delays shorter than the deadline; exact retransmission of a valid frame is indistinguishable from a replay; a sender restart looks like a replay storm until the monitor reboots; a root Linux can stop answering, or disable the path, without anything outside noticing.
 
