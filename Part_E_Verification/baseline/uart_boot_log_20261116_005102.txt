@@ -286,3 +286,23 @@
 19:24:32.331 D/TC:? 0 tee_ta_init_session_with_context:570 Re-open trusted service 9a986af1-048a-44a8-b984-1e902290d63c
 19:24:32.343 D/TC:? 0 tee_ta_close_session:513 id 1
 19:24:32.349 D/TC:? 0 tee_ta_close_session:527 Destroy session
+19:27:21.794 Stopping sshd: stopped /usr/sbin/sshd (pid 168)
+19:27:21.796 OK
+19:27:21.808 Stopping crond: stopped /usr/sbin/crond (pid 163)
+19:27:21.810 OK
+19:27:21.825 Stopping dhcpcd...
+19:27:21.831 stopped /sbin/dhcpcd (pid 140)
+19:27:21.888 Stopping network: OK
+19:27:21.907 Stopping tee-supplicant: FAIL
+19:27:21.915 Stopping CAN interfaces: OK
+19:27:21.962 Stopping modules: OK
+19:27:21.983 Stopping klogd: stopped /sbin/klogd (pid 98)
+19:27:21.984 OK
+19:27:22.007 Stopping syslogd: stopped /sbin/syslogd (pid 94)
+19:27:22.009 OK
+19:27:22.045 Seeding 256 bits and crediting
+19:27:22.050 Saving 256 bits of creditable seed for next boot
+19:27:22.086 umount: devtmpfs busy - remounted read-only
+19:27:22.484 [  250.016986] EXT4-fs (mmcblk0p2): re-mounted 42d17940-e4c3-4d7c-aed8-b64b4d3b46f1 ro. Quota mode: none.
+19:27:23.501 The system is gSent SIGKILL to all processes
+19:27:23.503 Requesting system poweroff
