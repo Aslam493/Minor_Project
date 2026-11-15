@@ -16,20 +16,20 @@ sample() {  # $1 = n
     /health:/ {for(k=1;k<=NF;k++){ if($k ~ /^init_ok=/){split($k,a,"="); io=a[2]} if($k ~ /^starved=/){split($k,a,"="); sv=a[2]}}}
     END {printf "%s,%s,%s,%s,%s,%s,%s,\n", n, t, up, b, f, io, sv}' >> "$OUT"
 }
-wait_up() {  # wait until ssh answers with uptime < 200 s
+wait_up() {  # wait until ssh answers; with $1 = fresh also require uptime < 200 s (a new boot)
   for ((s = 0; s < 240; s += 5)); do
     u=$($SSH 'cut -d" " -f1 /proc/uptime' 2>/dev/null | cut -d. -f1)
-    [ -n "$u" ] && [ "$u" -lt 200 ] && return 0
+    if [ -n "$u" ] && { [ "$1" != fresh ] || [ "$u" -lt 200 ]; }; then return 0; fi
     sleep 5
   done
   return 1
 }
-wait_up || { echo "Pi not reachable"; exit 1; }
+wait_up any || { echo "Pi not reachable"; exit 1; }
 sleep 20; sample 0     # the boot we are on now
 for ((i = 1; i <= N; i++)); do
   $SSH 'sync; reboot' >/dev/null 2>&1
   sleep 25                       # let it go down
-  wait_up || { echo "$i,$(date -u +%FT%TZ),,,,,,NOT_BACK_IN_240S" >> "$OUT"; echo "STOP: Pi not back after reboot $i"; exit 1; }
+  wait_up fresh || { echo "$i,$(date -u +%FT%TZ),,,,,,NOT_BACK_IN_240S" >> "$OUT"; echo "STOP: Pi not back after reboot $i"; exit 1; }
   sleep 20                       # let the monitor and tee-supplicant settle
   sample "$i"
   echo "reboot $i/$N: $(tail -1 "$OUT")"
