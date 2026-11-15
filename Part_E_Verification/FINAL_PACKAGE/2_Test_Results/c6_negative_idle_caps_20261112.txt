@@ -1,0 +1,12 @@
+== C6 negative tests, command 21 (idle lease caps)
+start: idle_uses 0, flags 0x07
+  PASS  N1     mode 2 / on with 0 ms / off with 100 ms -> BAD_PARAMETERS (0xffff0006 0xffff0006 0xffff0006), idle_uses unchanged (0), no lease
+  PASS  N2     off with no lease -> NO_CHANGE (expected NO_CHANGE)
+  PASS  N3     request 120000 ms -> GRANTED, remaining 60000 ms (clamped to the 60000 ms cap)
+  PASS  N4     lease active, request 5000 then 1000 ms -> RENEWED, RENEWED, remaining 1000 ms (replaced, not 6000)
+  PASS  N4b    off with an active lease -> RETURNED (expected RETURNED)
+  PASS  N5     use cap: 13 more uses granted (idle_uses 3 -> 16, cap 16), 7 requests REFUSED_CAP, LEASE_REFUSED +7
+  note  N5     the per-boot use cap is now exhausted: idle mode stays refused until the board is rebooted
+end: flags 0x07 idle_uses 16 starved=0
+SUMMARY: 6 PASS, 0 FAIL, 1 note
+exit=0

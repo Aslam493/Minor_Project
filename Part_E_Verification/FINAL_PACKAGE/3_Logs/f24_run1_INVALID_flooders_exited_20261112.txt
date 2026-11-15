@@ -1,0 +1,40 @@
+# INVALID RUN - kept for the record. The flooders exited immediately (pta_latency accepts 100..200000 calls, the script passed 2000000), so this was a second 0-flooder baseline, NOT a 3-flooder test. Repeated as f24_run1b_N3_20261112.txt.
+# F24 run: N=3 flooders, soak 60s, 2026-11-12T01:34:02+05:30
+## before
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 18063861358 core1_poll_age_ticks 5970 poll_count 33639492538
+  skip_count 0 skip_total 23 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 1598 hb_seq 923 hb_state OPEN hb_miss_count 9 idle_uses 0
+  traffic_age_ticks 181283256 hb_last_ok_age_ticks 198337637 lease_remaining_ticks 0
+  ev_seq 5 ev_ack 0 ev_lost 0 pinned_used 3
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=23
+ 00:15:22 up 15 min,  load average: 0.00, 0.00, 0.00
+flooders started: 3
+ 00:15:26 up 15 min,  load average: 0.00, 0.00, 0.00
+## soak (heartbeat responder + software frame sender, period 100 ms)
+soak: 60 s, period 100 ms, 599 ticks
+frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 60 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 75 p99 79 max 83
+frame submit latency (us): p50 8515 p99 9475 max 10228
+end state: flags 0x07 last_counter 2197 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +27 starved 0
+soak_exit=0
+flooders stopped
+ 00:16:29 up 16 min,  load average: 0.00, 0.00, 0.00
+## after
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 19357866346 core1_poll_age_ticks 8069 poll_count 36096703419
+  skip_count 0 skip_total 50 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 2197 hb_seq 990 hb_state MISSED hb_miss_count 3 idle_uses 0
+  traffic_age_ticks 62776746 hb_last_ok_age_ticks 70230955 lease_remaining_ticks 0
+  ev_seq 10 ev_ack 0 ev_lost 0 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=50
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352987026
+seq 2 COUNTER_RESYNC       counter 1000 detail 0 ticks 16734412378
+seq 3 HEARTBEAT_RECOVERED  counter 854 detail 0 ticks 16734630619
+seq 4 TIMEOUT              counter 0 detail 1 ticks 17888343302
+seq 5 TIMEOUT              counter 0 detail 2 ticks 17931879899
+  returned 5, more=1, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=50
+[    0.000000] printk: debug: ignoring loglevel setting.
+[    7.794799] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0

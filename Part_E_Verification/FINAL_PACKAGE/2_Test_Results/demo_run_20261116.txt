@@ -1,0 +1,85 @@
+
+==================================================================
+1. The monitor is alive in Secure World (OP-TEE), Core 1 is polling it
+==================================================================
+page 0: version 1 length 128 boot_id 0x946da5d7 flags 0x13 mode 0
+  now_ticks 9158675609 core1_poll_age_ticks 677 poll_count 16728097623
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+(events already in the ring before the demo: 1)
+
+==================================================================
+2. HEALTHY TRAFFIC for 8 s: a software sender (100 ms period) + heartbeat responder, valid frames only
+==================================================================
+soak: 8 s, period 100 ms, 79 ticks
+frame verdicts: ACCEPTED 78 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 8 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 75 p99 83 max 83
+frame submit latency (us): p50 8920 p99 9407 max 9407
+end state: flags 0x07 last_counter 1078 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +2 starved 0
+last accepted counter now: 1078
+--- now the sender is stopped; we inject faults ourselves, one frame at a time ---
+
+==================================================================
+3. A valid frame (counter L+1) is accepted
+==================================================================
+verdict ACCEPTED (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=2
+
+==================================================================
+4. TAMPERED frame (one bit of the authentication tag flipped) -> must be rejected
+==================================================================
+verdict AUTH_FAIL (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=2
+
+==================================================================
+5. The same frame again, a repeat of an old counter -> DUPLICATE
+==================================================================
+verdict DUPLICATE (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=3
+
+==================================================================
+6. An older counter (replay) -> REPLAY
+==================================================================
+verdict REPLAY (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=3
+
+==================================================================
+7. A skipped counter (jump of 20) -> GAP
+==================================================================
+verdict GAP (detail 20)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=3
+
+==================================================================
+8. Wrong CAN id (0x124) -> MALFORMED
+==================================================================
+verdict MALFORMED (detail 3)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=3
+
+==================================================================
+9. Heartbeat: Secure World asks, Linux must answer the fresh challenge in time
+==================================================================
+hb_seq 468 answered: ON_TIME (detail 0)
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=3
+
+==================================================================
+10. SILENCE: nobody sends frames and nobody answers the heartbeat for 5 s
+==================================================================
+  skip_count 0 skip_total 3 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 1100 hb_seq 473 hb_state OPEN hb_miss_count 4 idle_uses 0
+  traffic_age_ticks 98707682 hb_last_ok_age_ticks 97035707 lease_remaining_ticks 0
+
+==================================================================
+11. What the monitor recorded (the events; severity and cause are in the event name and detail)
+==================================================================
+seq 2 COUNTER_RESYNC       counter 1000 detail 0 ticks 9163098839
+seq 3 LATE_ANSWER          counter 459 detail 0 ticks 9163332835
+seq 4 HEARTBEAT_RECOVERED  counter 460 detail 0 ticks 9165249727
+seq 5 AUTH_FAIL            counter 1080 detail 0 ticks 9315606189
+seq 6 REPLAY               counter 1079 detail 2 ticks 9316451096
+seq 7 REPLAY               counter 1073 detail 1 ticks 9317351940
+seq 8 COUNTER_GAP          counter 1100 detail 20 ticks 9318210763
+seq 9 MALFORMED            counter 1101 detail 3 ticks 9318988497
+seq 10 TIMEOUT              counter 0 detail 1 ticks 9323975488
+seq 11 TIMEOUT              counter 0 detail 2 ticks 9385767379
+
+(events 1..1 were there before the demo)

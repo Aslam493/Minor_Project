@@ -1,0 +1,98 @@
+board_full_check  1970-01-01 00:01:26 UTC  host buildroot  kernel 6.7.0-rc6-v8  uptime 86 s
+tools: /tmp   log: /tmp/board_check_19700101T000126Z.txt
+
+== B  Boot and hardware
+  PASS   B1 kernel is 6.7.0-rc6-v8 (6.7.0-rc6-v8)
+  PASS   B2 OP-TEE reports its revision: optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS   B3 OP-TEE driver initialised
+  PASS   B4 no OP-TEE error in the kernel log
+  PASS   B5 /dev/tee0 and /dev/teepriv0 exist
+  PASS   B6 tee-supplicant is running
+  PASS   B7 legacy Core 1 heartbeat rising: 3170013124 -> 3244595366
+  PASS   B8 PTA answers (FIQ count read)
+  PASS   B9 FIQ not armed (FIQ_CONTROL 0x00000000)
+  PASS   B10 can0 exists and is up
+  PASS   B11 mcp251xfd initialised the MCP2518FD on can0
+  PASS   B12 no SPI CRC errors from the CAN driver
+
+== C  Isolation settings (Linux side)
+  PASS   C1 Linux CPUs online = 0,2-3, Core 1 never runs Linux ('0,2-3')
+  PASS   C2 kernel log: CPU1 failed to come online (held by the TF-A divert)
+  PASS   C3 secure DRAM 0x10000000-0x10ffffff (TF-A + OP-TEE, N-04) is reserved in /proc/iomem
+  PASS   C4 shared-memory pool 0x08000000-0x09ffffff is reserved in /proc/iomem
+  PASS   C5 /dev/tee0 has no world access (crw-rw---- root teeclnt)
+  PASS   C6 group teeclnt has no members (F24: only root can call the TEE)
+
+== D  Monitor health
+  PASS   D1 monitor initialised: init_ok=1
+  PASS   D2 Core 1 not starved: starved=0
+  PASS   D3 no PTA lock timeouts: 0
+  PASS   D4 Core 1 last poll 0 ms ago (limit 10 ms)
+  PASS   D5 Core 1 polls on its own: poll_count 3253281673 -> 3294756064 in 1 s, no Linux help
+  PASS   D6 past the 60 s boot grace (uptime 89 s), timeouts are live
+  note   event log before section E: ev_seq 1, ev_lost 0
+
+== E  Detection, step by step (software-injected frames, ID 0x123)
+  PASS   E1 first frame since boot (1) -> RESYNC: RESYNC 0
+  PASS   E2 valid next frame (2) -> ACCEPTED: ACCEPTED 0
+  PASS   E3 one tag bit flipped -> AUTH_FAIL (AUTH_FAIL 0), last_counter stays 2 (2)
+  PASS   E4 same frame again (2) -> DUPLICATE: DUPLICATE 0
+  PASS   E5 same counter, different payload -> CONFLICT: CONFLICT 0
+  SKIP   E6 replay needs last_counter >= 4
+  PASS   E7 wrong CAN id 0x124 -> MALFORMED: MALFORMED 3
+  PASS   E8 rejected frames never moved the counter: last_counter 2 = 2
+  PASS   E9 counter jumps 2 -> 8 -> GAP detail 5 (5 frames missing): GAP 5
+  PASS   E10 after the gap the next frame (9) is ACCEPTED: ACCEPTED 0
+  PASS   E11 1 s of silence -> traffic TIMEOUT (detail 1) from Core 1; traffic age 1098 ms (deadline 300 ms)
+  PASS   E12 traffic resumes -> ACCEPTED (ACCEPTED 0) and TRAFFIC_RECOVERED event
+  PASS   E13 Secure World issues fresh challenges: hb_seq 95 -> 97, nonce 0x0000000000000000 -> 0x3a2fd89d46a09515
+  PASS   E14 Normal World answers a fresh challenge -> ON_TIME: hb_seq 98 answered: ON_TIME (detail 0)
+  PASS   E15 answer again without a new challenge -> nothing to answer: no open challenge (state ANSWERED, hb_seq 98): nothing to answer
+  PASS   E16 responder silent 5 s -> hb_state OPEN, misses 4 (>=3), heartbeat TIMEOUT (detail 2) from Core 1
+  PASS   E17 responder back -> hb_seq 104 answered: ON_TIME (detail 0), HEARTBEAT_RECOVERED, miss count 0
+  PASS   E18 every detection is in the Secure World event log (AUTH_FAIL REPLAY MALFORMED COUNTER_GAP TRAFFIC_RECOVERED TIMEOUT HEARTBEAT_RECOVERED)
+         seq 2 HEARTBEAT_RECOVERED  counter 92 detail 0 ticks 2098649854
+         seq 3 COUNTER_RESYNC       counter 1 detail 0 ticks 2102398880
+         seq 4 AUTH_FAIL            counter 3 detail 0 ticks 2104284140
+         seq 5 REPLAY               counter 2 detail 2 ticks 2106341265
+         seq 6 REPLAY               counter 2 detail 3 ticks 2107321830
+         seq 7 MALFORMED            counter 3 detail 3 ticks 2108171324
+         seq 8 TIMEOUT              counter 0 detail 1 ticks 2109117911
+         seq 9 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 2110248026
+         seq 10 COUNTER_GAP          counter 8 detail 5 ticks 2110248026
+         seq 11 TIMEOUT              counter 0 detail 1 ticks 2116976058
+         seq 12 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 2134287539
+         seq 13 TIMEOUT              counter 0 detail 1 ticks 2140050692
+         seq 14 TIMEOUT              counter 0 detail 2 ticks 2164887978
+         seq 15 HEARTBEAT_RECOVERED  counter 98 detail 0 ticks 2214615156
+         seq 16 TIMEOUT              counter 0 detail 2 ticks 2280119880
+         seq 17 HEARTBEAT_RECOVERED  counter 104 detail 0 ticks 2329485086
+
+== F  Full regression and negative tests
+       SKIP  T4b    frame length 43/45 cannot be sent through the fixed 44-byte client API (covered by the host harness, command 17 length checks)
+       FAIL  T21d   lease expiry is reported as MODE_CHANGED detail 2 (IDLE_EXPIRED, C6 image); LEASE_GRANTED +1. On an older image the expiry shows detail 0 and this check FAILS
+  KNOWN  F1 c5_board_tests: SUMMARY: 25 PASS, 1 FAIL, 5 note, 1 skip. Only T21d failed: IDLE_EXPIRED is not flashed on the frozen image (use --c6-image after flashing C6)
+  PASS   F2 legacy/debug commands refused, bad parameters rejected (T25): SUMMARY: 12 PASS, 0 FAIL, 0 note
+  PASS   F3 idle-lease caps (C6 negative): 6 PASS, 0 FAIL
+
+== G  Soak (sender 10 frames/s + heartbeat responder)
+     soak: 60 s, period 100 ms, 599 ticks
+     frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+     heartbeat answers: ON_TIME 60 LATE 0 other 0
+     send lateness vs absolute deadline (us): p50 75 p99 80 max 84
+     frame submit latency (us): p50 8540 p99 9455 max 10293
+     end state: flags 0x07 last_counter 820 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +24 starved 0
+  PASS   G1 frames: ACCEPTED 599 (+RESYNC 0) of ~600, wrong verdicts 0, BUSY 0, errors 0
+  PASS   G2 heartbeat: ON_TIME 60, LATE 0 (first answer may be late), other 0
+  PASS   G3 no lock timeouts (+0) and no starvation (0) under load
+
+== H  After the run
+  PASS   H1 monitor still healthy: init_ok=1 starved=0 lock timeouts 0 ev_lost 12
+  PASS   H2 Core 1 still running: heartbeat 7232227958 -> 7270380946, FIQ still unarmed
+
+== SUMMARY
+48 PASS, 0 FAIL, 1 KNOWN, 1 SKIP
+Scope: software-injected frames through the PTA (not CAN-bus traffic); prototype keys; detection only; Pi 3 has no TZASC.
+Test events are now in the monitor's RAM log: reboot for a clean state. Remove the key when done: rm /tmp/kf
+Log: /tmp/board_check_19700101T000126Z.txt
+EXIT 0

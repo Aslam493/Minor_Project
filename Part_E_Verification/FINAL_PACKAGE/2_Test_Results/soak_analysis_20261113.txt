@@ -1,0 +1,18 @@
+file baseline/soak_watch_20261112.csv
+samples 431 (+1 UNREACHABLE, 0 malformed)  2026-11-12T12:47:36Z .. 2026-11-12T20:03:47Z  Pi uptime 1336s .. 27507s  covered 7.27 h
+
+FAIL   C1 no sample lost: 1 UNREACHABLE first at 2026-11-12T18:47:55Z
+PASS   C2 no reboot or panic: boot_ids ['0x2988a3c3'], uptime increasing: True
+PASS   C3 starved == 0: max starved 0
+PASS   C4 zero lock timeouts: max pta_lock_timeouts 0
+PASS   C5 heartbeat answered: states {'ANSWERED': 392, 'OPEN': 39} (OPEN = 9.0% of samples, a challenge awaiting its answer), max hb_miss 0
+PASS   C6 traffic keeps flowing: last_counter 1262 -> 262945, mean 10.00 frames/s (sender period 100 ms = 10/s), 0 pairs without progress
+
+PASS   C7 no alarm events after the first sample: baseline at first sample: TIMEOUT=1, LATE_ANSWER=1, AUTH_FAIL=0, REPLAY=0, COUNTER_GAP=0, TRAFFIC_RECOVERED=0, HEARTBEAT_RECOVERED=1; 0 rise(s) = false-positive candidates
+         2026-11-12T13:47:16Z  TIMEOUT +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  LATE_ANSWER +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  TRAFFIC_RECOVERED +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+PASS   C8 no ring loss: ev_lost at end 0
+PASS   C9 Core 1 poll age bounded: min 0 us, median 222 us, p99 448 us, max 449 us (limit 10000 us)
+
+OVERALL: NOT all pass: read the lines marked FAIL / REVIEW; do not call this a clean soak

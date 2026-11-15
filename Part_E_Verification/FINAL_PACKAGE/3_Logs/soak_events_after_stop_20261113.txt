@@ -1,0 +1,15 @@
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1353075393
+seq 2 LEGACY_CMD_REFUSED   counter 0 detail 0 ticks 20406840740
+seq 3 LEGACY_CMD_REFUSED   counter 0 detail 0 ticks 20997380883
+seq 4 COUNTER_RESYNC       counter 1000 detail 0 ticks 25510205635
+seq 5 LATE_ANSWER          counter 1310 detail 0 ticks 25510431128
+  returned 5, more=1, ev_lost=0
+seq 6 HEARTBEAT_RECOVERED  counter 1311 detail 0 ticks 25518102335
+seq 7 TIMEOUT              counter 0 detail 1 ticks 94632126082
+seq 8 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 94669302519
+seq 9 LATE_ANSWER          counter 4911 detail 0 ticks 94669529463
+seq 10 TIMEOUT              counter 0 detail 1 ticks 528687210586
+  returned 5, more=1, ev_lost=0
+seq 11 TIMEOUT              counter 0 detail 2 ticks 528737217201
+  returned 1, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=14211

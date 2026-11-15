@@ -1,0 +1,40 @@
+# F24 run: N=24 flooders, soak 60s, 2026-11-12T01:38:33+05:30
+## before
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 23272150191 core1_poll_age_ticks 5312 poll_count 43524384439
+  skip_count 0 skip_total 109 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 3395 hb_seq 1194 hb_state MISSED hb_miss_count 20 idle_uses 0
+  traffic_age_ticks 376791801 hb_last_ok_age_ticks 393691915 lease_remaining_ticks 0
+  ev_seq 60 ev_ack 0 ev_lost 16 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=109
+ 00:19:53 up 19 min,  load average: 5.27, 2.25, 0.84
+flooders started: 24, alive after 3 s: 24
+ 00:19:57 up 19 min,  load average: 6.77, 2.61, 0.97
+## soak (heartbeat responder + software frame sender, period 100 ms)
+soak: 60 s, period 100 ms, 599 ticks
+frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 84 LATE 8 other 0
+send lateness vs absolute deadline (us): p50 14787056 p99 32872897 max 33331246
+frame submit latency (us): p50 10431 p99 704642 max 1180722
+end state: flags 0x07 last_counter 3994 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +28 starved 0
+soak_exit=0
+flooders still alive at end of soak: 24
+flooders stopped
+ 00:21:37 up 21 min,  load average: 21.61, 8.99, 3.43
+## after
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x1f mode 0
+  now_ticks 25269956339 core1_poll_age_ticks 5951 poll_count 47314135958
+  skip_count 0 skip_total 137 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 3994 hb_seq 1298 hb_state MISSED hb_miss_count 3 idle_uses 0
+  traffic_age_ticks 68543951 hb_last_ok_age_ticks 68248697 lease_remaining_ticks 0
+  ev_seq 193 ev_ack 0 ev_lost 149 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=137
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352987026
+seq 4 TIMEOUT              counter 0 detail 1 ticks 17888343302
+seq 5 TIMEOUT              counter 0 detail 2 ticks 17931879899
+seq 9 TIMEOUT              counter 0 detail 1 ticks 19300854431
+seq 154 TIMEOUT              counter 0 detail 1 ticks 24720400886
+  returned 5, more=1, ev_lost=149
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=137
+[    0.000000] printk: debug: ignoring loglevel setting.
+[    7.794799] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0

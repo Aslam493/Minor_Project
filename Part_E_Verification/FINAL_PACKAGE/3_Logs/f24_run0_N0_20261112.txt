@@ -1,0 +1,39 @@
+# F24 run: N=0 flooders, soak 60s, 2026-11-12T01:32:49+05:30
+## before
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x13 mode 0
+  now_ticks 16654437957 core1_poll_age_ticks 1049 poll_count 30963058223
+  skip_count 0 skip_total 0 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 0 hb_seq 849 hb_state MISSED hb_miss_count 849 idle_uses 0
+  traffic_age_ticks 18446744073709551615 hb_last_ok_age_ticks 18446744073709551615 lease_remaining_ticks 0
+  ev_seq 1 ev_ack 0 ev_lost 0 pinned_used 1
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+ 00:14:09 up 14 min,  load average: 0.00, 0.00, 0.00
+sh: can't open /tmp/fl.pids: no such file
+flooders started: 0
+ 00:14:12 up 14 min,  load average: 0.00, 0.00, 0.00
+## soak (heartbeat responder + software frame sender, period 100 ms)
+soak: 60 s, period 100 ms, 599 ticks
+frame verdicts: ACCEPTED 598 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 60 LATE 0 other 0
+send lateness vs absolute deadline (us): p50 75 p99 77 max 85
+frame submit latency (us): p50 8899 p99 9389 max 10025
+end state: flags 0x07 last_counter 1598 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +22 starved 0
+soak_exit=0
+flooders stopped
+ 00:15:13 up 15 min,  load average: 0.00, 0.00, 0.00
+## after
+page 0: version 1 length 128 boot_id 0xb60b72e0 flags 0x0f mode 0
+  now_ticks 17901803263 core1_poll_age_ticks 320 poll_count 33331741112
+  skip_count 1 skip_total 23 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 1598 hb_seq 914 hb_state MISSED hb_miss_count 1 idle_uses 0
+  traffic_age_ticks 19225161 hb_last_ok_age_ticks 36279542 lease_remaining_ticks 0
+  ev_seq 4 ev_ack 0 ev_lost 0 pinned_used 2
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=23
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352987026
+seq 2 COUNTER_RESYNC       counter 1000 detail 0 ticks 16734412378
+seq 3 HEARTBEAT_RECOVERED  counter 854 detail 0 ticks 16734630619
+seq 4 TIMEOUT              counter 0 detail 1 ticks 17888343302
+  returned 4, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=23
+[    0.000000] printk: debug: ignoring loglevel setting.
+[    7.794799] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0
