@@ -120,7 +120,7 @@ Specific to this work:
 - **F24:** any process that can open `/dev/tee0` (root, and the `test` account until it was removed from the `teeclnt` group on the Pi, not in the image build) can delay the heartbeat path and cause false alarms and late-answer events; it cannot be prevented here.
 - **Event counters for refused legacy commands are best-effort** (finding F29): dropped when the monitor lock is busy; the refusal itself is not affected.
 - Keys are prototype constants in the source. The Linux-side responder and sender in these tests are software test tools, not a production consumer.
-- The boot-ID uniqueness check is a sample of 3 boots (the plan asks for 20 or more); it is not a proof.
+- **Boot-ID uniqueness (T18b):** 21 boots (the current one plus 20 reboots on 2026-11-16) gave 21 distinct boot IDs, every boot with `init_ok` 1 and `starved` 0 (`baseline/t18b_boot_ids_20261116.csv`). This meets the plan's "20 or more" sample size. It is a sample, not a proof of uniqueness: boot IDs are 32 bits, and no collision was seen in 21 draws.
 
 ## 9. Not done, and not claimed
 - **Design 2 (chip B, report cross-check, T26 to T47): not built.**

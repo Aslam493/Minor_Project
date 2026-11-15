@@ -18,7 +18,7 @@ Project: M.Tech minor project. Detection-only Secure CAN Monitor in OP-TEE (Secu
 | C5 | Heartbeat and traffic deadline | Done on the board: 26 PASS, 0 FAIL, 1 skip | `baseline/c5_board_tests_run2_full_20261112.txt` |
 | C6 | Hardening | Done on the board for the flashed image (idle caps 6 PASS, negative tests 12 PASS). Two source changes written, not flashed | `monitor/COMPONENT_6_HARDENING.md` |
 | C7 | Independent CAN (chip B) | **Designed, not built** (no second board, no sender) | `monitor/COMPONENT_7_DESIGNED_NOT_BUILT.md` |
-| C8 | Soaks and final report | In progress. Soaks running on the Pi; `RESULTS.md` sections 6 and 7 pending | `RESULTS.md` |
+| C8 | Soaks and final report | Done with deviations (soak 2 stopped at 6.3 h, 1 sample lost) | `RESULTS.md`, `baseline/soak_analysis_20261113.txt` |
 
 ## 2. What was done
 
@@ -38,7 +38,7 @@ Project: M.Tech minor project. Detection-only Secure CAN Monitor in OP-TEE (Secu
 7. **Written but not flashed.** `IDLE_EXPIRED` event (MODE_CHANGED detail 2) and a non-blocking UART `ALIVE` line behind a flag that is off. Both host-tested, built with 0 warnings, object-checked.
 8. **Decisions D-A to D-F** (delegated by the user): no coalescing change; contention hint dropped; UART flag stays off; **the current hardened c16384 image is frozen as final**; `IDLE_EXPIRED` not flashed; soaks use software-injected frames; nested repos never pushed.
 9. **Documentation and git.** Status board and dated log rewritten; plan with decisions; progress report; C7 record; `RESULTS.md` draft; cited-path checker (500 paths, 0 unresolved); source bundles refreshed. Committed after each operation; top-level repo pushed to `origin nov-2026-backup`.
-10. **Soaks (in progress).** A detached chain on the Pi: 1 hour, then 10 hours, software sender at 100 ms period plus heartbeat responder. A laptop watcher samples the monitor every 60 s into `baseline/soak_watch_20261112.csv`. At the last sample read (about 2 hours of uptime, 14:26Z) the heartbeat state was ANSWERED and the frame counter was still rising. **That is an interim observation, not a result.** The verdict comes after the run ends (about 05:20 IST on 2026-11-13).
+10. **Soaks (finished, with deviations).** 1 h and 6.3 h (planned 10 h; stopped by hand), 7.27 h in total, one boot. `starved` 0, no lock timeouts, heartbeat never missed, no alarm event in steady state; the only events were start-up, the 2 s hand-over pause between the soaks, and the stop itself (correctly detected). One of 432 monitoring samples was lost (SSH, cause unknown), and soak 2 has no tool summary (killed). Details: `RESULTS.md` sections 6 and 7, `baseline/soak_analysis_20261113.txt`.
 
 ## 3. Measurements
 
@@ -88,16 +88,15 @@ Project: M.Tech minor project. Detection-only Secure CAN Monitor in OP-TEE (Secu
 - Event log is RAM-only, not tamper-evident.
 - F24: any process that can open `/dev/tee0` can cause false alarms and late-answer events.
 - No "no false alarms" claim. Missed by construction: delays shorter than the deadline, exact retransmission of a valid frame, a sender restart (looks like a replay storm).
-- Boot-ID uniqueness is a sample of 3 boots (plan asks for 20+).
+- Boot-ID uniqueness: 21 boots, 21 distinct IDs (T18b, `baseline/t18b_boot_ids_20261116.csv`); a sample, not a proof.
 - Design 2, UART verification, `IDLE_EXPIRED` and UART on the board, CAN/SPI floods, gap histogram, T5b, T4b, T18e on the board, and T24 for the debug profile: **not done, not claimed**.
 - No off-laptop copy of `SD_Card_Backups/`.
 
 ## 6. What remains
-1. Let the soaks finish (about 05:20 IST on 2026-11-13). No other load on the Pi.
-2. Analyse the CSV and the end-of-run summaries against the pass criteria fixed in advance: zero BUSY after retries, zero lock timeouts, `starved=0` throughout, no panic or reboot, all heartbeat answers on time except possibly the first, Core 1 poll age bounded.
-3. Fill `RESULTS.md` sections 6 and 7 honestly, run `verify_boot`, clean the Pi's `/tmp`, update the status board, commit and push.
-4. Optional: 20-reboot boot-ID sample (about 25 minutes).
-5. Before Saturday: external copy of `SD_Card_Backups/`, repo freeze, refreshed bundles, demo rehearsal.
+1. ~~20-reboot boot-ID sample (T18b)~~ done 2026-11-16: 21 boots, 21 distinct IDs, `init_ok` 1 and `starved` 0 every time (`baseline/t18b_boot_ids_20261116.csv`).
+2. Final repo freeze and refreshed source bundles; demo rehearsal.
+3. Hardware-blocked, stays a stated limit: UART, floods, gap histogram, real CAN-bus traffic, C7.
+4. Optional and not recommended this close to the evaluation: flashing `IDLE_EXPIRED`.
 
 ## 7. Recovery if anything fails
 Flash only the 8 GB spare card (`scripts/card_helper.sh`), never the 32 GB original. Rollback image: hardened c16384 (`armstub8.monitor-hardened-c16384.bin`, sha256 `775ce3849a38...`, listed in `SD_Card_Backups/SHA256SUMS`).

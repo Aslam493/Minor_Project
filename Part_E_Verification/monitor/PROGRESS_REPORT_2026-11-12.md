@@ -35,7 +35,7 @@ Host harness (real sources, ASan + UBSan): 434 checks flag off, 1493 TEST_STATS,
 | My own mistakes | Wrong R/grace/N_req claim (they are defined in the original plan), two test bugs (T22, T17c), a relative build path that polluted the source tree, a false object-code "pass" on empty disassembly: all found, fixed and kept in the records |
 
 ## 6. What is NOT done
-UART never connected (W2, T23 and the UART line unverified on hardware); no CAN-bus evidence; Design 2 (chip B) not built; only 3 of 20+ boot IDs sampled; floods and gap histogram not run; IDLE_EXPIRED and the UART line not flashed; 1-hour and overnight soaks not run; `RESULTS.md` not written.
+UART never connected (W2, T23 and the UART line unverified on hardware); no CAN-bus evidence; Design 2 (chip B) not built; (at the time of writing: 3 boot IDs sampled, soaks not run, `RESULTS.md` not written; **update 2026-11-16: 21 boots with 21 distinct IDs, soaks of 1 h + 6.3 h done, `RESULTS.md` written**) floods and gap histogram not run; IDLE_EXPIRED and the UART line not flashed.
 
 ## 7. Next
 `monitor/PLAN_REMAINING_WORK_2026-11-12.md`: units U0-U8, decisions D-A to D-F, schedule to Saturday and the cut rule.
