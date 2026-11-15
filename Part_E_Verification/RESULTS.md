@@ -19,14 +19,14 @@ Design 1 ("Mode F") only: Linux forwards frames to Secure World; Secure World ch
 | Card | 8 GB spare, name `SD8GB`, serial `0x6d280b3c`; the 32 GB original was never written |
 | Device tree | N-04 version (`no-map` reservation of 0x10000000-0x10FFFFFF), sha256 `e8ac38fa...` |
 | Kernel / OP-TEE | 6.7.0-rc6-v8; OP-TEE 4.10 (`a7ccc63e4`) |
-| Access | SSH only; no UART connected |
+| Access | SSH; the UART console (3.3 V FTDI on header pins 6, 8, 10, CAN shield removed) was connected once, on 2026-11-16, for one boot log |
 | Timing constants | traffic deadline T = 300 ms (the sender period in the soaks is 100 ms); heartbeat H = 1000 ms; D_req = 500 ms; boot grace G = 60 s; K_miss = 3; Core 1 lock attempt every 16384 passes |
 
 ## 3. Results by component
 | # | Component | Result | Evidence |
 |---|---|---|---|
 | C1 | Baseline and hardware readiness | Done (software gate). N-04 found and resolved | `baseline/COMPONENT_1_RECORD.md`, `monitor/N04_SECURE_MEMORY_RESERVATION.md` |
-| C2 | Monitor foundation | 51 PASS, 2 PARTIAL, 0 FAIL of 53 checks | `monitor/COMPONENT_2_2_INVENTORY.md`, `COMPONENT_2_GATE_CHECK.md` |
+| C2 | Monitor foundation | 52 PASS, 1 PARTIAL, 0 FAIL of 53 checks (W2 upgraded to the literal boot-log form on 2026-11-16, see section 9) | `monitor/COMPONENT_2_2_INVENTORY.md`, `COMPONENT_2_GATE_CHECK.md` |
 | C3 | Core 1 integration | Done; stack worst case 2000 B of 4096 B, normal path 640 B (board watermark 688 B) | `monitor/COMPONENT_3_CORE1_CALL_LIST_AND_SYMBOL_DIFF.md` |
 | C4 | Timing | Closed with limits; floods, sender, histogram not done | `monitor/COMPONENT_4_TIMING_AND_MEASUREMENT.md` |
 | C5 | Heartbeat and traffic deadline | Board: 26 PASS, 0 FAIL, 1 skip; two real reboots | `baseline/c5_board_tests_run2_full_20261112.txt` |
@@ -124,7 +124,7 @@ Specific to this work:
 
 ## 9. Not done, and not claimed
 - **Design 2 (chip B, report cross-check, T26 to T47): not built.**
-- **UART:** never connected. The literal boot log (W2), the stalled-UART test (T23) and the `ALIVE` line are unverified. The `ALIVE` line is written, host-tested (451 checks) and object-checked, behind a flag that is **off**, and was **not flashed**.
+- **UART:** connected once, on 2026-11-16 (shield removed, so `can0` was absent in that boot), and one boot log was captured (`baseline/uart_boot_log_20261116_005102.txt`, 280 lines, no framing errors). **It shows W2 in its literal form:** `rpi3_mon_init()` runs as an OP-TEE initcall at 04.721 s, before "Primary CPU switching to normal world boot" and 7.8 s before "Secondary CPU 1 initializing" (12.479 s), so the monitor initialises before Core 1 exists. The initcall line is a debug trace of the call, not a result; init success is shown by `init_ok=1` read over SSH in the same boot (`baseline/status_after_uart_boot_20261116.txt`). The log also shows the N-04 reservation in the kernel (`reserved mem: 0x10000000..0x10ffffff nomap`). **Still unverified:** the stalled-UART test (T23) and the `ALIVE` line, which is behind a flag that is off and was not flashed. The firmware is a debug build (TF-A v2.6 debug, OP-TEE debug traces); the boot log does not contain a monitor-specific message.
 - **`IDLE_EXPIRED`:** implemented as `MODE_CHANGED` detail 2, host-tested and object-checked, **not flashed**; on the flashed image an idle-lease expiry is visible only as the following traffic timeout (a recorded deviation from the plan's wording).
 - CAN and SPI floods, a hardware sender and the gap histogram (C4.3, C4.4); T5b (a chip-B row); T4b, T18e on the board; T24 for the debug profile.
 - N-04's build rule has been verified by reproducing its command, not by a full image build.

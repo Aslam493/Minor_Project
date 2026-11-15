@@ -1,0 +1,288 @@
+19:22:54.251 NOTICE:  Booting Trusted Firmware
+19:22:54.256 NOTICE:  BL1: v2.6(debug):v2.6-1-gc60998525-dirty
+19:22:54.260 NOTICE:  BL1: Built : 13:55:34, Nov  7 2026
+19:22:54.264 INFO:    BL1: RAM 0x100ee000 - 0x100f7000
+19:22:54.270 INFO:    BL1: cortex_a53: CPU workaround for 843419 was applied
+19:22:54.276 INFO:    BL1: cortex_a53: CPU workaround for 855873 was applied
+19:22:54.281 WARNING: BL1: cortex_a53: CPU workaround for 1530924 was missing!
+19:22:54.289 NOTICE:  rpi3: Detected: Raspberry Pi 3 Model B (1GB, Embest, China) [0x00a22082]
+19:22:54.291 INFO:    BL1: Loading BL2
+19:22:54.295 INFO:    Loading image id=1 at address 0x100b4000
+19:22:54.300 INFO:    Image id=1 loaded: 0x100b4000 - 0x100bc419
+19:22:54.303 NOTICE:  BL1: Booting BL2
+19:22:54.307 INFO:    Entry point address = 0x100b4000
+19:22:54.309 INFO:    SPSR = 0x3c5
+19:22:56.641 NOTICE:  BL2: v2.6(debug):v2.6-1-gc60998525-dirty
+19:22:56.646 NOTICE:  BL2: Built : 13:55:39, Nov  7 2026
+19:22:56.648 INFO:    BL2: Doing platform setup
+19:22:56.651 INFO:    BL2: Loading image id 3
+19:22:56.656 INFO:    Loading image id=3 at address 0x100e0000
+19:22:56.661 INFO:    Image id=3 loaded: 0x100e0000 - 0x100ea073
+19:22:56.664 INFO:    BL2: Loading image id 4
+19:22:56.668 INFO:    Loading image id=4 at address 0x10100000
+19:22:56.673 INFO:    Image id=4 loaded: 0x10100000 - 0x1010001c
+19:22:56.675 INFO:    OPTEE ep=0x10100000
+19:22:56.678 INFO:    OPTEE header info:
+19:22:56.681 INFO:          magic=0x4554504f
+19:22:56.683 INFO:          version=0x2
+19:22:56.685 INFO:          arch=0x1
+19:22:56.688 INFO:          flags=0x0
+19:22:56.690 INFO:          nb_images=0x1
+19:22:56.694 INFO:    BL2: Loading image id 21
+19:22:56.698 INFO:    Loading image id=21 at address 0x10100000
+19:22:56.710 INFO:    Image id=21 loaded: 0x10100000 - 0x101b6f48
+19:22:56.713 INFO:    BL2: Skip loading image id 22
+19:22:56.716 INFO:    BL2: Loading image id 5
+19:22:56.720 INFO:    Loading image id=5 at address 0x11000000
+19:22:56.730 INFO:    Image id=5 loaded: 0x11000000 - 0x11083f50
+19:22:58.534 NOTICE:  BL1: Booting BL31
+19:22:58.538 INFO:    Entry point address = 0x100e0000
+19:22:58.540 INFO:    SPSR = 0x3cd
+19:22:58.547 NOTICE:  BL31: v2.6(debug):v2.6-1-gc60998525-dirty
+19:22:58.550 NOTICE:  BL31: Built : 13:55:47, Nov  7 2026
+19:22:58.554 INFO:    rpi3: Checking DTB...
+19:22:58.557 INFO:    BL31: Initializing runtime services
+19:22:58.563 INFO:    BL31: cortex_a53: CPU workaround for 843419 was applied
+19:22:58.569 INFO:    BL31: cortex_a53: CPU workaround for 855873 was applied
+19:22:58.575 WARNING: BL31: cortex_a53: CPU workaround for 1530924 was missing!
+19:22:58.582 INFO:    BL31: Initializing BL32
+19:22:58.597 D/TC:0   plat_get_aslr_seed:122 Warning: no ASLR seed
+19:22:58.616 D/TC:0   collect_mem_ranges:1148 tee_ram_initial_offs 0
+19:22:58.643 D/TC:0   add_phys_mem:798 VCORE_UNPG_RX_PA type TEE_RAM_RX 0x10100000 size 0x000b3000
+19:22:58.671 D/TC:0   add_phys_mem:798 VCORE_UNPG_RW_PA type TEE_RAM_RW 0x101b3000 size 0x00029000
+19:22:58.699 D/TC:0   add_phys_mem:798 VCORE_UNPG_RW_PA type SEC_RAM_OVERALL 0x101b3000 size 0x00029000
+19:22:58.726 D/TC:0   add_phys_mem:798 VCORE_FREE_PA type TEE_RAM_RW 0x101dc000 size 0x00624000
+19:22:58.752 D/TC:0   merge_mmaps:751 Merging 0x101b3000..0x101dbfff and 0x101dc000..0x107fffff
+19:22:58.780 D/TC:0   add_phys_mem:798 VCORE_FREE_PA type SEC_RAM_OVERALL 0x101dc000 size 0x00624000
+19:22:58.806 D/TC:0   merge_mmaps:751 Merging 0x101b3000..0x101dbfff and 0x101dc000..0x107fffff
+19:22:58.832 D/TC:0   add_phys_mem:798 next_pa type SEC_RAM_OVERALL 0x10800000 size 0x00800000
+19:22:58.858 D/TC:0   merge_mmaps:751 Merging 0x101b3000..0x107fffff and 0x10800000..0x10ffffff
+19:22:58.884 D/TC:0   add_phys_mem:798 ARM_LOCAL_BASE type IO_SEC 0x40000000 size 0x00200000
+19:22:58.909 D/TC:0   add_phys_mem:798 VC_INTC_BASE type IO_SEC 0x3f000000 size 0x00200000
+19:22:58.933 D/TC:0   add_phys_mem:798 GPIO_BASE type IO_SEC 0x3f200000 size 0x00200000
+19:22:58.959 D/TC:0   merge_mmaps:751 Merging 0x3f000000..0x3f1fffff and 0x3f200000..0x3f3fffff
+19:22:58.983 D/TC:0   add_phys_mem:798 SPI0_BASE type IO_SEC 0x3f200000 size 0x00200000
+19:22:59.010 D/TC:0   merge_mmaps:751 Merging 0x3f000000..0x3f3fffff and 0x3f200000..0x3f3fffff
+19:22:59.036 D/TC:0   add_phys_mem:798 CONSOLE_UART_BASE type IO_NSEC 0x3f200000 size 0x00200000
+19:22:59.063 D/TC:0   add_phys_mem:798 TEE_SHMEM_START type NSEC_SHM 0x08000000 size 0x00400000
+19:22:59.083 D/TC:0   add_va_space:842 type RES_VASPACE size 0x00a00000
+19:22:59.102 D/TC:0   add_va_space:842 type SHM_VASPACE size 0x02000000
+19:22:59.123 D/TC:0   add_va_space:842 type TEE_DYN_VASPACE size 0x00100000
+19:22:59.165 D/TC:0   dump_mmap_table:968 type TEE_RAM_RX   va 0x10100000..0x101b2fff pa 0x10100000..0x101b2fff size 0x000b3000 (smallpg)
+19:22:59.203 D/TC:0   dump_mmap_table:968 type TEE_RAM_RW   va 0x101b3000..0x107fffff pa 0x101b3000..0x107fffff size 0x0064d000 (smallpg)
+19:22:59.241 D/TC:0   dump_mmap_table:968 type RES_VASPACE  va 0x10800000..0x111fffff pa 0x00000000..0x009fffff size 0x00a00000 (pgdir)
+19:22:59.280 D/TC:0   dump_mmap_table:968 type TEE_DYN_VASPACE va 0x11200000..0x112fffff pa 0x00000000..0x000fffff size 0x00100000 (pgdir)
+19:22:59.318 D/TC:0   dump_mmap_table:968 type SHM_VASPACE  va 0x11400000..0x133fffff pa 0x00000000..0x01ffffff size 0x02000000 (pgdir)
+19:22:59.355 D/TC:0   dump_mmap_table:968 type NSEC_SHM     va 0x13400000..0x137fffff pa 0x08000000..0x083fffff size 0x00400000 (pgdir)
+19:22:59.394 D/TC:0   dump_mmap_table:968 type SEC_RAM_OVERALL va 0x139b3000..0x147fffff pa 0x101b3000..0x10ffffff size 0x00e4d000 (pgdir)
+19:22:59.432 D/TC:0   dump_mmap_table:968 type IO_SEC       va 0x14800000..0x14bfffff pa 0x3f000000..0x3f3fffff size 0x00400000 (pgdir)
+19:22:59.470 D/TC:0   dump_mmap_table:968 type IO_NSEC      va 0x14c00000..0x14dfffff pa 0x3f200000..0x3f3fffff size 0x00200000 (pgdir)
+19:22:59.508 D/TC:0   dump_mmap_table:968 type IO_SEC       va 0x14e00000..0x14ffffff pa 0x40000000..0x401fffff size 0x00200000 (pgdir)
+19:22:59.523 D/TC:0   add_padding:96 0x101dc100 len 0xf00
+19:22:59.543 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 1
+19:22:59.563 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 2
+19:23:00.133 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 3
+19:23:01.252 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 4
+19:23:02.372 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 5
+19:23:03.496 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 6
+19:23:04.076 D/TC:0   core_mmu_xlat_table_alloc:709 xlat tables used 7
+19:23:04.254 I/TC: 
+19:23:04.261 D/TC:0   carve_out_core_mem:2837 0x10100000 .. 0x10800000
+19:23:04.269 D/TC:0   boot_mem_foreach_padding:268 consumed 0x101dc100 0x101dc100 len 0xf00
+19:23:04.277 D/TC:0   boot_mem_release_unused:294 Allocated 49472 bytes at va 0x101dc000 pa 0x101dc000
+19:23:04.284 D/TC:0   boot_mem_release_unused:298 Tempalloc 33864 bytes at va 0x107f7bb8
+19:23:04.291 D/TC:0   boot_mem_release_unused:320 Carving out 0x10100000..0x101e813f
+19:23:04.299 D/TC:0   boot_mem_release_unused:329 Releasing 6352576 bytes from va 0x101e9000
+19:23:04.530 D/TC:0   print_stack_limits:296 tmp [0] 0x107fcfd0..0x107fdff0
+19:23:04.536 D/TC:0   print_stack_limits:301 abt [0] 0x107f9fd0..0x107faff0
+19:23:04.542 D/TC:0   print_stack_limits:308 thr [0] 0x11201610..0x11204630
+19:23:04.549 D/TC:0   print_stack_limits:308 thr [1] 0x11206610..0x11209630
+19:23:04.554 D/TC:0   print_stack_limits:308 thr [2] 0x1120b610..0x1120e630
+19:23:04.561 D/TC:0   print_stack_limits:308 thr [3] 0x11210610..0x11213630
+19:23:04.580 I/TC: OP-TEE version: 4.10.0-260-ga7ccc63e4-dev (gcc version 14.3.1 20250623 (Arm GNU Toolchain 14.3.Rel1 (Build arm-14.174))) #1 Sat Nov  7 08:25:18 UTC 2026 aarch64
+19:23:04.586 I/TC: WARNING: This OP-TEE configuration might be insecure!
+19:23:04.595 I/TC: WARNING: Please check https://optee.readthedocs.io/en/latest/architecture/porting_guidelines.html
+19:23:04.598 I/TC: Primary CPU initializing
+19:23:04.608 D/TC:0 0 boot_init_primary_runtime:1054 Executing at offset 0 with virtual load address 0x10100000
+19:23:04.614 D/TC:0 0 do_init_calls:19 preinitcall level 2 mobj_mapped_shm_init()
+19:23:04.622 D/TC:0 0 mobj_mapped_shm_init:543 Shared memory address range: 11400000, 13400000
+19:23:04.629 D/TC:0 0 do_init_calls:19 early_initcall level 1 teecore_init_pub_ram()
+19:23:04.635 D/TC:0 0 do_init_calls:19 service_initcall level 1 tee_cryp_init()
+19:23:04.649 D/TC:0 0 do_init_calls:19 service_initcall level 2 check_ta_store()
+19:23:04.654 D/TC:0 0 check_ta_store:460 TA store: "early TA"
+19:23:04.660 D/TC:0 0 check_ta_store:460 TA store: "Secure Storage TA"
+19:23:04.664 D/TC:0 0 check_ta_store:460 TA store: "REE"
+19:23:04.670 D/TC:0 0 do_init_calls:19 service_initcall level 2 early_ta_init()
+19:23:04.682 D/TC:0 0 early_ta_init:56 Early TA f04a0fe7-1f5d-4b9b-abf7-619b85b4ce8c size 49668 (compressed, uncompressed 113448)
+19:23:04.689 D/TC:0 0 do_init_calls:19 service_initcall level 2 verify_pseudo_tas_conformance()
+19:23:04.696 D/TC:0 0 do_init_calls:19 service_initcall level 3 tee_fs_init_key_manager()
+19:23:04.707 D/TC:0 0 boot_mem_release_tmp_alloc:370 Releasing 36864 bytes from va 0x107f7000
+19:23:04.714 D/TC:0 0 do_init_calls:19 driver_initcall level 1 rpi3_can_fiq_init()
+19:23:04.721 D/TC:0 0 do_init_calls:19 driver_initcall level 1 rpi3_mon_init()
+19:23:04.730 D/TC:0 0 do_init_calls:19 driver_initcall level 2 init_multi_core_halt_handler()
+19:23:04.736 D/TC:0 0 do_init_calls:19 driver_initcall level 2 mobj_init()
+19:23:04.744 D/TC:0 0 do_init_calls:19 driver_initcall level 2 default_mobj_init()
+19:23:04.750 D/TC:0 0 do_init_calls:19 driver_initcall level 2 ftmn_boot_tests()
+19:23:04.755 D/TC:0 0 ftmn_boot_tests:198 Calling simple_call()
+19:23:04.760 D/TC:0 0 ftmn_boot_tests:198 Return from simple_call()
+19:23:04.765 D/TC:0 0 ftmn_boot_tests:199 Calling two_level_call()
+19:23:04.771 D/TC:0 0 ftmn_boot_tests:199 Return from two_level_call()
+19:23:04.776 D/TC:0 0 ftmn_boot_tests:200 Calling chained_calls()
+19:23:04.782 D/TC:0 0 ftmn_boot_tests:200 Return from chained_calls()
+19:23:04.789 D/TC:0 0 ftmn_boot_tests:202 *************************************************
+19:23:04.796 D/TC:0 0 ftmn_boot_tests:203 **************  Tests complete  *****************
+19:23:04.804 D/TC:0 0 ftmn_boot_tests:204 *************************************************
+19:23:04.809 I/TC: Primary CPU switching to normal world boot
+19:23:04.816 D/TC:0   print_stack_limits:296 tmp [0] 0x11215610..0x11216630
+19:23:04.822 D/TC:0   print_stack_limits:301 abt [0] 0x11218610..0x11219630
+19:23:04.828 D/TC:0   print_stack_limits:296 tmp [1] 0x1121b610..0x1121c630
+19:23:04.834 D/TC:0   print_stack_limits:301 abt [1] 0x1121e610..0x1121f630
+19:23:04.840 D/TC:0   print_stack_limits:296 tmp [2] 0x11221610..0x11222630
+19:23:04.846 D/TC:0   print_stack_limits:301 abt [2] 0x11224610..0x11225630
+19:23:04.852 D/TC:0   print_stack_limits:296 tmp [3] 0x11227610..0x11228630
+19:23:04.858 D/TC:0   print_stack_limits:301 abt [3] 0x1122a610..0x1122b630
+19:23:04.865 D/TC:0   print_stack_limits:308 thr [0] 0x11201610..0x11204630
+19:23:04.871 D/TC:0   print_stack_limits:308 thr [1] 0x11206610..0x11209630
+19:23:04.876 D/TC:0   print_stack_limits:308 thr [2] 0x1120b610..0x1120e630
+19:23:04.883 D/TC:0   print_stack_limits:308 thr [3] 0x11210610..0x11213630
+19:23:04.888 INFO:    BL31: Preparing for EL3 exit to normal world
+19:23:04.891 INFO:    Entry point address = 0x11000000
+19:23:04.893 INFO:    SPSR = 0x3c9
+19:23:04.962 
+19:23:04.964 
+19:23:04.966 U-Boot 2021.10 (Sep 20 2026 - 02:37:42 +0530)
+19:23:04.968 
+19:23:04.971 DRAM:  948 MiB
+19:23:04.992 RPI 3 Model B (0xa22082)
+19:23:05.564 MMC:   mmc@7e202000: 0, sdhci@7e300000: 1
+19:23:05.599 Loading Environment from FAT... OK
+19:23:05.600 In:    serial
+19:23:05.604 Out:   serial
+19:23:05.608 Err:   serial
+19:23:05.609 Net:   No ethernet found.
+19:23:05.611 starting USB...
+19:23:06.859 Bus usb@7e980000: USB DWC2
+19:23:11.229 scanning bus usb@7e980000 for devices... ∞L≤2`ê∆ûbr≤ú`Ã|båú~≤û|ÜºrlÃ|6¬Nn¬NúLûéFåº~BÃ|∞Ún|Úúú¬ûbr≤úé¬BbbÃlêÚn|ˆúê¬ûBr∂ú@Ã|båº~≤û|ÇúrL`2NûL¬NÃr2û~Ã|êˆnL≤æ∞Únp~ÚNûÏÃ¸@``å<¸@@`L¸ 0 
+19:23:11.237 34713 bytes read in 4 ms (8.3 MiB/s)
+19:23:12.173 20371968 bytes read in 931 ms (20.9 MiB/s)
+19:23:12.177 ## Flattened Device Tree blob at 01000000
+19:23:12.181    Booting using the fdt blob at 0x1000000
+19:23:12.187    Loading Device Tree to 000000003af4f000, end 000000003af5a798 ... OK
+19:23:12.228 
+19:23:12.230 Starting kernel ...
+19:23:12.231 
+19:23:12.479 I/TC: Secondary CPU 1 initializing
+19:23:12.484 I/TC: Secondary CPU 1 switching to normal world boot
+19:23:17.588 I/TC: Secondary CPU 2 initializing
+19:23:17.592 I/TC: Secondary CPU 2 switching to normal world boot
+19:23:17.597 I/TC: Secondary CPU 3 initializing
+19:23:17.602 I/TC: Secondary CPU 3 switching to normal world boot
+19:23:19.758 I/TC: Reserved shared memory is enabled
+19:23:19.761 I/TC: Dynamic shared memory is disabled
+19:23:19.766 I/TC: Normal World virtualization support is disabled
+19:23:19.771 I/TC: Asynchronous notifications are disabled
+19:23:19.781 D/TC:? 0 tee_ta_init_pseudo_ta_session:303 Lookup pseudo TA 7011a688-ddde-4053-a5a9-7b3c4ddf13b8
+19:23:19.787 D/TC:? 0 tee_ta_init_pseudo_ta_session:315 Open device.pta
+19:23:19.796 D/TC:? 0 tee_ta_init_pseudo_ta_session:330 device.pta : 7011a688-ddde-4053-a5a9-7b3c4ddf13b8
+19:23:19.808 D/TC:? 0 tee_ta_close_session:513 id 1
+19:23:19.813 D/TC:? 0 tee_ta_close_session:527 Destroy session
+19:23:19.940 [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+19:23:19.968 [    0.000000] Linux version 6.7.0-rc6-v8 (aslam@Aslam-ideapad) (aarch64-linux-gnu-gcc (Arm GNU Toolchain 14.3.Rel1 (Build arm-14.174)) 14.3.1 20250623, GNU ld (Arm GNU Toolchain 14.3.Rel1 (Build arm-14.174)) 2.44.0.20250616) #3 SMP PREEMPT Tue Sep  8 13:30:37 IST 2026
+19:23:19.973 [    0.000000] KASLR disabled due to lack of seed
+19:23:19.978 [    0.000000] Machine model: Raspberry Pi 3 Model B
+19:23:19.983 [    0.000000] printk: debug: ignoring loglevel setting.
+19:23:19.986 [    0.000000] efi: UEFI not found.
+19:23:19.994 [    0.000000] Reserved memory: created CMA memory pool at 0x0000000036c00000, size 64 MiB
+19:23:20.007 [    0.000000] OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+19:23:20.016 [    0.000000] OF: reserved mem: 0x0000000036c00000..0x000000003abfffff (65536 KiB) map reusable linux,cma
+19:23:20.031 [    0.000000] OF: reserved mem: 0x0000000010000000..0x0000000010ffffff (16384 KiB) nomap non-reusable optee_secure@10000000
+19:23:20.038 [    0.000000] Zone ranges:
+19:23:20.049 [    0.000000]   DMA      [mem 0x0000000000000000-0x000000003b3fffff]
+19:23:20.051 [    0.000000]   DMA32    empty
+19:23:20.055 [    0.000000]   Normal   empty
+19:23:20.059 [    0.000000] Movable zone start for each node
+19:23:20.062 [    0.000000] Early memory node ranges
+19:23:20.069 [    0.000000]   node   0: [mem 0x0000000000000000-0x000000000fffffff]
+19:23:20.075 [    0.000000]   node   0: [mem 0x0000000010000000-0x0000000010ffffff]
+19:23:20.082 [    0.000000]   node   0: [mem 0x0000000011000000-0x000000003b3fffff]
+19:23:20.089 [    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x000000003b3fffff]
+19:23:20.095 [    0.000000] On node 0, zone DMA: 19456 pages in unavailable ranges
+19:23:20.100 [    0.000000] psci: probing for conduit method from DT.
+19:23:20.105 [    0.000000] psci: PSCIv1.1 detected in firmware.
+19:23:20.110 [    0.000000] psci: Using standard PSCI v0.2 function IDs
+19:23:20.115 [    0.000000] psci: Trusted OS migration not required
+19:23:20.119 [    0.000000] psci: SMC Calling Convention v1.2
+19:23:20.126 [    0.000000] percpu: Embedded 29 pages/cpu s80488 r8192 d30104 u118784
+19:23:20.133 [    0.000000] pcpu-alloc: s80488 r8192 d30104 u118784 alloc=29*4096
+19:23:20.137 [    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 
+19:23:20.141 [    0.000000] Detected VIPT I-cache on CPU0
+19:23:20.146 [    0.000000] CPU features: detected: ARM erratum 843419
+19:23:20.152 [    0.000000] CPU features: detected: ARM erratum 845719
+19:23:20.157 [    0.000000] alternatives: applying boot alternatives
+19:23:20.193 [    0.000000] Kernel command line: console=tty0 console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfs=ext4 smsc95xx.macaddr=b8:27:eb:1e:98:02 ignore_loglevel dma.dmachans=0x7f35 rootwait 8250.nr_uarts=1 elevator=deadline fsck.repair=yes bcm2708_fb.fbwidth=1920 bcm2708_fb.fbheight=1080 vc_mem.mem_base=0x3ec00000 vc_mem.mem_size=0x40000000 dwc_otg.fiq_enable=0 dwc_otg.fiq_fsm_enable=0 dwc_otg.nak_holdoff=0
+19:23:20.199 [    0.000000] Kernel parameter elevator= does not have any effect anymore.
+19:23:20.206 [    0.000000] Please use sysfs to set IO scheduler for individual devices.
+19:23:20.215 [    0.000000] Unknown kernel command line parameters "rootfs=ext4", will be passed to user space.
+19:23:20.223 [    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+19:23:20.231 [    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+19:23:20.237 [    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 238896
+19:23:20.244 [    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+19:23:20.251 [    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 0MB
+19:23:20.259 [    0.000000] software IO TLB: area num 4.
+19:23:20.267 [    0.000000] software IO TLB: mapped [mem 0x000000003ae4f000-0x000000003af4f000] (1MB)
+19:23:20.286 [    0.000000] Memory: 813616K/970752K available (12224K kernel code, 2038K rwdata, 3772K rodata, 1728K init, 1006K bss, 91600K reserved, 65536K cma-reserved)
+19:23:20.292 [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+19:23:20.302 [    0.000000] ftrace: allocating 38750 entries in 152 pages
+19:23:20.312 [    0.000000] ftrace: allocated 152 pages with 3 groups
+19:23:20.321 [    0.000000] trace event string verifier disabled
+19:23:20.331 [    0.000000] rcu: Preemptible hierarchical RCU implementation.
+19:23:20.340 [    0.000000] rcu: 	RCU event tracing is enabled.
+19:23:23.459 [    0.000000] 	Trampoline variant 'º≤rvn|åL∂≤Lº|6FÜnÇú|L`Œ2åbL2L`líÇúåæB2n∆næÃNº≤rrn|ål≤íLº|2FÇnÇú|L`2åBL2L`íå2v2nnºåæB2n‡„nûÃNº≤vrn|ål≤íLú|2BÇn‚Çú|L`Ó'åbL2å|≤ûÃål≤íÃpÇnp≤Çn‡ÇûÇúåûÇN∂ºÃnúÃ|NÇº≤ÜN¬B∂B¬nNÏ'|ê≤N¬nûúÇn2LN|LårB∆º<6Nr¬Bl2åBL2åll˛≤F≤∞r2>åéêbån|˛≤F2vBåéêbB≤úÜNnnpÜæ2ÜúLn|ÇrBL@2åbL2åL~ÚnûLll2n∆Núp≤ºåBåp≤N‡ÃúÃ≤F≤n≤B2rNÏ'Ú2N∆Nºp∂º≤Ï'|Ç≤@2åBL2å|≤ûÏÃ|år≤û≤Ï'nÏ'ûÏÃL2Üæ∞2nnúÃ|åv≤û˛õ|∞F≤æÜæÃ|bB≤úéåpr≤º0ÃnnÃp~¬nû2¬nûbÚnnBl2åbL2LBrn2æb≤nBBÃpÄ2Léæb≤n¬BB|bå|≤¬nn¬núLÇæLLåBÄLLL~bnr2BBlŒ2åbL2ÃppÚNpnrÚnÚBv≤úÏLFrn≤|¬rÚ≤p~∂û|ÇûBBLN‡rrn>¬ú¬ú¬º¬º¬ú∆ú¬úLnÚ≤p‚vÜnrBÜéºú‚Ãé2ÇéæBLNÚ≤Üºp≤ú2N|Ïé∞Ãé¬Léååûåéûån|rlŒ2åbL2Ã|NÜú˛≤ppÚnpnFLéúåpBÜûéLÇûLLLLL~på|rÚnnÇæbÚnNLéåån|pÃæå2rLúú≤ºå6ééLéúLéÇLÃé¿åN|rl2åBéÇÃ2Ã@~¬n|~ÇNFÃp~ÜnnBú≤≤n6º¬ûbr≤úBLérlŒ2åbéåL2B6nnûNBN¬Úºr6Ãp~¬n|~ÇN‚Ãn∞Çû‚L2Lú|2BÇn‚∂`2åbLLéæL2Ã@ÇnÃBB2Çûb¬nºúÇn2nnnb|N2n≤ú2bBåûÇnÚ≤ú
+19:23:23.464 Saving 256 bits of creditable seed for next boot
+19:23:23.522 Starting syslogd: OK
+19:23:23.538 Starting klogd: OK
+19:23:23.581 Running sysctl: OK
+19:23:23.675 Starting modules: spi_bcm2835 [   11.204330] CAN device driver interface
+19:23:23.708 [   11.235122] spi_master spi0: will run message pump with realtime priority
+19:23:23.763 [   11.284381] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+19:23:23.776 [   11.302347] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+19:23:23.838 [   11.359051] mcp251xfd spi0.0 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+19:23:23.850 [   11.377077] mcp251xfd spi0.0: error -ENODEV: Failed to detect MCP251xFD.
+19:23:23.863 mcp251xfd OK
+19:23:23.875 Starting CAN interfaces: FAIL (no CAN interfaces present)
+19:23:23.903 Set permissions on /dev/tee*: OK
+19:23:23.922 Create/set permissions on /var/lib/tee: OK
+19:23:23.945 Starting tee-supplicant: Using device /dev/teepriv0.
+19:23:23.950 OK
+19:23:23.962 D/TC:? 0 tee_ta_init_session_with_context:570 Re-open trusted service 7011a688-ddde-4053-a5a9-7b3c4ddf13b8
+19:23:23.974 D/TC:? 0 tee_ta_close_session:513 id 1
+19:23:23.981 D/TC:? 0 tee_ta_close_session:527 Destroy session
+19:23:24.038 Starting network: OK
+19:23:24.046 Starting dhcpcd...
+19:23:24.346 [   11.875216] NET: Registered PF_INET6 protocol family
+19:23:24.358 [   11.888039] Segment Routing with IPv6
+19:23:24.368 [   11.897616] In-situ OAM (IOAM) with IPv6
+19:23:24.386 dhcpcd-10.2.4 starting
+19:23:24.396 DUID 00:01:03:04:c7:92:bc:8c:00:00:00:00:00:00
+19:23:24.443 [   11.972313] 8021q: 802.1Q VLAN Support v1.8
+19:23:24.735 [   12.260769] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+19:23:24.954 [   12.479513] Loaded X.509 cert 'benh@debian.org: 577e021cb980e0e820821ba7b54b4961b8b4fadf'
+19:23:24.970 [   12.495077] Loaded X.509 cert 'romain.perier@gmail.com: 3abbc6ec146e09d1b6016ab9d6cf71dd233f0328'
+19:23:24.983 [   12.511233] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+19:23:24.998 [   12.522877] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+19:23:25.008 [   12.537507] cfg80211: failed to load regulatory.db
+19:23:25.080 no interfaces have a carrier
+19:23:25.100 Starting crond: [   12.627091] smsc95xx 1-1.1:1.0 eth0: hardware isn't capable of remote wakeup
+19:23:25.107 OK
+19:23:25.118 [   12.644433] smsc95xx 1-1.1:1.0 eth0: Link is Up - 100Mbps/Full - flow control off
+19:23:25.645 Starting sshd: OK
+19:23:25.752 
+19:23:25.758 Welcome to Buildroot, type root or test to login
+19:24:32.269 buildroot login: D/TC:? 0 tee_ta_init_pseudo_ta_session:303 Lookup pseudo TA 9a986af1-048a-44a8-b984-1e902290d63c
+19:24:32.277 D/TC:? 0 tee_ta_init_pseudo_ta_session:315 Open rpi3_can_spi_poc.pta
+19:24:32.288 D/TC:? 0 tee_ta_init_pseudo_ta_session:330 rpi3_can_spi_poc.pta : 9a986af1-048a-44a8-b984-1e902290d63c
+19:24:32.304 D/TC:? 0 tee_ta_close_session:513 id 1
+19:24:32.311 D/TC:? 0 tee_ta_close_session:527 Destroy session
+19:24:32.331 D/TC:? 0 tee_ta_init_session_with_context:570 Re-open trusted service 9a986af1-048a-44a8-b984-1e902290d63c
+19:24:32.343 D/TC:? 0 tee_ta_close_session:513 id 1
+19:24:32.349 D/TC:? 0 tee_ta_close_session:527 Destroy session
