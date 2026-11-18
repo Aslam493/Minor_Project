@@ -33,3 +33,7 @@ canbridge_test: canbridge_test.c canbridge.c mon_client.c canbridge.h mon_client
 	gcc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -I$(TEEC_INC) -I$(OS)/lib/libutee/include -Wl,--unresolved-symbols=ignore-all -o $@ canbridge_test.c canbridge.c mon_client.c
 can_replay: can_replay.c canbridge.o mon_client.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDADD)
+
+# Mode P request/reply protocol test (2026-11-18): deliberate protocol mistakes, board only
+pq_protocol_test: pq_protocol_test.c mon_client.o mon_client.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ pq_protocol_test.c mon_client.o $(LDADD)
