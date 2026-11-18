@@ -1,0 +1,510 @@
+# Evidence file: Secure CAN Monitor (detection only), Raspberry Pi 3 B
+
+**Collected:** 2026-11-18 12:41:15 IST on Aslam-ideapad
+
+**How to read this file.** Section 1 is the result in one table. Section 2 explains, for every component, what was run and what a good output looks like, and then shows the **unedited output** of the commands (`$` = run on the laptop, `pi#` = run on the Raspberry Pi over SSH). Where a line says FAIL or KNOWN it is explained next to it.
+
+## 1. Result at a glance
+
+| Comp. | Check | Result | Verdict |
+|---|---|---|---|
+| C2 | Host tests, real sources, ASan + UBSan (production / test-stats / UART flag) | 434 / 1493 / 451 checks, 0 failed | OK |
+| C2 | Static checks (source + object code) | 58 pass, 0 FAIL | OK |
+| C1 | verify_boot at start (boot, Core 1, CAN) | 16 pass, 0 FAIL, 2 skipped | OK |
+| C1 | Rollback image checksums | 7 OK, 0 FAILED | OK |
+| C3 | Core 1 polls by itself (poll_count rises) | 5173684538 -> 5248280654 | OK |
+| C4 | 10 s healthy run: frames | ACCEPTED 98 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 / BUSY 0 errors 0 | OK |
+| C4 | 10 s healthy run: heartbeat | ON_TIME 10 LATE 1 other 0 | OK |
+| C5 | On-Pi full check (B to H) | 49 PASS, 0 FAIL, 1 KNOWN, 0 SKIP | OK |
+| C5 | C5 board test, own fresh boot | 25 PASS, 1 FAIL (T21d), 1 skip | OK |
+| C6 | Legacy commands refused / bad parameters rejected | 12 PASS, 0 FAIL | OK |
+| C6 | Idle-lease caps (own fresh boot) | 6 PASS, 0 FAIL | OK |
+| C7 | Independent CAN (chip B) | NOT BUILT (designed only) | n/a |
+| C8 | Soak analysis, 7.27 h, 9 criteria fixed in advance | 8 of 9 criteria PASS; not passed: C1 (C1 = one monitoring sample lost over SSH) | n/a |
+| C8 | Monitor boot IDs over reboots (T18b) | 21 boots, 21 distinct IDs | OK |
+| C8 | Mutation testing (planted bugs in the real source) | 141 of 144 caught (3 equivalent survivors) | OK |
+| C8 | Paths cited in the documents | 519 checked, 0 unresolved | OK |
+| END | verify_boot after cleanup and reboot | 16 pass, 0 FAIL, 2 skipped | OK |
+
+**Known, explained non-passes:** T21d tests the `IDLE_EXPIRED` event, which is written, host-tested and built but deliberately **not flashed** (the proven image is frozen), so it fails by design on this image. E6 is skipped because a fresh boot starts at counter 1 and the replay step needs a counter of at least 4. The 2 SKIPs in `verify_boot` are test tools not copied to the Pi.
+
+**Limits (unchanged):** software-injected frames only; prototype keys; no prevention (the Pi 3 has no TZASC); not done: C7 (chip B), CAN/SPI floods, the gap histogram, the stalled-UART test and the `ALIVE` line.
+
+## 2. Evidence by component
+
+### Scope and honesty rules
+
+Everything below was produced by `scripts/collect_evidence.sh` on the day shown, from the laptop and from the live Raspberry Pi. Frames are injected in software through the Secure World interface (PTA); this is not CAN-bus traffic. Keys are prototype values. The monitor detects, it does not prevent.
+
+```text
+evidence collected: 2026-11-18 12:41:15 IST on Aslam-ideapad
+repo: branch nov-2026-backup commit 06fd245
+optee_os commit 6fe8ffad0, trusted-firmware-a ce8b7cb0b
+Scope: software-injected frames through the PTA (not CAN-bus traffic); prototype keys; detection only; Pi 3 has no TZASC.
+
+pi# chmod +x /tmp/mon_client /tmp/c5_board_tests /tmp/c6_negative_raw; chmod 600 /tmp/kf; echo "Pi fresh boot, uptime $(cut -d. -f1 /proc/uptime) s, boot_id $(/tmp/mon_client status 0 | sed -n "s/.*boot_id \(0x[0-9a-f]*\).*/\1/p"), tools copied to /tmp (RAM)"
+Pi fresh boot, uptime 107 s, boot_id 0x46463b4c, tools copied to /tmp (RAM)
+[exit 0]
+```
+
+### C1 Baseline and hardware readiness
+
+**What it shows:** the rollback images are intact (checksums), the Pi runs the expected kernel and OP-TEE 4.10, Core 1 is held back from Linux (`0,2-3`), the secure memory `0x10000000-0x10ffffff` is reserved (N-04), and the CAN chip works on `can0`. **Good result:** every checksum `OK`, `verify_boot` 16 pass and 0 FAIL (the 2 SKIPs are tools not copied to the Pi).
+
+```text
+$ sha256sum -c SD_Card_Backups/SHA256SUMS   (rollback images are intact)
+pre-dual-core/rpi3-sdcard-known-good-classification.img: OK
+pre-linux-lockout/rpi3-sdcard-known-good-pre-lockout.img: OK
+pre-S0-sep20/rpi3-sdcard-sep20.img: OK
+pre-secure-peripheral-ownership/rpi3-sdcard-known-good-parallel-worlds-demo.img: OK
+step15-can-fiq-routing-complete/rpi3-sdcard-known-good-step15.img: OK
+step2-core1-hard-pinning-verified/rpi3-sdcard-known-good-step2.img: OK
+working-demo-verified-sep18/rpi3-sdcard-known-good-working-demo.img: OK
+[exit 0]
+
+pi# uname -r; dmesg | grep -m1 "optee: revision"; dmesg | grep -m1 "optee: initialized driver"; cat /sys/devices/system/cpu/online; dmesg | grep "CPU1: failed"; dmesg | grep "mcp251xfd spi0.0 can0"; cat /sys/class/net/can0/operstate; ls -l /dev/tee0 /dev/teepriv0; grep -E "^ *(08000000-09ffffff|10000000-10ffffff)" /proc/iomem; dmesg | grep "OF: reserved mem" | grep optee
+6.7.0-rc6-v8
+[    7.285996] optee: revision 4.10 (a7ccc63e41c4acc5)
+[    7.346623] optee: initialized driver
+0,2-3
+[    5.116422] CPU1: failed to come online
+[    5.116454] CPU1: failed in unknown state : 0x0
+[   10.955835] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) successfully initialized.
+up
+crw-rw----    1 root     teeclnt   248,   0 Jan  1 00:00 /dev/tee0
+crw-rw----    1 root     tee       248,  16 Jan  1 00:00 /dev/teepriv0
+  08000000-09ffffff : reserved
+10000000-10ffffff : reserved
+[    0.000000] OF: reserved mem: 0x0000000010000000..0x0000000010ffffff (16384 KiB) nomap non-reusable optee_secure@10000000
+[exit 0]
+
+$ verify_boot.sh 10.237.27.187   (16 boot/hardware checks)
+verify_boot: 10.237.27.187  mode=--expect-core1-pinned
+  PASS  ssh reachable
+  info  uptime 117.71s, kernel 6.7.0-rc6-v8
+  PASS  kernel is 6.7.0-rc6
+  info  [    7.285996] optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS  OP-TEE reports its revision
+  PASS  OP-TEE driver initialised
+  PASS  no OP-TEE error in dmesg
+  PASS  /dev/tee0 and /dev/teepriv0 exist
+  PASS  tee-supplicant is running
+  info  CPU online=0,2-3 offline=1
+  PASS  CPU mask is 0,2-3 (Core 1 diverted)
+  PASS  CPU1 reported as failing to come online
+  info  Core 1 heartbeat 4462227200 -> 4558783567
+  PASS  Core 1 heartbeat is rising
+  info  FIQ_CONTROL=0x00000000
+  PASS  PTA answers (fiq-count)
+  PASS  FIQ is NOT armed after boot (FIQ_CONTROL 0x00000000)
+  PASS  can0 exists
+  PASS  can0 is up
+  PASS  mcp251xfd found the chip on can0
+  PASS  no SPI CRC errors from the CAN driver
+  SKIP  canmode not on the Pi (/tmp); bitrate and mode not read
+  SKIP  ta_roundtrip not on the Pi (/tmp); TA/PTA round trip not run
+verify_boot: 16 pass, 0 FAIL, 2 skipped
+[exit 0]
+```
+
+### C2 Monitor foundation
+
+**What it shows:** the real monitor source, compiled on the laptop with a mock platform under AddressSanitizer and UBSan, passes all its checks in three configurations, and the static checks (including object-code checks) pass. Then the live monitor on the Pi reports itself healthy. **Good result:** `0 failed`, `0 FAIL`, and on the Pi `init_ok=1 starved=0 pta_lock_timeouts=0`. On a fresh boot with no consumer, `hb_state MISSED` and a `CONSUMER_NEVER_STARTED` timeout are expected.
+
+```text
+$ make test | tail -1  (ASan + UBSan)
+total: 434 checks, 0 failed
+[exit 0]
+
+$ make test_ts | tail -1  (ASan + UBSan)
+total: 1493 checks, 0 failed
+[exit 0]
+
+$ make test_uart | tail -1  (ASan + UBSan)
+total: 451 checks, 0 failed
+[exit 0]
+
+$ static_checks.sh | tail -1
+static_checks: 58 pass, 0 FAIL
+[exit 0]
+
+pi# /tmp/mon_client status 0; /tmp/mon_client status 1 | head -12
+page 0: version 1 length 128 boot_id 0x46463b4c flags 0x13 mode 0
+  now_ticks 3061385933 core1_poll_age_ticks 926 poll_count 5148607808
+  skip_count 0 skip_total 0 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 0 hb_seq 142 hb_state OPEN hb_miss_count 141 idle_uses 0
+  traffic_age_ticks 18446744073709551615 hb_last_ok_age_ticks 18446744073709551615 lease_remaining_ticks 0
+  ev_seq 1 ev_ack 0 ev_lost 0 pinned_used 1
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+page 1: version 1 length 128 verdict totals frame 0 heartbeat 0 crosscheck 0
+  TIMEOUT              1
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+[exit 0]
+```
+
+### C3 Core 1 integration
+
+**What it shows:** Linux sees only cores 0, 2 and 3; Core 1 runs the monitor loop on its own. **Good result:** `poll_count` rises between the two reads although nothing on Linux is driving it. The stack figures come from the recorded analysis (host call-graph and the board watermark).
+
+```text
+pi# echo "Linux cores online: $(cat /sys/devices/system/cpu/online) (Core 1 reserved for the Secure World)"; /tmp/mon_client status 0 | grep poll_count; sleep 2; /tmp/mon_client status 0 | grep poll_count
+Linux cores online: 0,2-3 (Core 1 reserved for the Secure World)
+  now_ticks 3074600454 core1_poll_age_ticks 5641 poll_count 5173684538
+  now_ticks 3113881563 core1_poll_age_ticks 5521 poll_count 5248280654
+[exit 0]
+
+$ stack and call-graph record (documented analysis)
+The plan's A1.6 stack-watermark test (SPSel=0, 4096-byte tmp stack, an HMAC at depth plus a FIQ) has not been run. Under D1 Option B no FIQ is ever taken on Core 1 and Core 1 reaches no HMAC, so the c
+**Margin (my proposal, needs the user's confirmation):** the plan states no number; I use headroom >= 2048 bytes of the 4096-byte AArch64 tmp stack (`STACK_TMP_SIZE` = 4096 with `CFG_WITH_ARM_TRUSTED_
+- NORMAL path (fatal-path functions removed): **640 bytes**, headroom 3456: OK. Path: loop 64 + `rpi3_mon_core1_attempt` 48 + the stack-check/spinlock helpers (`__cyg_profile_func_enter` 32, `check_st
+- Including the fatal path (stack-check failure, then panic, then trace printing): **2000 bytes**, headroom 2096: still >= 2048. That path only runs after a failure.
+`baseline/board_C3_stack_watermark_20261109.txt` (image `rpi3-sdcard-monitor-teststats-stack.img`, sha256 50038db6...; Pi 3 B at 10.237.27.187; flashed by the user, the cmp output of this flash was no
+[exit 0]
+```
+
+### C4 Timing and measurement
+
+**What it shows:** a 10 s run with a software sender (100 ms period) and the heartbeat responder, with measured send lateness and frame-submit latency. **Good result:** all frames `ACCEPTED`, `BUSY 0`, heartbeat answers `ON_TIME`, no lock timeouts, `starved 0`. The first heartbeat answer of a run is sometimes late (a known start-up effect, cause not proven).
+
+```text
+pi# /tmp/mon_client soak 10 --key-file /tmp/kf
+soak: 10 s, period 100 ms, 99 ticks
+frame verdicts: ACCEPTED 98 GAP 0 RESYNC 1 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+heartbeat answers: ON_TIME 10 LATE 1 other 0
+send lateness vs absolute deadline (us): p50 75 p99 90 max 90
+frame submit latency (us): p50 9303 p99 10254 max 10254
+end state: flags 0x07 last_counter 1098 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +4 starved 0
+[exit 0]
+
+$ recorded loop model (documented measurement)
+| C4.1 Loop timing | Model from board data: Core 1 base pass **26.6 ns** (hardened image), one lock attempt **12.6 us**; attempt interval = cadence x 26.6 ns + 12.6 us = **448 us at cadence 16384**. D
+| C4.5 CNTPCT sanity on Core 1 | 3000 samples over 299.9 s: secure counter never went backwards or stood still across the cores serving the PTA calls; rate 19.199968 MHz (-1.7 ppm vs CLOCK_MONOTONIC_R
+[exit 0]
+```
+
+### C5 Heartbeat and traffic deadline (on-Pi full check)
+
+**What it shows:** the whole behaviour in order. B = boot and hardware, C = isolation settings, D = monitor health, **E1 to E18 = each detection step by step** (valid frame, tampered tag, duplicate, conflict, replay, wrong CAN id, gap, silence then traffic timeout and recovery, fresh heartbeat challenges, on-time answer, silent responder then heartbeat timeout and recovery, and that each detection is in the event log), F = regression and negative tests, G = a 60 s soak, H = state afterwards. **Legend:** PASS = condition met; FAIL = not met; KNOWN = a failure explained in advance (T21d tests `IDLE_EXPIRED`, which is written but not flashed); SKIP = not applicable here.
+
+```text
+pi# sh /tmp/board_full_check.sh
+board_full_check  1970-01-01 00:02:35 UTC  host buildroot  kernel 6.7.0-rc6-v8  uptime 155 s
+tools: /tmp   log: /tmp/board_check_19700101T000235Z.txt
+
+== B  Boot and hardware
+  PASS   B1 kernel is 6.7.0-rc6-v8 (6.7.0-rc6-v8)
+  PASS   B2 OP-TEE reports its revision: optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS   B3 OP-TEE driver initialised
+  PASS   B4 no OP-TEE error in the kernel log
+  PASS   B5 /dev/tee0 and /dev/teepriv0 exist
+  PASS   B6 tee-supplicant is running
+  PASS   B7 legacy Core 1 heartbeat rising: 5661835270 -> 5736454484
+  PASS   B8 PTA answers (FIQ count read)
+  PASS   B9 FIQ not armed (FIQ_CONTROL 0x00000000)
+  PASS   B10 can0 exists and is up
+  PASS   B11 mcp251xfd initialised the MCP2518FD on can0
+  PASS   B12 no SPI CRC errors from the CAN driver
+
+== C  Isolation settings (Linux side)
+  PASS   C1 Linux CPUs online = 0,2-3, Core 1 never runs Linux ('0,2-3')
+  PASS   C2 kernel log: CPU1 failed to come online (held by the TF-A divert)
+  PASS   C3 secure DRAM 0x10000000-0x10ffffff (TF-A + OP-TEE, N-04) is reserved in /proc/iomem
+  PASS   C4 shared-memory pool 0x08000000-0x09ffffff is reserved in /proc/iomem
+  PASS   C5 /dev/tee0 has no world access (crw-rw---- root teeclnt)
+  PASS   C6 group teeclnt has no members (F24: only root can call the TEE)
+
+== D  Monitor health
+  PASS   D1 monitor initialised: init_ok=1
+  PASS   D2 Core 1 not starved: starved=0
+  PASS   D3 no PTA lock timeouts: 0
+  PASS   D4 Core 1 last poll 0 ms ago (limit 10 ms)
+  PASS   D5 Core 1 polls on its own: poll_count 5745171890 -> 5786669914 in 1 s, no Linux help
+  PASS   D6 past the 60 s boot grace (uptime 157 s), timeouts are live
+  note   event log before section E: ev_seq 6, ev_lost 0
+
+== E  Detection, step by step (software-injected frames, ID 0x123)
+  PASS   E1 valid next frame (1099) -> ACCEPTED: ACCEPTED 0
+  PASS   E2 valid next frame (1100) -> ACCEPTED: ACCEPTED 0
+  PASS   E3 one tag bit flipped -> AUTH_FAIL (AUTH_FAIL 0), last_counter stays 1100 (1100)
+  PASS   E4 same frame again (1100) -> DUPLICATE: DUPLICATE 0
+  PASS   E5 same counter, different payload -> CONFLICT: CONFLICT 0
+  PASS   E6 older counter (1097) -> REPLAY: REPLAY 0
+  PASS   E7 wrong CAN id 0x124 -> MALFORMED: MALFORMED 3
+  PASS   E8 rejected frames never moved the counter: last_counter 1100 = 1100
+  PASS   E9 counter jumps 1100 -> 1106 -> GAP detail 5 (5 frames missing): GAP 5
+  PASS   E10 after the gap the next frame (1107) is ACCEPTED: ACCEPTED 0
+  PASS   E11 1 s of silence -> traffic TIMEOUT (detail 1) from Core 1; traffic age 1098 ms (deadline 300 ms)
+  PASS   E12 traffic resumes -> ACCEPTED (ACCEPTED 0) and TRAFFIC_RECOVERED event
+  PASS   E13 Secure World issues fresh challenges: hb_seq 162 -> 165, nonce 0xac2b84ae2f0dc958 -> 0x1ca733e97db1f564
+  PASS   E14 Normal World answers a fresh challenge -> ON_TIME: hb_seq 166 answered: ON_TIME (detail 0)
+  PASS   E15 answer again without a new challenge -> nothing to answer: no open challenge (state ANSWERED, hb_seq 166): nothing to answer
+  PASS   E16 responder silent 5 s -> hb_state OPEN, misses 4 (>=3), heartbeat TIMEOUT (detail 2) from Core 1
+  PASS   E17 responder back -> hb_seq 172 answered: ON_TIME (detail 0), HEARTBEAT_RECOVERED, miss count 0
+  PASS   E18 every detection is in the Secure World event log (AUTH_FAIL REPLAY MALFORMED COUNTER_GAP TRAFFIC_RECOVERED TIMEOUT HEARTBEAT_RECOVERED)
+         seq 7 HEARTBEAT_RECOVERED  counter 160 detail 0 ticks 3404971494
+         seq 8 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 3406978747
+         seq 9 AUTH_FAIL            counter 1101 detail 0 ticks 3408885498
+         seq 10 REPLAY               counter 1100 detail 2 ticks 3410973471
+         seq 11 REPLAY               counter 1100 detail 3 ticks 3411928897
+         seq 12 REPLAY               counter 1097 detail 1 ticks 3412865780
+         seq 13 TIMEOUT              counter 0 detail 1 ticks 3413721327
+         seq 14 MALFORMED            counter 1101 detail 3 ticks 3413939643
+         seq 15 COUNTER_GAP          counter 1106 detail 5 ticks 3416092610
+         seq 16 TIMEOUT              counter 0 detail 1 ticks 3422783895
+         seq 17 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 3440083447
+         seq 18 TIMEOUT              counter 0 detail 1 ticks 3445844474
+         seq 19 TIMEOUT              counter 0 detail 2 ticks 3470946198
+         seq 20 HEARTBEAT_RECOVERED  counter 166 detail 0 ticks 3520760348
+         seq 21 TIMEOUT              counter 0 detail 2 ticks 3586172336
+         seq 22 HEARTBEAT_RECOVERED  counter 172 detail 0 ticks 3635500690
+
+== F  Full regression and negative tests
+       SKIP  T4b    frame length 43/45 cannot be sent through the fixed 44-byte client API (covered by the host harness, command 17 length checks)
+       FAIL  T21d   lease expiry is reported as MODE_CHANGED detail 2 (IDLE_EXPIRED, C6 image); LEASE_GRANTED +1. On an older image the expiry shows detail 0 and this check FAILS
+  KNOWN  F1 c5_board_tests: SUMMARY: 25 PASS, 1 FAIL, 5 note, 1 skip. Only T21d failed: IDLE_EXPIRED is not flashed on the frozen image (use --c6-image after flashing C6)
+  PASS   F2 legacy/debug commands refused, bad parameters rejected (T25): SUMMARY: 12 PASS, 0 FAIL, 0 note
+  PASS   F3 idle-lease caps (C6 negative): 6 PASS, 0 FAIL
+
+== G  Soak (sender 10 frames/s + heartbeat responder)
+     soak: 60 s, period 100 ms, 599 ticks
+     frame verdicts: ACCEPTED 599 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+     heartbeat answers: ON_TIME 60 LATE 0 other 0
+     send lateness vs absolute deadline (us): p50 75 p99 77 max 82
+     frame submit latency (us): p50 8913 p99 9418 max 9490
+     end state: flags 0x07 last_counter 1919 hb_state ANSWERED miss_count 0 | pta_lock_timeouts +0 skip_total +32 starved 0
+  PASS   G1 frames: ACCEPTED 599 (+RESYNC 0) of ~600, wrong verdicts 0, BUSY 0, errors 0
+  PASS   G2 heartbeat: ON_TIME 60, LATE 0 (first answer may be late), other 0
+  PASS   G3 no lock timeouts (+0) and no starvation (0) under load
+
+== H  After the run
+  PASS   H1 monitor still healthy: init_ok=1 starved=0 lock timeouts 0 ev_lost 16
+  PASS   H2 Core 1 still running: heartbeat 9709650782 -> 9747782087, FIQ still unarmed
+
+== SUMMARY
+49 PASS, 0 FAIL, 1 KNOWN, 0 SKIP
+Scope: software-injected frames through the PTA (not CAN-bus traffic); prototype keys; detection only; Pi 3 has no TZASC.
+Test events are now in the monitor's RAM log: reboot for a clean state. Remove the key when done: rm /tmp/kf
+Log: /tmp/board_check_19700101T000235Z.txt
+[exit 0]
+```
+
+### C5 board test (27 checks, own fresh boot)
+
+(`[exit 1]` below is the program reporting T21d.) **What it shows:** the original C5 acceptance tests, each with its numbers (for example the traffic timeout 296.5 ms after the last frame, against a 300 ms limit; 1000 bad-tag frames producing 1000 `AUTH_FAIL` verdicts but only a handful of ring entries, with the earliest evidence kept). **Good result:** all PASS except T21d, which is expected on this image.
+
+```text
+pi# chmod +x /tmp/mon_client /tmp/c5_board_tests /tmp/c6_negative_raw; chmod 600 /tmp/kf; echo "Pi fresh boot, uptime $(cut -d. -f1 /proc/uptime) s, boot_id $(/tmp/mon_client status 0 | sed -n "s/.*boot_id \(0x[0-9a-f]*\).*/\1/p"), tools copied to /tmp (RAM)"
+Pi fresh boot, uptime 105 s, boot_id 0x2ea91410, tools copied to /tmp (RAM)
+[exit 0]
+
+pi# /tmp/c5_board_tests --key-file /tmp/kf --no-t6
+c5_board_tests: boot_id 0x2ea91410, flags 0x13, last_counter 0, hb_state OPEN, ev_seq 1, idle_uses 0
+== frames (T1-T8)
+  note  setup  traffic not armed; first frame verdict RESYNC
+  PASS  T1     5 valid frames ACCEPTED, frame-class events +0 (expected 0)
+  PASS  T2     bad tag -> AUTH_FAIL, AUTH_FAIL +1, traffic age 1760316->2155542 ticks (not refreshed), last_counter unchanged=1
+  PASS  T3     payload altered, tag kept -> AUTH_FAIL, AUTH_FAIL +1
+  PASS  T4     id 0x124 -> MALFORMED, EFF flag -> MALFORMED, MALFORMED +2, state unchanged=1
+  SKIP  T4b    frame length 43/45 cannot be sent through the fixed 44-byte client API (covered by the host harness, command 17 length checks)
+  PASS  T5     last=1005: 995->REPLAY, 1005->DUPLICATE, 1005(diff)->CONFLICT, 1006->ACCEPTED, 1010->GAP(detail 3); REPLAY events +3, GAP +1
+  PASS  T7a    sender stopped: TIMEOUT(traffic) +1 (expected exactly 1), 296.3 ms after the last accepted frame (T=300 ms)
+  PASS  T7b    traffic-timeout flag set while silent (flags 0x0f)
+  PASS  T7c    sender resumed: frame ACCEPTED, TRAFFIC_RECOVERED +1, timeout flag cleared=1
+  PASS  T8     sender counter restarted at 1: 3 frames -> REPLAY (REPLAY events +3, rate-limited ones not counted), then silence 400 ms: TIMEOUT(traffic) +1 (replayed frames do not refresh the deadline)
+  note  T8     recover with the monitor's next counter 1013 -> ACCEPTED
+== heartbeat (T9-T16)
+  PASS  T9     fetch -> answer: ON_TIME, state ANSWERED, no answer-related events
+  PASS  T14    same answer twice: second -> DUPLICATE (expected DUPLICATE)
+  PASS  T12    wrong nonce -> BAD_NONCE, request stays OPEN, BAD_NONCE +1
+  PASS  T13    previous answer resent -> STALE, STALE_ANSWER +1
+  PASS  T15    unissued seq 116 -> UNISSUED, UNISSUED +1
+  PASS  T11    answer 700 ms after issue (D_req 500) -> LATE, state LATE_ANSWERED, LATE_ANSWER +1, miss_count 0 -> 1 (not reset)
+  PASS  T11c   same late answer twice more -> DUPLICATE, DUPLICATE; miss_count unchanged (1); DUPLICATE_ANSWER +2
+  note  T11b   answer at exactly issue+D_req needs tick-exact timing: host harness only; T11a needs a stalled Core 1: host harness t_stall
+  PASS  T16    consumer session closed and reopened: same request seq 113/113, same nonce=1, no false event
+  PASS  T10    no answers for 4.6 s: miss_count 0 -> 4 (>= +3), TIMEOUT(heartbeat) +1 (exactly 1), heartbeat-timeout flag=1
+  PASS  T10b   responder back: ON_TIME, HEARTBEAT_RECOVERED +1, miss_count 0
+== four parallel callers (T19)
+  note  T19    responder: ON_TIME 8 LATE 0 other 0 errs 0 | frames accepted 186 (errs 0, BUSY-after-retries 0) | cmd22 calls 476 (BUSY-after-retries 0) | cmd20 calls 430 (BUSY-after-retries 0)
+  PASS  T19    4 concurrent callers (cmds 20/22/23/17) for 8 s: every heartbeat answer on time (8), miss_count 0, no TIMEOUT, not starved
+  PASS  T19b   no call failed with an error other than BUSY (BUSY after 60 retries counted separately above: 0)
+== idle mode (T21)
+  PASS  T21a   idle lease 2000 ms: GRANTED, remaining 2000 ms, lease flag=1, idle_uses 0 -> 1
+  PASS  T21b   silence for 1.5 s inside the lease: no traffic TIMEOUT (+0)
+  PASS  T21c   after the lease expired (2 s): TIMEOUT(traffic) +1, lease flag cleared=1
+  FAIL  T21d   lease expiry is reported as MODE_CHANGED detail 2 (IDLE_EXPIRED, C6 image); LEASE_GRANTED +1. On an older image the expiry shows detail 0 and this check FAILS
+  note  T21    recover with next frame -> ACCEPTED
+== log flood (T22)
+  PASS  T22    1000 bad-tag frames: 1000 AUTH_FAIL verdicts, earliest pinned event (seq 1, type TIMEOUT) before and after, still readable=1, not starved
+  note  T22    AUTH_FAIL counted 1000, events written to the ring 17 (ev_seq 30 -> 47), ev_lost 0 -> 0, pinned_used 10 -> 12; suppressed (counted but not written) = 983; UART flood not testable (no UART)
+end: flags 0x0f last_counter 1201 hb_state LATE_ANSWERED miss_count 1 ev_seq 47 ev_lost 0 starved=0
+SUMMARY: 25 PASS, 1 FAIL, 6 note, 1 skip
+[exit 1]
+```
+
+### C6 Hardening
+
+**What it shows:** the old debug and hardware commands are refused (`NOT_SUPPORTED`) and counted, calls with wrong parameter types are rejected without crashing, and the idle lease cannot be abused (cap on length and on the number of uses per boot). **Good result:** the raw negative test passes all its checks, and the idle-lease caps pass on a fresh boot.
+
+```text
+pi# chmod +x /tmp/mon_client /tmp/c5_board_tests /tmp/c6_negative_raw; chmod 600 /tmp/kf; echo "Pi fresh boot, uptime $(cut -d. -f1 /proc/uptime) s, boot_id $(/tmp/mon_client status 0 | sed -n "s/.*boot_id \(0x[0-9a-f]*\).*/\1/p"), tools copied to /tmp (RAM)"
+Pi fresh boot, uptime 104 s, boot_id 0xe47b13ac, tools copied to /tmp (RAM)
+[exit 0]
+
+pi# /tmp/c6_negative_raw
+c6_negative_raw: boot_id 0xe47b13ac flags 0x13 profile HARDENED, init_ok=1 starved=0
+== legacy ids 0,3,6,7,13,14 (wrong parameter types: harmless even if a refusal were missing)
+  PASS  R1    ids 0,3,6,7,13,14 x 2 patterns -> all NOT_SUPPORTED (a BAD_PARAMETERS would mean the refusal is missing)
+  PASS  R1b   LEGACY_CMD_REFUSED +12 of 12 (best effort by design: one trylock, dropped when the monitor lock is busy; 0 dropped), LEGACY_CMD_USED +0 (expected 0)
+== chip-A debug readers 4,5,8,9,10,11,15,16
+  PASS  R2    8 readers x 2 patterns -> NOT_SUPPORTED in the hardened profile
+  PASS  R2b   LEGACY_CMD_REFUSED +16 of 16 (best effort by design; 0 dropped)
+== unknown ids
+  PASS  R3    ids 24-30, 40, 100, 0x1000, 0xFFFFFFFF x 2 patterns -> NOT_SUPPORTED, monitor state unchanged
+== monitor commands 17-23 with wrong parameter types
+  PASS  R4    commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS
+  PASS  R4b   no counter, verdict total, event, last_counter, idle use or acknowledgement changed
+== short buffers
+  PASS  R5    command 18 with an 8-byte buffer for 5 events -> SHORT_BUFFER, required size 120 (expected 120)
+  PASS  R5b   command 20 with an 8-byte buffer -> SHORT_BUFFER, required size 128 (expected 128)
+  PASS  R6    command 18 with max_entries 0 and 6 -> BAD_PARAMETERS (0xffff0006, 0xffff0006)
+== legacy ids kept: 1, 2, 12
+  PASS  R7    ids 1 (FIQ count), 2 (FIQ control), 12 (Core 1 heartbeat) -> SUCCESS with VALUE_OUTPUT
+  PASS  H     monitor still healthy: init_ok=1 starved=0, Core 1 last poll 0 ms ago
+SUMMARY: 12 PASS, 0 FAIL, 0 note
+[exit 0]
+
+pi# /tmp/c5_board_tests --key-file /tmp/kf --c6-negative
+== C6 negative tests, command 21 (idle lease caps)
+start: idle_uses 0, flags 0x07
+  PASS  N1     mode 2 / on with 0 ms / off with 100 ms -> BAD_PARAMETERS (0xffff0006 0xffff0006 0xffff0006), idle_uses unchanged (0), no lease
+  PASS  N2     off with no lease -> NO_CHANGE (expected NO_CHANGE)
+  PASS  N3     request 120000 ms -> GRANTED, remaining 60000 ms (clamped to the 60000 ms cap)
+  PASS  N4     lease active, request 5000 then 1000 ms -> RENEWED, RENEWED, remaining 1000 ms (replaced, not 6000)
+  PASS  N4b    off with an active lease -> RETURNED (expected RETURNED)
+  PASS  N5     use cap: 13 more uses granted (idle_uses 3 -> 16, cap 16), 7 requests REFUSED_CAP, LEASE_REFUSED +7
+  note  N5     the per-boot use cap is now exhausted: idle mode stays refused until the board is rebooted
+end: flags 0x07 idle_uses 16 starved=0
+SUMMARY: 6 PASS, 0 FAIL, 1 note
+[exit 0]
+```
+
+### C7 Independent CAN path (chip B)
+
+**Not built.** The design exists; it needs a second CAN board and a sender, which were not available. Nothing in this evidence file claims it works.
+
+```text
+$ NOT BUILT: designed only
+# COMPONENT 7: Independent CAN and cross-checking (plan S5 + S6): DESIGNED, NOT BUILT (2026-11-12)
+
+**Status: NOT STARTED, BLOCKED. Nothing of Design 2 is implemented or tested.** This is deliberate: the plan itself says "without a second board and a sender the report says Design 2 designed, not tested".
+
+## 1. Why it is not built
+| Need (plan C7) | State |
+|---|---|
+| A second working CAN controller ("chip B") that Core 1 reads directly | **None.** `can1` on the shield is dead hardware (`ENODEV`, `baseline/CAN_CONTROLLER1_BASELINE.md`). |
+| An external CAN sender (CAN-FD frames, ID 0x123, 50 ms) | **None.** The user has no second Pi. A Waveshare RS485 CAN HAT (MCP2515) exists but is classic-CAN only, so it could be a sender or listener on a second Pi, **n
+| Header access for chip B wiring (M5.1) | Not possible: the shield's pass-through header takes only male pins; no suitable jumpers. |
+
+## 2. What exists (design only)
+[exit 0]
+```
+
+### C8 Soaks, reboots, mutation testing, document check
+
+**What it shows:** the 7.27 h soak judged by `analyze_soak.py` against criteria fixed in advance (one sample was lost to SSH, so its criterion C1 is a FAIL and its `[exit 1]` below is that; everything else passes); 21 boots gave 21 distinct boot IDs; the mutation test (144 planted bugs in the real source) caught 141 and the 3 survivors are equivalent; every path cited in the documents exists.
+
+```text
+$ analyze_soak.py on the 7.27 h soak CSV
+file /home/aslam/Minor_Project/Part_E_Verification/baseline/soak_watch_20261112.csv
+samples 431 (+1 UNREACHABLE, 0 malformed)  2026-11-12T12:47:36Z .. 2026-11-12T20:03:47Z  Pi uptime 1336s .. 27507s  covered 7.27 h
+
+FAIL   C1 no sample lost: 1 UNREACHABLE first at 2026-11-12T18:47:55Z
+PASS   C2 no reboot or panic: boot_ids ['0x2988a3c3'], uptime increasing: True
+PASS   C3 starved == 0: max starved 0
+PASS   C4 zero lock timeouts: max pta_lock_timeouts 0
+PASS   C5 heartbeat answered: states {'ANSWERED': 392, 'OPEN': 39} (OPEN = 9.0% of samples, a challenge awaiting its answer), max hb_miss 0
+PASS   C6 traffic keeps flowing: last_counter 1262 -> 262945, mean 10.00 frames/s (sender period 100 ms = 10/s), 0 pairs without progress
+
+PASS   C7 no alarm events after the first sample: baseline at first sample: TIMEOUT=1, LATE_ANSWER=1, AUTH_FAIL=0, REPLAY=0, COUNTER_GAP=0, TRAFFIC_RECOVERED=0, HEARTBEAT_RECOVERED=1; 0 rise(s) = false-positive candidates
+         2026-11-12T13:47:16Z  TIMEOUT +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  LATE_ANSWER +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+         2026-11-12T13:47:16Z  TRAFFIC_RECOVERED +1   HANDOFF (soak 1 -> soak 2; sender really paused), not counted
+PASS   C8 no ring loss: ev_lost at end 0
+PASS   C9 Core 1 poll age bounded: min 0 us, median 222 us, p99 448 us, max 449 us (limit 10000 us)
+
+OVERALL: NOT all pass: read the lines marked FAIL / REVIEW; do not call this a clean soak
+[exit 1]
+
+$ 21 boots, boot IDs (T18b)
+n,utc,uptime_s,boot_id,flags,init_ok,starved,note
+0,2026-11-15T18:39:12Z,413.93,0x1ea249b8,0x13,1,0,
+1,2026-11-15T18:40:23Z,45.43,0x096f68b5,0x03,1,0,
+2,2026-11-15T18:41:34Z,45.20,0x4a5f820a,0x03,1,0,
+3,2026-11-15T18:42:49Z,49.42,0x95efa938,0x03,1,0,
+4,2026-11-15T18:44:04Z,49.55,0xb0766725,0x03,1,0,
+5,2026-11-15T18:45:14Z,44.27,0xbe80df92,0x03,1,0,
+6,2026-11-15T18:46:30Z,51.20,0x7307d6c1,0x03,1,0,
+7,2026-11-15T18:47:46Z,50.24,0x3fc36316,0x03,1,0,
+8,2026-11-15T18:49:01Z,50.16,0x16d6e2a1,0x03,1,0,
+9,2026-11-15T18:50:15Z,48.00,0x670bf319,0x03,1,0,
+10,2026-11-15T18:51:29Z,49.21,0xa5d59f0d,0x03,1,0,
+11,2026-11-15T18:52:45Z,50.21,0xd42f4152,0x03,1,0,
+12,2026-11-15T18:53:56Z,46.02,0x73c37dc0,0x03,1,0,
+13,2026-11-15T18:55:12Z,50.00,0xb864f5bb,0x03,1,0,
+14,2026-11-15T18:56:28Z,50.19,0xdce21258,0x03,1,0,
+15,2026-11-15T18:57:38Z,45.14,0x96367702,0x03,1,0,
+16,2026-11-15T18:58:53Z,50.25,0xa27c8f43,0x03,1,0,
+17,2026-11-15T19:00:08Z,49.21,0x23f9a314,0x03,1,0,
+18,2026-11-15T19:01:23Z,50.24,0xbfa1d684,0x03,1,0,
+19,2026-11-15T19:02:39Z,50.41,0x71d7614c,0x03,1,0,
+20,2026-11-15T19:03:51Z,46.10,0x485e04e8,0x03,1,0,
+[exit 0]
+
+$ mutation testing (run 2026-11-18, real sources, 144 mutants)
+caught 141 of 144; survivors: ["no 'now < t0' term (unsigned wrap already fails closed)", 'init does not clear the lock explicitly (memset already zeroes it)', 'counter wrap guard removed']
+[exit 0]
+
+$ cited paths in the documents
+cited paths checked: 519 | unresolved: 0
+[exit 0]
+```
+
+### Cleanup and final state
+
+The test tools and the key were removed from the Pi's RAM disk, the Pi was rebooted, and `verify_boot` was run again. **Good result:** `/tmp` shows no tools and `verify_boot` is 16 pass, 0 FAIL.
+
+```text
+pi# rm -f /tmp/mon_client /tmp/c5_board_tests /tmp/c6_negative_raw /tmp/kf /tmp/board_full_check.sh /tmp/board_check_*; ls /tmp; sync; reboot
+messages
+[exit 0]
+
+$ verify_boot.sh after cleanup and reboot
+verify_boot: 10.237.27.187  mode=--expect-core1-pinned
+  PASS  ssh reachable
+  info  uptime 49.78s, kernel 6.7.0-rc6-v8
+  PASS  kernel is 6.7.0-rc6
+  info  [    7.287961] optee: revision 4.10 (a7ccc63e41c4acc5)
+  PASS  OP-TEE reports its revision
+  PASS  OP-TEE driver initialised
+  PASS  no OP-TEE error in dmesg
+  PASS  /dev/tee0 and /dev/teepriv0 exist
+  PASS  tee-supplicant is running
+  info  CPU online=0,2-3 offline=1
+  PASS  CPU mask is 0,2-3 (Core 1 diverted)
+  PASS  CPU1 reported as failing to come online
+  info  Core 1 heartbeat 2032243431 -> 2129385994
+  PASS  Core 1 heartbeat is rising
+  info  FIQ_CONTROL=0x00000000
+  PASS  PTA answers (fiq-count)
+  PASS  FIQ is NOT armed after boot (FIQ_CONTROL 0x00000000)
+  PASS  can0 exists
+  PASS  can0 is up
+  PASS  mcp251xfd found the chip on can0
+  PASS  no SPI CRC errors from the CAN driver
+  SKIP  canmode not on the Pi (/tmp); bitrate and mode not read
+  SKIP  ta_roundtrip not on the Pi (/tmp); TA/PTA round trip not run
+verify_boot: 16 pass, 0 FAIL, 2 skipped
+[exit 0]
+DONE
+```

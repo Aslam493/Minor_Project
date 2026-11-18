@@ -38,12 +38,12 @@ INTRO = {
         "step by step** (valid frame, tampered tag, duplicate, conflict, replay, wrong CAN id, gap, silence then traffic timeout and recovery, fresh heartbeat challenges, on-time answer, silent responder then "
         "heartbeat timeout and recovery, and that each detection is in the event log), F = regression and negative tests, G = a 60 s soak, H = state afterwards. "
         "**Legend:** PASS = condition met; FAIL = not met; KNOWN = a failure explained in advance (T21d tests `IDLE_EXPIRED`, which is written but not flashed); SKIP = not applicable here."),
- "C5b": ("C5 board test (27 checks, own fresh boot)", "**What it shows:** the original C5 acceptance tests, each with its numbers (for example the traffic timeout 296.5 ms after the last frame, against a 300 ms limit; "
+ "C5b": ("C5 board test (27 checks, own fresh boot)", "(`[exit 1]` below is the program reporting T21d.) **What it shows:** the original C5 acceptance tests, each with its numbers (for example the traffic timeout 296.5 ms after the last frame, against a 300 ms limit; "
          "1000 bad-tag frames producing 1000 `AUTH_FAIL` verdicts but only a handful of ring entries, with the earliest evidence kept). **Good result:** all PASS except T21d, which is expected on this image."),
  "C6": ("C6 Hardening", "**What it shows:** the old debug and hardware commands are refused (`NOT_SUPPORTED`) and counted, calls with wrong parameter types are rejected without crashing, and the idle "
         "lease cannot be abused (cap on length and on the number of uses per boot). **Good result:** the raw negative test passes all its checks, and the idle-lease caps pass on a fresh boot."),
  "C7": ("C7 Independent CAN path (chip B)", "**Not built.** The design exists; it needs a second CAN board and a sender, which were not available. Nothing in this evidence file claims it works."),
- "C8": ("C8 Soaks, reboots, mutation testing, document check", "**What it shows:** the 7.27 h soak judged by `analyze_soak.py` against criteria fixed in advance (one sample was lost to SSH, so C1 of the analyser is a FAIL; "
+ "C8": ("C8 Soaks, reboots, mutation testing, document check", "**What it shows:** the 7.27 h soak judged by `analyze_soak.py` against criteria fixed in advance (one sample was lost to SSH, so its criterion C1 is a FAIL and its `[exit 1]` below is that; "
         "everything else passes); 21 boots gave 21 distinct boot IDs; the mutation test (144 planted bugs in the real source) caught 141 and the 3 survivors are equivalent; every path cited in the documents exists."),
  "END": ("Cleanup and final state", "The test tools and the key were removed from the Pi's RAM disk, the Pi was rebooted, and `verify_boot` was run again. **Good result:** `/tmp` shows no tools and `verify_boot` is 16 pass, 0 FAIL."),
 }
@@ -76,17 +76,19 @@ def table():
     if c5:
         names = " ".join(re.findall(r"\n\s+FAIL\s+(\S+)", secs["C5b"][1]))
         rows.append(("C5", "C5 board test, own fresh boot", "%s PASS, %s FAIL (%s), %s skip" % (c5[0], c5[1], names or "none", c5[3]), c5[1] == "0" or names.strip() == "T21d"))
-    c6 = last("C6", r"SUMMARY: (\d+) PASS, (\d+) FAIL")
+    c6l = find("C6", r"SUMMARY: (\d+) PASS, (\d+) FAIL")
+    c6 = c6l[0] if c6l else None
     if c6: rows.append(("C6", "Legacy commands refused / bad parameters rejected", "%s PASS, %s FAIL" % c6, c6[1] == "0"))
     cap = secs.get("C6", ("", ""))[1]
     seg = cap.split("c5_board_tests --key-file /tmp/kf --c6-negative")[-1]
     np_, nf_ = len(re.findall(r"\n\s+PASS ", seg)), len(re.findall(r"\n\s+FAIL ", seg))
     rows.append(("C6", "Idle-lease caps (own fresh boot)", "%d PASS, %d FAIL" % (np_, nf_), nf_ == 0 and np_ > 0))
     rows.append(("C7", "Independent CAN (chip B)", "NOT BUILT (designed only)", None))
-    an = find("C8", r"OVERALL: ([^\n]+)")
-    rows.append(("C8", "Soak analysis (7.27 h, 9 criteria)", "all pass except C1: 1 sample lost over SSH" if an else "n/a", None))
-    ids = find("C8", r"\n(\d+),20\d\d-")
-    rows.append(("C8", "Boot IDs over reboots", "%d boots" % len(ids) if ids else "n/a", None))
+    cr = find("C8", r"\n(PASS|FAIL|REVIEW)\s+(C\d) ")
+    bad = [c for v, c in cr if v != "PASS"]
+    rows.append(("C8", "Soak analysis, 7.27 h, 9 criteria fixed in advance", "%d of %d criteria PASS; not passed: %s (C1 = one monitoring sample lost over SSH)" % (len(cr) - len(bad), len(cr), ", ".join(bad) or "none"), None))
+    ids = re.findall(r"\n(\d+),20\d\d-[^,]*,[^,]*,(0x[0-9a-f]+),", secs.get("C8", ("", ""))[1])
+    rows.append(("C8", "Monitor boot IDs over reboots (T18b)", "%d boots, %d distinct IDs" % (len(ids), len({i[1] for i in ids})) if ids else "n/a", len(ids) >= 20 and len({i[1] for i in ids}) == len(ids)))
     mu = last("C8", r"caught (\d+) of (\d+)")
     if mu: rows.append(("C8", "Mutation testing (planted bugs in the real source)", "%s of %s caught (3 equivalent survivors)" % mu, mu[0] == "141"))
     cp = last("C8", r"cited paths checked: (\d+) \| unresolved: (\d+)")

@@ -17,7 +17,7 @@ python3 "$PV/scripts/build_evidence_md.py" "$RAW" "$R/2_EVIDENCE_FILE.md"
 cp "$RAW" "$R/3_raw_evidence_output.txt"
 for f in 1_PROJECT_EXPLANATION 2_EVIDENCE_FILE; do
   t=$(head -1 "$R/$f.md" | sed 's/^# //')
-  pandoc "$R/$f.md" -s --metadata title="$t" -H "$CSS" -o "$T/$f.html"
+  pandoc "$R/$f.md" -s --metadata pagetitle="$t" -H "$CSS" -o "$T/$f.html"
   google-chrome --headless --no-sandbox --disable-gpu --no-pdf-header-footer --print-to-pdf="$R/$f.pdf" "$T/$f.html" >/dev/null 2>&1
 done
 rm -rf "$T"
