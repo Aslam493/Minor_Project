@@ -91,7 +91,7 @@ M = [  # (name, file, [(old, new[, count])], expected_equivalent)
  ("command 19 not clamped", 'c', [("\tif (ack_upto > l->ev_seq)\t\t\t/* clamp */\n\t\tack_upto = l->ev_seq;\n", "")], False),
  ("command 19 can move backwards", 'c', [("if (ack_upto > l->ev_ack)\t\t\t/* monotonic; never touches ev_lost or the overwrite victim */\n\t\tl->ev_ack = ack_upto;", "l->ev_ack = ack_upto;")], False),
  ("command 19 resets the lost counter", 'c', [("\t\tl->ev_ack = ack_upto;\n\teff", "\t\tl->ev_ack = ack_upto;\n\tl->ev_lost = 0;\n\teff")], False),
- ("command 20 accepts page 2", 'c', [("if (b != 0 || page >= 2)\n\t\treturn RPI3_MON_R_BAD_PARAMETERS;\n\tif (out == NULL && *len > 0)\n\t\treturn RPI3_MON_R_BAD_PARAMETERS;\n\tif (!rpi3_mon_init_ok())\n\t\treturn RPI3_MON_R_BAD_STATE;\n\tif (*len < 128)", "if (b != 0 || page >= 3)\n\t\treturn RPI3_MON_R_BAD_PARAMETERS;\n\tif (out == NULL && *len > 0)\n\t\treturn RPI3_MON_R_BAD_PARAMETERS;\n\tif (!rpi3_mon_init_ok())\n\t\treturn RPI3_MON_R_BAD_STATE;\n\tif (*len < 128)")], False),
+ ("command 20 accepts page 2", 'c', [("if (b != 0 || page >= 2)\n#endif", "if (b != 0 || page >= 3)\n#endif")], False),
  ("command 20 wrong length field", 'c', [("\tp.version = 1;\n\tp.length = 128;\n\tp.boot_id = boot_id;", "\tp.version = 1;\n\tp.length = 120;\n\tp.boot_id = boot_id;")], False),
  ("command 20 hardened flag inverted", 'c', [("(profile == RPI3_MON_PROFILE_HARDENED ? RPI3_MON_PFLAG_HARDENED : 0)", "(profile != RPI3_MON_PROFILE_HARDENED ? RPI3_MON_PFLAG_HARDENED : 0)")], False),
  ("command 20 pinned_used missing", 'c', [("\tp.pinned_used = l->pinned_used;\n", "")], False),
