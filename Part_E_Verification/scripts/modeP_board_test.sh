@@ -23,10 +23,22 @@ say "2. PUSH is refused in Mode P: the old forwarder (command 17) replays 5 pack
 /tmp/can_forwarder run 6 > /tmp/push.out 2>&1 &
 FP=$!; sleep 2; /tmp/can_replay /tmp/few.txt; wait $FP; grep -E "frames submitted|dropped|can0 rx_packets" /tmp/push.out
 $M status 1 | grep -E "^page 1|frame "
+evc() { $M status 1 | awk -v k="$1" '$1==k {print $2; f=1} END {if (!f) print 0}'; }
+B_AF=$(evc AUTH_FAIL); B_RP=$(evc REPLAY); B_GP=$(evc COUNTER_GAP); B_ML=$(evc MALFORMED); B_TR=$(evc TRAFFIC_RECOVERED); B_LA=$(evc LATE_ANSWER)
 say "3. PULL: forwarder holds the packets and answers Secure World's requests; can_replay sends the ready-made packets through the CAN controller"
 /tmp/can_forwarder run 25 --verbose --pull > /tmp/fwd.out 2>&1 &
 FP=$!; sleep 3; /tmp/can_replay /tmp/packets.txt; sleep 1; wait $FP
 say "4. forwarder output (requests answered, what was sent in each reply, what Secure World judged)"; cat /tmp/fwd.out
+say "4b. EXPECTED vs ACTUAL (packets reached Secure World only through command 31; the old forwarder in step 2 judged none)"
+ok=0; bad=0
+chk() { if [ "$2" = "$3" ]; then echo "  PASS  $1: $3"; ok=$((ok+1)); else echo "  FAIL  $1: expected $2, got $3"; bad=$((bad+1)); fi; }
+chk "altered packet (one tag bit flipped) -> AUTH_FAIL events" 1 $(( $(evc AUTH_FAIL) - B_AF ))
+chk "old packet (counter 5 below the last) -> REPLAY events" 1 $(( $(evc REPLAY) - B_RP ))
+chk "counter jump of 10 -> COUNTER_GAP events" 1 $(( $(evc COUNTER_GAP) - B_GP ))
+chk "wrong CAN id + extended id -> MALFORMED events" 2 $(( $(evc MALFORMED) - B_ML ))
+chk "silence then a valid packet -> TRAFFIC_RECOVERED events" 1 $(( $(evc TRAFFIC_RECOVERED) - B_TR ))
+echo "  LATE_ANSWER events during this functional run (informational, not a pass condition): $(( $(evc LATE_ANSWER) - B_LA ))"
+echo "  RESULT: $ok PASS, $bad FAIL"
 say "5. monitor event log (Secure World)"; $M events --all | grep -v returned
 say "6. restore can0 to the boot mode"
 /tmp/canfdcfg can0 normal; sleep 1; /tmp/canmode can0 | grep -E "mtu|FD mode|loopback"

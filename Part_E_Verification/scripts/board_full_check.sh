@@ -39,13 +39,14 @@
 # of that class (the counter stays exact). Run it on a freshly rebooted Pi (empty ring): E11 passes there. On a second run without a reboot E11
 # can FAIL although the monitor behaved correctly (checked in the event log: TIMEOUT 300.4 ms after the last frame).
 
-DIR=/tmp; SOAK=60; QUICK=0; C6IMG=0
+DIR=/tmp; SOAK=60; QUICK=0; C6IMG=0; MODEP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) DIR="$2"; shift ;;
     --soak) SOAK="$2"; shift ;;
     --quick) QUICK=1 ;;
     --c6-image) C6IMG=1 ;;
+    --mode-p) MODEP=1 ;;      # the flashed image is the Mode P image (command 17 refused): tests that need command 17 are SKIPPED with that reason, not failed
     -h|--help) sed -n 2,36p "$0"; exit 0 ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac; shift
@@ -83,7 +84,9 @@ for b in mon_client c5_board_tests c6_negative_raw; do
   [ -x "$DIR/$b" ] || { echo "  FAIL   $DIR/$b missing: copy it from the laptop (see the header of this script)"; echo 2 > "$RC"; return; }
 done
 HAVEKEY=0; [ -f "$DIR/kf" ] && [ "$(tr -d '\n ' < "$DIR/kf" | wc -c)" -eq 64 ] && HAVEKEY=1 && chmod 600 "$DIR/kf"
-[ $HAVEKEY = 1 ] || note "no 64-hex-character key in $DIR/kf: frame tests (E1-E12, F1, G) will be skipped"
+WHY="no key file"
+[ $MODEP = 1 ] && { HAVEKEY=0; WHY="Mode P image: needs command 17, which is refused there (packets are tested by modeP_board_test.sh through command 31)"; note "--mode-p: frame tests E1-E12, F1, F2 and G need command 17 and are skipped (not failed); E18 expects only the heartbeat events"; }
+[ $HAVEKEY = 1 ] || [ $MODEP = 1 ] || note "no 64-hex-character key in $DIR/kf: frame tests (E1-E12, F1, G) will be skipped"
 
 # ---------------------------------------------------------------- B
 echo; echo "== B  Boot and hardware"
@@ -160,7 +163,7 @@ if [ $HAVEKEY = 1 ]; then
   c=$((L + 1)); r=$(v17 $c $c); L=$c; sleep 1; rev=$(evsince $E1 | grep TRAFFIC_RECOVERED)
   chk "E12 traffic resumes -> ACCEPTED ($r) and TRAFFIC_RECOVERED event" $([ "${r% *}" = ACCEPTED ] && [ -n "$rev" ] && echo 1 || echo 0)
 else
-  skip "E1-E12 frame tests (no key file)"
+  skip "E1-E12 frame tests ($WHY)"
 fi
 a=$(nonce); sleep 2; b=$(nonce); sa=${a%% *}; sb=${b%% *}; na=${a##* }; nb=${b##* }
 chk "E13 Secure World issues fresh challenges: hb_seq $sa -> $sb, nonce $na -> $nb" $([ -n "$sb" ] && [ "$sb" -gt "$sa" ] 2>/dev/null && [ "$na" != "$nb" ] && echo 1 || echo 0)
@@ -191,19 +194,30 @@ else
     elif [ $C6IMG = 0 ] && [ "$nf" = 1 ] && [ "$fl" = T21d ]; then
       known "F1 c5_board_tests: $sum. Only T21d failed: IDLE_EXPIRED is not flashed on the frozen image (use --c6-image after flashing C6)"
     else fail "F1 c5_board_tests: ${sum:-no SUMMARY line}; failed: $fl"; fi
-  else skip "F1 c5_board_tests (no key file)"; fi
+  else skip "F1 c5_board_tests ($WHY)"; fi
+  if [ $MODEP = 1 ]; then
+    out=$("$DIR/c6_negative_raw" 2>&1); sum=$(echo "$out" | grep '^SUMMARY' | tail -1); nfl=$(echo "$out" | grep -E '^  FAIL' | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')
+    echo "$out" | grep -E '^  FAIL' | sed 's/^/     /'
+    if [ -z "$nfl" ]; then pass "F2 legacy/debug commands refused, bad parameters rejected (T25): $sum"
+    elif [ "$nfl" = "R4 R4b" ] || [ "$nfl" = "R4" ]; then known "F2 c6_negative_raw: $sum. Only R4/R4b failed: they expect command 17 to answer BAD_PARAMETERS for wrong parameter types; in Mode P command 17 is refused first (NOT_SUPPORTED), by design"
+    else fail "F2 c6_negative_raw: $sum; failed: $nfl"; fi
+  else
   out=$("$DIR/c6_negative_raw" 2>&1); rc=$?; sum=$(echo "$out" | grep '^SUMMARY' | tail -1)
   echo "$out" | grep -E '^  FAIL' | sed 's/^/     /'
   chk "F2 legacy/debug commands refused, bad parameters rejected (T25): $sum" $([ $rc = 0 ] && echo 1 || echo 0)
+  fi
+  if [ $MODEP = 1 ]; then skip "F3 idle-lease caps (C6 negative): one step injects a frame with command 17, refused in Mode P; the lease commands themselves are covered by F1 on the Mode F image"
+  else
   out=$("$DIR/c5_board_tests" --key-file "$DIR/kf" --c6-negative 2>&1); rc=$?
   np=$(echo "$out" | grep -c '^  PASS'); nfl=$(echo "$out" | grep -c '^  FAIL')
   echo "$out" | grep -E '^  FAIL' | sed 's/^/     /'
   chk "F3 idle-lease caps (C6 negative): $np PASS, $nfl FAIL" $([ $rc = 0 ] && [ "$nfl" = 0 ] && echo 1 || echo 0)
+  fi
 fi
 
 # ---------------------------------------------------------------- G
 echo; echo "== G  Soak (sender 10 frames/s + heartbeat responder)"
-if [ $QUICK = 1 ] || [ "$SOAK" = 0 ] || [ $HAVEKEY = 0 ]; then skip "G soak (--quick, --soak 0 or no key file)"
+if [ $QUICK = 1 ] || [ "$SOAK" = 0 ] || [ $HAVEKEY = 0 ]; then skip "G soak (--quick, --soak 0 or $WHY)"
 else
   out=$($M soak "$SOAK" $K 2>&1); echo "$out" | sed 's/^/     /'
   g(){ v=$(echo "$1" | tr ' ' '\n' | awk -v k="$2" 'p==k{print; exit} {p=$0}'); echo "${v:-0}"; }
