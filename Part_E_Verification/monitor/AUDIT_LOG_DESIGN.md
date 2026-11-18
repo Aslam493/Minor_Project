@@ -39,3 +39,6 @@ Separate audit ring (the alarm log keeps its limiter); 128 records; command 32; 
 
 ## Execution plan
 The multi-agent execution plan (agents, file ownership, waves, gates, risks, decisions D1-D4, time) is in `AUDIT_LOG_PLAN.md` (2026-11-18). Execution starts 2026-11-19 after the Mode P timing runs.
+
+## 7. Protection requirement (user, 2026-11-18): see `AUDIT_LOG_PLAN.md` section 8
+The log should live where an attacker cannot get it. On the Pi 3 that cannot be guaranteed (no TZASC, no usable secure storage). Level 1 (records sealed in Secure World: encrypted and chained, newest chain value also on the UART) is part of stage A; Level 2 (a chip only Secure World uses) is optional hardware; Level 3 (a board with a memory firewall) is the real fix. The honest claim: tamper-evident, not tamper-proof.

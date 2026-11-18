@@ -68,3 +68,15 @@ Stage A: about 6 to 7 h of work (host about 4 h with agents in parallel, build a
 
 ## 7. Order against the other open work
 Tomorrow's first hour (Mode P timing runs, `board_full_check --mode-p`, key-wording fix) comes first, because the audit image is built on the same Mode P base and the timing result may change constants.
+
+## 8. Requirement added by the user, 2026-11-18: "log the events carefully into secure memory where the attacker cannot get that part"
+**What cannot be promised on the Pi 3.** There is no TZASC, so Secure World RAM is not protected from a root attacker or from DMA; OP-TEE secure storage is a file on the same SD card written through Linux, encrypted with a hardware key that is all zeros on this board (public), and the eMMC RPMB that OP-TEE normally relies on does not exist here. So "the attacker cannot get that part" cannot be guaranteed. The report must say: **tamper-evident, not tamper-proof.**
+
+**Protection levels (what to build, in this order):**
+| Level | What | Cost | What it gives | What it does not give |
+|---|---|---|---|---|
+| 1 (moved from stage B into stage A) | Each record is sealed in Secure World BEFORE it leaves: encrypted and chained with a log key `K_log` held only in Secure World (computed lazily outside the lock, never inside a hold); the newest chain value is also printed on the UART (outside copy) | software only, about 2 more hours than stage B alone | the file on the SD card is unreadable, and edits, middle deletions and reordering are detectable offline | a root attacker who reads Secure World RAM can extract `K_log`; tail deletion without the UART copy; rollback of the card |
+| 2 (needs the user to add hardware) | Secure World writes the records straight to a small SPI FRAM/flash on a bus Linux does not use (Secure World already owns SPI0 from the earlier peripheral-ownership phase); Linux is not in the path at all | one small chip + wiring | Linux cannot drop or edit what never passes through it; survives a Linux compromise that stays in software | without a peripheral firewall a kernel-level attacker could still drive that bus; kernel hardening (no `/dev/mem`) raises the bar |
+| 3 | A board with a memory firewall (STM32MP1, i.MX8) | different hardware | real protection of Secure World memory | not available now; named in the report as the path to a guarantee |
+
+**Changes to the work units above:** (a) the chain tag and the sealing move from wave 6 into waves 1 to 5 (unit S computes the seal lazily when command 32 reads records; unit N stores the sealed form; the offline reader decrypts and verifies); (b) new decision **D5**: does the user want Level 2 (needs the chip)? default: no, Level 1 only; (c) new decision **D6**: kernel hardening (no `/dev/mem`, lockdown) in the same image, because Level 1 and 2 are only as strong as Linux's ability to reach Secure World memory; (d) the memory-isolation measurement (`/dev/mem` read test, read-only) is done first, so the claim in the report rests on a measurement; (e) the report states the limits above in the user's own terms.
