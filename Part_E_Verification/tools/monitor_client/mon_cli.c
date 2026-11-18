@@ -112,6 +112,14 @@ static int cmd_status(struct mon_ctx *c, int page)
 		printf("  last_counter %u hb_seq %u hb_state %s hb_miss_count %u idle_uses %u\n", s.last_counter, s.hb_seq, mon_hbstate_name(s.hb_state), s.hb_miss_count, s.idle_uses);
 		printf("  traffic_age_ticks %" PRIu64 " hb_last_ok_age_ticks %" PRIu64 " lease_remaining_ticks %" PRIu64 "\n", s.traffic_age_ticks, s.hb_last_ok_age_ticks, s.lease_remaining_ticks);
 		printf("  ev_seq %u ev_ack %u ev_lost %u pinned_used %u\n", s.ev_seq, s.ev_ack, s.ev_lost, s.pinned_used);
+	} else if (page == 2) {
+		struct mon_status2 s;
+		unsigned i;
+		RETRY(mon_get_status2(c, &s, &h), r);
+		if (r) { print_err("status", r); return 1; }
+		printf("page 2 (request latency, Secure World clock): version %u length %u answers ON_TIME %u LATE %u last %.3f ms max %.3f ms (since boot)\n", s.version, s.length, s.n_ontime, s.n_late, s.last_ticks / 19200.0, (double)s.max_ticks / 19200.0);
+		for (i = 0; i < MON_PQ_BUCKETS; i++)
+			if (s.bucket[i]) printf("  %2u-%s ms %u\n", 2 * i, i == MON_PQ_BUCKETS - 1 ? "inf" : (const char *[]){"2","4","6","8","10","12","14","16","18","20","22","24","26","28","30","32","34","36","38","40","42","44","46"}[i], s.bucket[i]);
 	} else {
 		struct mon_status1 s;
 		unsigned i;
@@ -227,7 +235,7 @@ int main(int argc, char **argv)
 
 	if (!strcmp(argv[a], "status")) {
 		int page = (a + 1 < argc) ? atoi(argv[a + 1]) : 0;
-		rc = (page == 0 || page == 1) ? cmd_status(&c, page) : (usage(), 2);
+		rc = (page >= 0 && page <= 2) ? cmd_status(&c, page) : (usage(), 2);
 	} else if (!strcmp(argv[a], "events")) {
 		uint32_t from = 0, max = MON_EVENT_MAX; int all = 0, ack = 0, i;
 		for (i = a + 1; i < argc; i++) {

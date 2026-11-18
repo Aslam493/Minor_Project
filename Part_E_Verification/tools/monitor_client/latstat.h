@@ -23,4 +23,15 @@ static inline uint32_t latstat_pct(const struct latstat *s, unsigned pct)
 	if (rank > s->n) rank = s->n;
 	return s->v[rank - 1];
 }
+/* Histogram percentile: smallest bucket index whose cumulative count reaches ceil(pct*total/100); returns nb when the histogram is empty. */
+static inline unsigned latstat_hist_pct(const uint32_t *bk, unsigned nb, unsigned pct)
+{
+	uint64_t total = 0, need, cum = 0; unsigned i;
+	for (i = 0; i < nb; i++) total += bk[i];
+	if (!total) return nb;
+	need = (pct * total + 99u) / 100u;
+	if (need < 1) need = 1;
+	for (i = 0; i < nb; i++) { cum += bk[i]; if (cum >= need) return i; }
+	return nb - 1;
+}
 #endif

@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 	const char *ifn = "can0", *cpus = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0; unsigned secs;
 	struct latstat l_reply, l_gap; uint64_t t_fetch = 0, t_prev_fetch = 0, t_start_us, cpu0_us; unsigned long fetches = 0; struct timespec cpu_ts;
 	static struct cb_queue q; static uint8_t batch[MON_PQ_MAX_BATCH * MON_FRAME_LEN]; uint32_t last_pseq = 0xFFFFFFFFu, pseq, pst, pmax, pdue, rv, proc;
-	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b;
+	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b; struct mon_status2 s2a, s2b; int have2 = 0;
 	struct sockaddr_can ad; struct ifreq ifr; struct mon_ctx c; struct mon_health h; struct mon_status0 s0; TEEC_Result r;
 	unsigned long verdict[8] = {0}, got = 0, drop[4] = {0}, ans_on = 0, ans_late = 0, ans_other = 0, busy = 0, errs = 0, rx0, rx1;
 	uint32_t seq, st, last_answered = 0xFFFFFFFFu, v, d; uint64_t nonce, end;
@@ -97,6 +97,7 @@ int main(int argc, char **argv)
 	if (r) { fprintf(stderr, "cannot open the monitor session (0x%08x)\n", (unsigned)r); return 1; }
 	memset(&s0, 0, sizeof s0); RETRY(mon_get_status0(&c, &s0, &h), r);
 	memset(&s1a, 0, sizeof s1a); memset(&s1b, 0, sizeof s1b); (void)mon_get_status1(&c, &s1a, &h);
+	memset(&s2a, 0, sizeof s2a); memset(&s2b, 0, sizeof s2b); if (pull && stats) have2 = !mon_get_status2(&c, &s2a, &h);
 	rx0 = rx_packets(ifn);
 	printf("can_forwarder: %s, %u s%s%s; monitor last_counter %u\n", ifn, secs, hb ? ", heartbeat answered" : ", no heartbeat", pull ? ", PULL mode (frames are held until Secure World asks)" : "", s0.last_counter);
 	end = now_ms() + (uint64_t)secs * 1000u;
@@ -153,6 +154,13 @@ int main(int argc, char **argv)
 	if (pull) {
 		printf("PULL: frames received from can0 and queued: %lu | requests answered: %lu (ON_TIME %lu, LATE %lu, STALE %lu, UNISSUED %lu, DUPLICATE %lu) | packets sent in replies and judged: %lu | still queued: %u | dropped by the queue: %lu\n",
 		       received, requests, reqv[0], reqv[1], reqv[2], reqv[3], reqv[4], judged_sent, q.n, q.dropped);
+		if (stats && have2 && !mon_get_status2(&c, &s2b, &h)) {
+			uint32_t d[MON_PQ_BUCKETS]; unsigned k, p50, p99, p100; uint32_t dn = (s2b.n_ontime + s2b.n_late) - (s2a.n_ontime + s2a.n_late);
+			for (k = 0; k < MON_PQ_BUCKETS; k++) d[k] = s2b.bucket[k] - s2a.bucket[k];
+			p50 = latstat_hist_pct(d, MON_PQ_BUCKETS, 50); p99 = latstat_hist_pct(d, MON_PQ_BUCKETS, 99); p100 = latstat_hist_pct(d, MON_PQ_BUCKETS, 100);
+			printf("SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n %u (ON_TIME %u, LATE %u); p50 in bucket %u-%u ms, p99 in bucket %u-%u ms, slowest in bucket %u-%u ms (2 ms buckets, upper edge is the bound); max since boot %.3f ms\n",
+			       dn, s2b.n_ontime - s2a.n_ontime, s2b.n_late - s2a.n_late, 2 * p50, 2 * p50 + 2, 2 * p99, 2 * p99 + 2, 2 * p100, 2 * p100 + 2, (double)s2b.max_ticks / 19200.0);
+		}
 		if (stats) {
 			uint64_t wall = now_us() - t_start_us, cpu_us; struct latstat *w[2] = { &l_reply, &l_gap }; static const char *const nm[2] = { "reply time, request fetched -> reply returned", "gap between two request fetches (worst wait before Linux looks)" }; int k;
 			clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_ts); cpu_us = (uint64_t)cpu_ts.tv_sec * 1000000u + (uint64_t)cpu_ts.tv_nsec / 1000u - cpu0_us;

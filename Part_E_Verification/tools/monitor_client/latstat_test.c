@@ -22,5 +22,11 @@ int main(void)
 	free(s.v); latstat_init(&s, 10); latstat_add(&s, 42); latstat_sort(&s);
 	CHECK(latstat_pct(&s, 50) == 42 && latstat_pct(&s, 99) == 42, "single sample: every percentile is that sample");
 	free(s.v);
+	{ uint32_t bk[24] = {0}; bk[1] = 90; bk[3] = 9; bk[23] = 1;		/* 100 answers */
+	  CHECK(latstat_hist_pct(bk, 24, 50) == 1, "histogram p50 is bucket 1");
+	  CHECK(latstat_hist_pct(bk, 24, 90) == 1, "histogram p90 (rank 90) is still bucket 1");
+	  CHECK(latstat_hist_pct(bk, 24, 99) == 3, "histogram p99 (rank 99) is bucket 3");
+	  CHECK(latstat_hist_pct(bk, 24, 100) == 23, "histogram p100 is the last bucket");
+	  memset(bk, 0, sizeof bk); CHECK(latstat_hist_pct(bk, 24, 50) == 24, "empty histogram returns nb"); }
 	printf("latstat_test: %s\n", fails ? "FAILED" : "all passed"); return fails != 0;
 }

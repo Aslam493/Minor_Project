@@ -144,6 +144,7 @@ static TEEC_Result get_status(struct mon_ctx *c, uint32_t page, void *out, struc
 
 TEEC_Result mon_get_status0(struct mon_ctx *c, struct mon_status0 *out, struct mon_health *h) { return get_status(c, 0, out, h); }
 TEEC_Result mon_get_status1(struct mon_ctx *c, struct mon_status1 *out, struct mon_health *h) { return get_status(c, 1, out, h); }
+TEEC_Result mon_get_status2(struct mon_ctx *c, struct mon_status2 *out, struct mon_health *h) { return get_status(c, 2, out, h); }
 
 TEEC_Result mon_set_idle(struct mon_ctx *c, uint32_t mode, uint32_t ms, uint32_t *verdict, uint32_t *remaining_ms, struct mon_health *h)
 {

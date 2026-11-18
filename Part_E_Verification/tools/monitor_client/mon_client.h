@@ -58,6 +58,19 @@ struct mon_status1 {
 	uint64_t rsv;
 };
 
+/* Command 20 page 2 (Mode P image only): time from packet request issue to its answer, measured in Secure World. 24 buckets of 2 ms
+ * (bucket i = [2i, 2i+2) ms, the last is 46 ms and more); ticks are 19.2 MHz. */
+#define MON_PQ_BUCKETS 24
+struct mon_status2 {
+	uint32_t version, length;
+	uint32_t n_ontime, n_late;
+	uint32_t last_ticks, rsv;
+	uint64_t max_ticks;
+	uint32_t bucket[MON_PQ_BUCKETS];
+};
+
+_Static_assert(sizeof(struct mon_status2) == 128, "page 2 is 128 bytes");
+
 struct mon_ctx {
 	TEEC_Context context;
 	TEEC_Session session;
@@ -77,6 +90,7 @@ TEEC_Result mon_ack_events(struct mon_ctx *c, uint32_t upto_seq, uint32_t *effec
 /* Command 20, page 0 or 1. */
 TEEC_Result mon_get_status0(struct mon_ctx *c, struct mon_status0 *out, struct mon_health *h);
 TEEC_Result mon_get_status1(struct mon_ctx *c, struct mon_status1 *out, struct mon_health *h);
+TEEC_Result mon_get_status2(struct mon_ctx *c, struct mon_status2 *out, struct mon_health *h);	/* Mode P image only; BAD_PARAMETERS otherwise */
 /* Command 21. mode 1 = request a lease of ms; mode 0 = return (ms must be 0). verdict: 0 GRANTED 1 RENEWED 2 RETURNED 3 REFUSED_CAP 4 NO_CHANGE. */
 TEEC_Result mon_set_idle(struct mon_ctx *c, uint32_t mode, uint32_t ms, uint32_t *verdict, uint32_t *remaining_ms, struct mon_health *h);
 /* Command 22. A zero nonce with state ANSWERED/LATE_ANSWERED/NONE means "no open challenge". states: 0 NONE 1 OPEN 2 ANSWERED 3 MISSED 4 LATE_ANSWERED. */
