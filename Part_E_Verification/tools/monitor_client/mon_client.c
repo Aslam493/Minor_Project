@@ -180,6 +180,47 @@ TEEC_Result mon_get_nonce(struct mon_ctx *c, uint64_t *nonce, uint32_t *seq, uin
 	return r;
 }
 
+TEEC_Result mon_get_packet_request(struct mon_ctx *c, uint32_t *seq, uint32_t *state, uint32_t *max_batch, uint32_t *due_ms, struct mon_health *h)
+{
+	TEEC_Operation op;
+	TEEC_Result r;
+
+	clear_op(&op);
+	op.paramTypes = PT(TEEC_VALUE_OUTPUT, TEEC_VALUE_OUTPUT, TEEC_VALUE_OUTPUT, TEEC_VALUE_OUTPUT);
+	r = invoke(c, PTA_RPI3_CAN_SPI_POC_CMD_MON_GET_PACKET_REQUEST, &op);
+	if (r == TEEC_SUCCESS) {
+		if (seq) *seq = op.params[0].value.a;
+		if (state) *state = op.params[0].value.b;
+		if (max_batch) *max_batch = op.params[1].value.a;
+		if (due_ms) *due_ms = op.params[1].value.b;
+	}
+	take_health(&op, h);
+	return r;
+}
+
+TEEC_Result mon_submit_packets(struct mon_ctx *c, uint32_t seq, uint32_t n, const uint8_t *pk, uint32_t *verdict, uint32_t *processed, struct mon_health *h)
+{
+	TEEC_Operation op;
+	uint8_t buf[MON_PQ_MAX_BATCH * MON_FRAME_LEN + 1];
+	TEEC_Result r;
+
+	if (n > MON_PQ_MAX_BATCH) return TEEC_ERROR_BAD_PARAMETERS;
+	if (n) memcpy(buf, pk, (size_t)n * MON_FRAME_LEN);
+	clear_op(&op);
+	op.paramTypes = PT(TEEC_VALUE_INOUT, TEEC_MEMREF_TEMP_INPUT, TEEC_VALUE_OUTPUT, TEEC_VALUE_OUTPUT);
+	op.params[0].value.a = seq;
+	op.params[0].value.b = n;
+	op.params[1].tmpref.buffer = buf;				/* a valid pointer even for an empty reply (size 0) */
+	op.params[1].tmpref.size = (size_t)n * MON_FRAME_LEN;
+	r = invoke(c, PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_PACKETS, &op);
+	if (r == TEEC_SUCCESS) {
+		if (verdict) *verdict = op.params[0].value.a;
+		if (processed) *processed = op.params[0].value.b;
+	}
+	take_health(&op, h);
+	return r;
+}
+
 TEEC_Result mon_submit_answer(struct mon_ctx *c, uint32_t seq, uint64_t nonce, uint32_t *verdict, uint32_t *detail, struct mon_health *h)
 {
 	TEEC_Operation op;
@@ -293,4 +334,5 @@ const char *mon_event_name(unsigned t) { return t < MON_EVENT_TYPES ? EVN[t] : "
 const char *mon_verdict17_name(unsigned v) { static const char *const n[] = {"ACCEPTED","GAP","RESYNC","MALFORMED","AUTH_FAIL","REPLAY","DUPLICATE","CONFLICT"}; return v < 8 ? n[v] : "?"; }
 const char *mon_verdict21_name(unsigned v) { static const char *const n[] = {"GRANTED","RENEWED","RETURNED","REFUSED_CAP","NO_CHANGE"}; return v < 5 ? n[v] : "?"; }
 const char *mon_verdict23_name(unsigned v) { static const char *const n[] = {"ON_TIME","LATE","STALE","UNISSUED","BAD_NONCE","DUPLICATE"}; return v < 6 ? n[v] : "?"; }
+const char *mon_verdict31_name(unsigned v) { static const char *const n[] = {"ON_TIME","LATE","STALE","UNISSUED","DUPLICATE"}; return v < 5 ? n[v] : "?"; }
 const char *mon_hbstate_name(unsigned s) { static const char *const n[] = {"NONE","OPEN","ANSWERED","MISSED","LATE_ANSWERED"}; return s < 5 ? n[s] : "?"; }

@@ -58,6 +58,40 @@ int cb_parse_line(const char *line, uint32_t *delay_ms, struct canfd_frame *f)
 	return 0;
 }
 
+void cb_q_init(struct cb_queue *q) { memset(q, 0, sizeof(*q)); }
+
+int cb_q_push(struct cb_queue *q, const uint8_t msg[MON_FRAME_LEN])
+{
+	int dropped = 0;
+
+	if (q->n == CB_QCAP) {
+		q->head = (q->head + 1) % CB_QCAP;
+		q->n--;
+		q->dropped++;
+		dropped = 1;
+	}
+	memcpy(q->m[(q->head + q->n) % CB_QCAP], msg, MON_FRAME_LEN);
+	q->n++;
+	return dropped;
+}
+
+unsigned cb_q_peek(const struct cb_queue *q, unsigned max, uint8_t *out)
+{
+	unsigned i, k = max < q->n ? max : q->n;
+
+	for (i = 0; i < k; i++)
+		memcpy(out + (size_t)i * MON_FRAME_LEN, q->m[(q->head + i) % CB_QCAP], MON_FRAME_LEN);
+	return k;
+}
+
+void cb_q_drop(struct cb_queue *q, unsigned k)
+{
+	if (k > q->n)
+		k = q->n;
+	q->head = (q->head + k) % CB_QCAP;
+	q->n -= k;
+}
+
 const char *cb_reason(int r)
 {
 	switch (r) {

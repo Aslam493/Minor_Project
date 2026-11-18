@@ -54,6 +54,26 @@ int main(void)
 		strcpy(ln, "10 123 "); for (k = 0; k < 48; k++) sprintf(ln + 7 + 2 * k, "%02x", f.data[k]); strcat(ln, "00"); CHECK(cb_parse_line(ln, &dl, &g) < 0, "data longer than 48 bytes is refused");
 		CHECK(cb_parse_line("abc 123 00", &dl, &g) < 0 && cb_parse_line("99999999 123 00", &dl, &g) < 0, "bad or huge delay is refused");
 	}
+	{ /* forwarder queue */
+		static struct cb_queue q; uint8_t a[MON_FRAME_LEN], out[40 * MON_FRAME_LEN]; unsigned k, j; int ok = 1;
+		cb_q_init(&q);
+		CHECK(q.n == 0 && cb_q_peek(&q, 5, out) == 0, "a new queue is empty");
+		for (k = 0; k < 10; k++) { memset(a, (int)k, sizeof a); cb_q_push(&q, a); }
+		CHECK(q.n == 10 && cb_q_peek(&q, 4, out) == 4 && out[0] == 0 && out[44] == 1 && out[3 * 44] == 3 && q.n == 10, "peek returns the oldest first and removes nothing");
+		CHECK(cb_q_peek(&q, 32, out) == 10, "peek never returns more than is queued");
+		cb_q_drop(&q, 3); CHECK(q.n == 7 && cb_q_peek(&q, 1, out) == 1 && out[0] == 3, "drop removes the oldest");
+		cb_q_drop(&q, 100); CHECK(q.n == 0 && q.dropped == 0, "dropping more than queued empties the queue and is not an overflow");
+		cb_q_init(&q);
+		for (k = 0; k < CB_QCAP; k++) { memset(a, (int)(k & 255), sizeof a); a[0] = (uint8_t)(k & 255); a[1] = (uint8_t)(k >> 8); cb_q_push(&q, a); }
+		CHECK(q.n == CB_QCAP && q.dropped == 0, "the queue holds CB_QCAP messages without loss");
+		memset(a, 0x77, sizeof a); a[0] = 0xFE; a[1] = 0xFE; j = (unsigned)cb_q_push(&q, a);
+		CHECK(j == 1 && q.n == CB_QCAP && q.dropped == 1, "when full the OLDEST is dropped and counted");
+		CHECK(cb_q_peek(&q, 1, out) == 1 && out[0] == 1 && out[1] == 0, "after one overflow the oldest left is message 1");
+		for (k = 0; k < 600; k++) { memset(a, 0, sizeof a); a[0] = (uint8_t)k; a[1] = (uint8_t)(k >> 8); cb_q_push(&q, a); }
+		{ uint8_t big[CB_QCAP * MON_FRAME_LEN]; static uint8_t chk[CB_QCAP * MON_FRAME_LEN]; unsigned n2 = cb_q_peek(&q, CB_QCAP, big); (void)chk;
+		  for (k = 0; k < n2; k++) { unsigned want = 600 - CB_QCAP + k; if (big[k * 44] != (uint8_t)want || big[k * 44 + 1] != (uint8_t)(want >> 8)) ok = 0; }
+		  CHECK(n2 == CB_QCAP && ok && q.dropped == 1 + 600, "after wrapping many times the queue holds exactly the newest CB_QCAP messages in order"); }
+	}
 	printf("canbridge_test: %d checks, %d failed\n", n_pass + n_fail, n_fail);
 	return n_fail != 0;
 }

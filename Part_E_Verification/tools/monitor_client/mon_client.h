@@ -92,6 +92,12 @@ void mon_hmac_sha256(const uint8_t *key, size_t keylen, const uint8_t *msg, size
 const char *mon_event_name(unsigned type);
 const char *mon_verdict17_name(unsigned v);
 const char *mon_verdict21_name(unsigned v);
+/* Mode P (pull) image only (CFG_RPI3_CAN_MONITOR_PULL=y): command 30 fetches the open packet request, command 31 replies to it with n packets
+ * (each a 44-byte monitor message). verdict = request verdict (see mon_verdict31_name), processed = how many packets Secure World judged. */
+#define MON_PQ_MAX_BATCH 32
+TEEC_Result mon_get_packet_request(struct mon_ctx *c, uint32_t *seq, uint32_t *state, uint32_t *max_batch, uint32_t *due_ms, struct mon_health *h);
+TEEC_Result mon_submit_packets(struct mon_ctx *c, uint32_t seq, uint32_t n, const uint8_t *pk, uint32_t *verdict, uint32_t *processed, struct mon_health *h);
+const char *mon_verdict31_name(unsigned v);
 const char *mon_verdict23_name(unsigned v);
 const char *mon_hbstate_name(unsigned s);
 
