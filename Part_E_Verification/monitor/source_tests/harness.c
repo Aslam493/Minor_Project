@@ -15,6 +15,13 @@ TEE_Result mock_init_extra(void)
 	return mock_init_extra_result;
 }
 
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+#define EXPECT_MODE RPI3_MON_MODE_P
+#define MON_FIRST_IDX 1	/* Mode P: command 17 is refused before any other check, so the loops over 17 to 23 start at 18 */
+#else
+#define EXPECT_MODE RPI3_MON_MODE_F
+#define MON_FIRST_IDX 0
+#endif
 static int nchk, nfail, tchk, tfail; static const char *cur;
 #define CHECK(c) do { nchk++; tchk++; if (!(c)) { nfail++; tfail++; printf("  FAIL line %d: %s\n", __LINE__, #c); } } while (0)
 static void begin(const char *n) { cur = n; tchk = tfail = 0; }
@@ -66,7 +73,7 @@ static void t_init(void)
 	mock_fail_mac_alloc = mock_fail_mac_init = mock_fail_mac_final = mock_fail_rng = 0;
 	memset(&rpi3_mon, 0xA5, sizeof rpi3_mon);								/* garbage in .bss must not matter */
 	CHECK(rpi3_mon_init() == TEE_SUCCESS && rpi3_mon_init_ok() && rpi3_mon.init_ok == 1);
-	CHECK(rpi3_mon_lock == SPINLOCK_UNLOCK && rpi3_mon.profile == RPI3_MON_PROFILE_HARDENED && rpi3_mon.l.mode == RPI3_MON_MODE_F);
+	CHECK(rpi3_mon_lock == SPINLOCK_UNLOCK && rpi3_mon.profile == RPI3_MON_PROFILE_HARDENED && rpi3_mon.l.mode == EXPECT_MODE);
 	CHECK(rpi3_mon.mac_pta != NULL && rpi3_mon.mac_core1 == NULL && rpi3_mon.mac_pta_busy == 0);
 	CHECK(rpi3_mon.boot_id == VEC_BOOTID);									/* DEC-IF-15, against the independent vector */
 	rpi3_mon_put_le64(in, 1000000060ull); in[8] = 0x5A; in[9] = 0xA5; host_hmac_sha256(KH, 32, in, 10, d);
@@ -316,7 +323,7 @@ static void t_c20(void)
 	CHECK(p->version == 1 && p->length == 128 && p->boot_id == VEC_BOOTID && p->rsv[0] == 0 && p->rsv[1] == 0 && p->rsv[2] == 0 && p->rsv2 == 0);
 	CHECK(p->now_ticks == M.timer_in_hold || p->now_ticks <= M.timer_in_hold);									/* N7: read inside the hold */
 	CHECK(p->poll_count == 4242 && p->core1_poll_age_ticks > 900000000ull && p->skip_total == 9 && p->pta_lock_timeouts == 4 && p->pta_timeouts_seen == 3 && p->last_counter == 41 && p->hb_seq == 6);
-	CHECK(p->hb_state == RPI3_MON_HB_ANSWERED && p->mode == RPI3_MON_MODE_F && (p->flags & RPI3_MON_PFLAG_INIT_OK) && (p->flags & RPI3_MON_PFLAG_HARDENED) && !(p->flags & RPI3_MON_PFLAG_STARVED));
+	CHECK(p->hb_state == RPI3_MON_HB_ANSWERED && p->mode == EXPECT_MODE && (p->flags & RPI3_MON_PFLAG_INIT_OK) && (p->flags & RPI3_MON_PFLAG_HARDENED) && !(p->flags & RPI3_MON_PFLAG_STARVED));
 	CHECK(p->traffic_age_ticks == ~0ULL && p->hb_last_ok_age_ticks == ~0ULL && p->lease_remaining_ticks == 0);					/* N6 sentinels */
 	CHECK(h.p3a == 4 && h.p3b == 9 && ((h.p2b >> 8) & 255) == 2 && (h.p2b & RPI3_MON_HP_INIT_OK)); end();
 	begin("N6 lease, armed traffic, starved flag, never-answered sentinel"); setup(); frozen(5000000000ull);
@@ -425,6 +432,9 @@ static void t_glue(void)
 #ifndef CFG_RPI3_CAN_MONITOR_TEST_STATS
 		24, 25, 26,	/* in the test-statistics build these three are the test commands (24 statistics, 25 control, 26 W1) */
 #endif
+#ifndef CFG_RPI3_CAN_MONITOR_PULL
+		30, 31,		/* the Mode P commands do not exist when the flag is off */
+#endif
 		27, 99, 1000, 0xFFFFFFFFu}; size_t k; for (i = 0; i < sizeof unk / sizeof unk[0]; i++) for (k = 0; k < 3; k++) { clearp(p); handled = false;
 		r = rpi3_mon_pta_invoke(unk[i], anytypes[k], p, &handled); CHECK(handled && r == TEE_ERROR_NOT_SUPPORTED); } } end();
 	begin("LG1/LG4 refused ids 0,3,6,7,13,14: NOT_SUPPORTED before any parameter check, in both profiles; refusal never waits"); setup(); frozen(5000000000ull);
@@ -442,11 +452,11 @@ static void t_glue(void)
 	begin("DS4 monitor init failure: 17 to 23 return BAD_STATE, legacy 1, 2, 12 still work, refusals still apply"); setup(); frozen(5000000000ull); rpi3_mon.init_ok = 0;
 	{ struct { uint32_t id, pt; } c[] = { {17, PTT(VALUE_OUTPUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT)}, {18, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT)}, {19, PTT(VALUE_INOUT, NONE, VALUE_OUTPUT, VALUE_OUTPUT)},
 	  {20, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT)}, {21, PTT(VALUE_INOUT, NONE, VALUE_OUTPUT, VALUE_OUTPUT)}, {22, PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT)}, {23, PTT(VALUE_INOUT, VALUE_INPUT, VALUE_OUTPUT, VALUE_OUTPUT)} };
-	  static uint8_t buf[200]; for (i = 0; i < 7; i++) { clearp(p); p[0].value.a = 0; p[0].value.b = (c[i].id == 18) ? 5 : 0; p[1].memref.buffer = buf; p[1].memref.size = sizeof buf; handled = false; r = rpi3_mon_pta_invoke(c[i].id, c[i].pt, p, &handled);
+	  static uint8_t buf[200]; for (i = MON_FIRST_IDX; i < 7; i++) { clearp(p); p[0].value.a = 0; p[0].value.b = (c[i].id == 18) ? 5 : 0; p[1].memref.buffer = buf; p[1].memref.size = sizeof buf; handled = false; r = rpi3_mon_pta_invoke(c[i].id, c[i].pt, p, &handled);
 		CHECK(handled && r == TEE_ERROR_BAD_STATE && p[2].value.a == 0 && p[2].value.b == 0 && p[3].value.a == 0 && p[3].value.b == 0); } }
 	handled = true; CHECK(rpi3_mon_pta_invoke(12, anytypes[1], p, &handled) == TEE_SUCCESS && !handled); CHECK(rpi3_mon_pta_invoke(3, anytypes[1], p, &handled) == TEE_ERROR_NOT_SUPPORTED && handled); end();
 	begin("HP1 exact param_types: any other combination is BAD_PARAMETERS and writes nothing"); setup(); frozen(5000000000ull);
-	for (i = 17; i <= 23; i++) { size_t k; for (k = 0; k < 3; k++) { clearp(p); handled = false; r = rpi3_mon_pta_invoke((uint32_t)i, anytypes[k], p, &handled);
+	for (i = 17 + MON_FIRST_IDX; i <= 23; i++) { size_t k; for (k = 0; k < 3; k++) { clearp(p); handled = false; r = rpi3_mon_pta_invoke((uint32_t)i, anytypes[k], p, &handled);
 		CHECK(handled && r == TEE_ERROR_BAD_PARAMETERS && p[0].value.a == 0xABABABABu && p[2].value.a == 0xABABABABu && p[3].value.b == 0xABABABABu); } }
 	clearp(p); CHECK(rpi3_mon_pta_invoke(18, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, NONE), p, &handled) == TEE_ERROR_BAD_PARAMETERS); end();
 }
@@ -456,7 +466,11 @@ static void t_glue_cmds(void)
 	begin("GLUE parameter mapping: outputs, sizes and the health pair for commands 17 to 23"); setup(); frozen(5000000000ull);
 	make_frame(f, 0x123, 100, 0xDDCCBBAA, true); clearp(p); p[1].memref.buffer = f; p[1].memref.size = 44; handled = false;
 	r = rpi3_mon_pta_invoke(17, PTT(VALUE_OUTPUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+	CHECK(handled && r == TEE_ERROR_NOT_SUPPORTED && rpi3_mon.l.verdict_frame.total == 0);		/* Mode P: command 17 is refused */
+#else
 	CHECK(handled && r == TEE_SUCCESS && p[0].value.a == RPI3_MON_V17_RESYNC && p[0].value.b == 0 && (p[2].value.b & RPI3_MON_HP_INIT_OK) && p[3].value.a == 0);
+#endif
 	for (i = 0; i < 6; i++) evadd(RPI3_MON_EV_AUTH_FAIL, i, 0);
 	memset(buf, 0xEE, sizeof buf); clearp(p); p[0].value.a = 1; p[0].value.b = 5; p[1].memref.buffer = buf; p[1].memref.size = 119;
 	r = rpi3_mon_pta_invoke(18, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(r == TEE_ERROR_SHORT_BUFFER && p[1].memref.size == 120 && p[0].value.a == 1 && p[2].value.a == 0 && buf[0] == 0xEE);
@@ -771,11 +785,152 @@ static void t_c5_gaps(void)
 	put(e); end();
 }
 
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+/* ------------------------------------------------------------------ Mode P: Secure World asks, Linux hands the packets over (design 2026-11-18) */
+static void mkbatch(uint8_t *b, unsigned n, uint32_t first) { unsigned i; for (i = 0; i < n; i++) make_frame(b + 44 * i, 0x123, first + i, 0xC0DE0000u | (first + i), true); }
+static enum rpi3_mon_res c31(uint32_t seq, uint32_t n, const uint8_t *pk, size_t len, uint32_t *oa, uint32_t *ob) { struct rpi3_mon_health_out h; return rpi3_mon_cmd31(seq, n, pk, len, oa, ob, &h); }
+static void pq_issue(void) { uint32_t e = take(); rpi3_mon_pq_issue_if_due(rpi3_mon_l(), M.now); put(e); }
+static void pq_eval(void) { uint32_t e = take(); rpi3_mon_evaluate(rpi3_mon_l(), M.now); put(e); }
+static unsigned g_pq_macs;
+static void block_on_second_mac(void) { if (++g_pq_macs == 2) M.ext_hold = 1; }
+static const struct rpi3_mon_event *last_ev(unsigned type)		/* the newest event of a type, searched in both rings */
+{
+	const struct rpi3_mon_event *best = NULL; unsigned i;
+	for (i = 0; i < RPI3_MON_PINNED_SLOTS; i++) if (rpi3_mon.l.pinned[i].seq && rpi3_mon.l.pinned[i].type == type && (!best || rpi3_mon.l.pinned[i].seq > best->seq)) best = &rpi3_mon.l.pinned[i];
+	for (i = 0; i < RPI3_MON_ORDINARY_SLOTS; i++) if (rpi3_mon.l.ordinary_used[i] && rpi3_mon.l.ordinary[i].type == type && (!best || rpi3_mon.l.ordinary[i].seq > best->seq)) best = &rpi3_mon.l.ordinary[i];
+	return best;
+}
+static void t_pull(void)
+{
+	static uint8_t b[44 * 40], bb[44 * 40]; uint32_t oa, ob, seq, st, mb, due; struct rpi3_mon_health_out h; const struct rpi3_mon_event *ev; unsigned i, calls; TEE_Param p[4]; bool handled; TEE_Result r;
+	const uint64_t P = RPI3_MON_PQ_PERIOD_TICKS, D = RPI3_MON_PQ_DREQ_TICKS;
+
+	begin("PQ1 Core 1 issue schedule: one request per period, no burst after a stall"); setup(); frozen(5000000000ull);
+	CHECK(rpi3_mon.l.mode == RPI3_MON_MODE_P && rpi3_mon.l.pq_seq == 0 && rpi3_mon.l.pq_state == RPI3_MON_PQ_NONE);
+	pq_issue(); CHECK(rpi3_mon.l.pq_seq == 1 && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN && rpi3_mon.l.pq_issue_ticks == M.now && rpi3_mon.l.pq_next_issue == M.now + P);
+	pq_issue(); CHECK(rpi3_mon.l.pq_seq == 1);
+	M.now += P - 1; pq_issue(); CHECK(rpi3_mon.l.pq_seq == 1);
+	M.now += 1; pq_issue(); CHECK(rpi3_mon.l.pq_seq == 2 && rpi3_mon.l.pq_next_issue == M.now + P);
+	M.now += 10 * P; pq_issue(); CHECK(rpi3_mon.l.pq_seq == 3 && rpi3_mon.l.pq_next_issue == M.now + P);		/* a stall of ten periods gives ONE new request */
+	CHECK(P == 50 * RPI3_MON_TICKS_PER_MS && D == 40 * RPI3_MON_TICKS_PER_MS && D < P && RPI3_MON_PQ_MAX_BATCH == 32);
+	rpi3_mon.l.pq_seq = 0xFFFFFFFFu; rpi3_mon.l.pq_next_issue = 0; pq_issue(); CHECK(rpi3_mon.l.pq_seq == 0xFFFFFFFFu);	/* never wraps */
+	CHECK(M.violations == 0); end();
+
+	begin("PQ2 command 30: the request, MISSED after D_p, BUSY, BAD_STATE, no HMAC"); setup(); frozen(5000000000ull); mock_hmac_calls = 0;
+	CHECK(rpi3_mon_cmd30(&seq, &st, &mb, &due, &h) == RPI3_MON_R_OK && seq == 0 && st == RPI3_MON_PQ_NONE && mb == 32 && due == 40 && (h.p2b & RPI3_MON_HP_INIT_OK));
+	pq_issue(); CHECK(rpi3_mon_cmd30(&seq, &st, &mb, &due, &h) == RPI3_MON_R_OK && seq == 1 && st == RPI3_MON_PQ_OPEN);
+	M.now += D + 100; CHECK(rpi3_mon_cmd30(&seq, &st, &mb, &due, &h) == RPI3_MON_R_OK && seq == 1 && st == RPI3_MON_PQ_MISSED && rpi3_mon.l.pq_miss_count == 1);
+	M.ext_hold = 1; CHECK(rpi3_mon_cmd30(&seq, &st, &mb, &due, &h) == RPI3_MON_R_BUSY && seq == 0 && st == 0 && h.p3a == 1 && rpi3_mon_pta_lock_timeouts == 1); M.ext_hold = 0;
+	rpi3_mon.init_ok = 0; CHECK(rpi3_mon_cmd30(&seq, &st, &mb, &due, &h) == RPI3_MON_R_BAD_STATE && h.p2a == 0); rpi3_mon.init_ok = 1;
+	CHECK(mock_hmac_calls == 0 && M.violations == 0); end();
+
+	begin("PQ3 command 31 request verdicts in command-23 order; packets are judged only for ON_TIME and LATE"); setup(); frozen(5000000000ull); mkbatch(b, 2, 100);
+	CHECK(c31(1, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_UNISSUED && ob == 0);							/* nothing issued yet */
+	pq_issue(); CHECK(c31(2, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_UNISSUED && ob == 0 && rpi3_mon.l.verdict_frame.total == 0);	/* ahead of the request */
+	M.now += P; pq_issue();																/* request 2 */
+	CHECK(c31(1, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_STALE && ob == 0 && rpi3_mon.l.verdict_frame.total == 0 && !rpi3_mon.l.ctr_f.have_last);
+	CHECK(c31(2, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 2 && rpi3_mon.l.pq_state == RPI3_MON_PQ_ANSWERED && rpi3_mon.l.pq_miss_count == 0 && rpi3_mon.l.pq_last_ok_ticks == M.now);
+	CHECK(rpi3_mon.l.verdict_frame.total == 2 && rpi3_mon.l.ctr_f.last_counter == 101);
+	CHECK(c31(2, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_DUPLICATE && ob == 0);
+	CHECK(c31(2, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_DUPLICATE && rpi3_mon.l.verdict_frame.total == 2);			/* a duplicate request answer judges nothing */
+	M.now += P; pq_issue(); M.now += D + 100; mkbatch(b, 2, 102);											/* request 3 is answered late */
+	CHECK(c31(3, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_LATE && ob == 2 && rpi3_mon.l.pq_state == RPI3_MON_PQ_LATE_ANSWERED && rpi3_mon.l.pq_miss_count == 1);
+	CHECK(rpi3_mon.l.verdict_frame.total == 4 && rpi3_mon.l.ctr_f.last_counter == 103);								/* late packets are still judged */
+	CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_UNISSUED_ANSWER] == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_STALE_ANSWER] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_DUP_ANSWER] == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 1);
+	ev = last_ev(RPI3_MON_EV_LATE_ANSWER); CHECK(ev && ev->detail == 1 && ev->counter == 3);									/* detail 1 = packet request, counter = request number */
+	ev = last_ev(RPI3_MON_EV_STALE_ANSWER); CHECK(ev && ev->detail == 1 && ev->counter == 1);
+	CHECK(M.hmac_in_hold == 0 && M.violations == 0); end();
+
+	begin("PQ4 a batch is judged exactly like the same frames sent one by one with command 17"); {
+		uint8_t seqf[9][44]; uint32_t ids[9] = {0x123,0x123,0x123,0x123,0x123,0x123,0x123,0x124,0x123}, cts[9] = {100,101,102,101,99,105,105,106,107}; uint32_t pls[9] = {1,2,3,2,9,5,6,7,8}; int good[9] = {1,1,0,1,1,1,1,1,1};
+		for (i = 0; i < 9; i++) { make_frame(seqf[i], ids[i], cts[i], pls[i], good[i]); memcpy(bb + 44 * i, seqf[i], 44); }
+		setup(); frozen(5000000000ull); for (i = 0; i < 9; i++) { uint32_t v, d; (void)c17(seqf[i], 44, &v, &d); }
+		{ uint32_t tot17 = rpi3_mon.l.verdict_frame.total, lc17 = rpi3_mon.l.ctr_f.last_counter, evc[RPI3_MON_EV_COUNT]; bool arm17 = rpi3_mon.l.tr_armed; memcpy(evc, rpi3_mon.l.ev_count, sizeof evc);
+		setup(); frozen(5000000000ull); pq_issue();
+		CHECK(c31(1, 9, bb, 9 * 44, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 9);
+		CHECK(rpi3_mon.l.verdict_frame.total == tot17 && rpi3_mon.l.ctr_f.last_counter == lc17 && rpi3_mon.l.tr_armed == arm17);
+		for (i = 0; i < RPI3_MON_EV_COUNT; i++) if (i != RPI3_MON_EV_UNISSUED_ANSWER && i != RPI3_MON_EV_STALE_ANSWER) CHECK(rpi3_mon.l.ev_count[i] == evc[i]);
+		CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_AUTH_FAIL] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_REPLAY] >= 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_MALFORMED] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_COUNTER_GAP] >= 1); }
+		CHECK(M.hmac_in_hold == 0 && M.violations == 0); } end();
+
+	begin("PQ5 parameter errors change nothing; an empty reply is valid"); setup(); frozen(5000000000ull); pq_issue(); mkbatch(b, 40, 100); calls = mock_hmac_calls;
+	CHECK(c31(1, 33, b, 33 * 44, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN && rpi3_mon.l.verdict_frame.total == 0 && mock_hmac_calls == calls);
+	CHECK(c31(1, 1, b, 43, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS && c31(1, 2, b, 44, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS && c31(1, 0, b, 44, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS);
+	CHECK(c31(1, 1, NULL, 44, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN);
+	rpi3_mon.init_ok = 0; CHECK(c31(1, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_BAD_STATE && oa == 0 && ob == 0); rpi3_mon.init_ok = 1;
+	CHECK(c31(1, 32, b, 32 * 44, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 32 && rpi3_mon.l.verdict_frame.total == 32 && rpi3_mon.l.ctr_f.last_counter == 131);	/* the maximum batch */
+	M.now += P; pq_issue(); CHECK(c31(2, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 0 && rpi3_mon.l.pq_state == RPI3_MON_PQ_ANSWERED && rpi3_mon.l.verdict_frame.total == 32);
+	CHECK(M.violations == 0); end();
+
+	begin("PQ6 BUSY: before the first packet nothing changes; in the middle the batch stops and says how many were processed"); setup(); frozen(5000000000ull); pq_issue(); mkbatch(b, 3, 100);
+	M.ext_hold = 1; CHECK(c31(1, 3, b, 132, &oa, &ob) == RPI3_MON_R_BUSY && oa == 0 && ob == 0 && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN && rpi3_mon.l.verdict_frame.total == 0 && rpi3_mon_pta_lock_timeouts == 1); M.ext_hold = 0;
+	CHECK(c31(1, 3, b, 132, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 3);									/* the retry works */
+	setup(); frozen(5000000000ull); pq_issue(); g_pq_macs = 0; mock_mac_final_hook = block_on_second_mac;
+	CHECK(c31(1, 3, b, 132, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 1 && rpi3_mon.l.pq_state == RPI3_MON_PQ_ANSWERED && rpi3_mon.l.verdict_frame.total == 1 && rpi3_mon_pta_lock_timeouts == 1);
+	mock_mac_final_hook = NULL; M.ext_hold = 0; M.now += P; pq_issue(); mkbatch(b, 2, 101);									/* the two left over go with the NEXT request */
+	CHECK(c31(2, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && ob == 2 && rpi3_mon.l.ctr_f.last_counter == 102 && rpi3_mon.l.verdict_frame.total == 3);
+	setup(); frozen(5000000000ull); pq_issue(); mkbatch(b, 2, 100); rpi3_mon.mac_pta_busy = 1; calls = mock_hmac_calls;
+	CHECK(c31(1, 2, b, 88, &oa, &ob) == RPI3_MON_R_BUSY && mock_hmac_calls == calls && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN); rpi3_mon.mac_pta_busy = 0;
+	mock_fail_mac_final = 1; CHECK(c31(1, 2, b, 88, &oa, &ob) == RPI3_MON_R_BAD_STATE && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN && rpi3_mon.l.verdict_frame.total == 0); mock_fail_mac_final = 0;
+	CHECK(M.hmac_in_hold == 0); end();
+
+	begin("PQ7 traffic deadline in Mode P: empty replies do not refresh it; a valid packet does"); setup(); frozen(5000000000ull); pq_issue(); mkbatch(b, 3, 100);
+	CHECK(c31(1, 3, b, 132, &oa, &ob) == RPI3_MON_R_OK && rpi3_mon.l.tr_armed && rpi3_mon.l.tr_last_valid_ticks == M.now);
+	for (i = 2; i <= 8; i++) { M.now += P; pq_issue(); CHECK(c31(i, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME); }	/* 7 x 50 ms of silence */
+	CHECK(rpi3_mon.l.tr_last_valid_ticks != M.now && rpi3_mon.l.tr_timeout_raised && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1 && last_ev(RPI3_MON_EV_TIMEOUT)->detail == 1);
+	M.now += P; pq_issue(); mkbatch(b, 1, 103); CHECK(c31(9, 1, b, 44, &oa, &ob) == RPI3_MON_R_OK && !rpi3_mon.l.tr_timeout_raised && rpi3_mon.l.ev_count[RPI3_MON_EV_TRAFFIC_RECOVERED] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1); end();
+
+	begin("PQ8 missed requests: 3 misses after the grace give ONE TIMEOUT detail 4; a prompt reply recovers; never answered after the grace also"); setup(); frozen(0); M.now = 2 * RPI3_MON_G_TICKS; rpi3_mon.init_ticks = 0;
+	rpi3_mon.l.hb_last_ok_ticks = M.now;													/* keep the heartbeat out of this test */
+	for (i = 1; i <= 3; i++) { pq_issue(); M.now += D + 100; pq_eval(); M.now += P; }
+	CHECK(rpi3_mon.l.pq_miss_count == 3 && rpi3_mon.l.pq_timeout_raised && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1 && last_ev(RPI3_MON_EV_TIMEOUT)->detail == 4);
+	pq_eval(); M.now += P; pq_issue(); M.now += D + 100; pq_eval(); CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1);						/* exactly once */
+	M.now += P; pq_issue(); CHECK(c31(rpi3_mon.l.pq_seq, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && rpi3_mon.l.pq_miss_count == 0 && !rpi3_mon.l.pq_timeout_raised);
+	ev = last_ev(RPI3_MON_EV_HB_RECOVERED); CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_HB_RECOVERED] == 1 && ev && ev->detail == 1);
+	setup(); frozen(0); M.now = 2 * RPI3_MON_G_TICKS; rpi3_mon.init_ticks = 0; rpi3_mon.l.hb_last_ok_ticks = M.now; pq_eval();
+	CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1 && last_ev(RPI3_MON_EV_TIMEOUT)->detail == 4);								/* never answered */
+	setup(); frozen(5000000000ull); rpi3_mon.l.hb_last_ok_ticks = M.now; pq_issue(); M.now += D + 100; pq_eval(); CHECK(rpi3_mon.l.pq_miss_count == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0);	/* inside the grace: counted, no timeout */
+	CHECK(M.violations == 0); end();
+
+	begin("PQ9 PTA glue: commands 30 and 31, exact parameter types, command 17 refused, mode 2 in the status page"); setup(); frozen(5000000000ull); pq_issue(); mkbatch(b, 2, 100);
+	clearp(p); handled = false; r = rpi3_mon_pta_invoke(30, PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
+	CHECK(handled && r == TEE_SUCCESS && p[0].value.a == 1 && p[0].value.b == RPI3_MON_PQ_OPEN && p[1].value.a == 32 && p[1].value.b == 40 && (p[2].value.b & RPI3_MON_HP_INIT_OK));
+	clearp(p); p[0].value.a = 1; p[0].value.b = 2; p[1].memref.buffer = b; p[1].memref.size = 88; handled = false;
+	r = rpi3_mon_pta_invoke(31, PTT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
+	CHECK(handled && r == TEE_SUCCESS && p[0].value.a == RPI3_MON_V31_ON_TIME && p[0].value.b == 2 && rpi3_mon.l.verdict_frame.total == 2);
+	{ static const uint32_t ty[] = { PTT(NONE, NONE, NONE, NONE), PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, NONE), PTT(VALUE_INPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), PTT(MEMREF_INOUT, VALUE_INPUT, VALUE_INOUT, MEMREF_OUTPUT) }; unsigned k;
+	  for (k = 0; k < 4; k++) { clearp(p); handled = false; r = rpi3_mon_pta_invoke(30, ty[k], p, &handled); CHECK(handled && r == TEE_ERROR_BAD_PARAMETERS && p[0].value.a == 0xABABABABu && p[2].value.a == 0xABABABABu);
+	    clearp(p); handled = false; r = rpi3_mon_pta_invoke(31, ty[k], p, &handled); CHECK(handled && r == TEE_ERROR_BAD_PARAMETERS && p[0].value.a == 0xABABABABu && p[2].value.a == 0xABABABABu); } }
+	clearp(p); p[1].memref.buffer = b; p[1].memref.size = 44; handled = false; { unsigned tries = M.trylock_calls; uint32_t acq = M.timer_reads;
+	  r = rpi3_mon_pta_invoke(17, PTT(VALUE_OUTPUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(handled && r == TEE_ERROR_NOT_SUPPORTED && p[0].value.a == 0xABABABABu && M.trylock_calls == tries && M.timer_reads == acq); }
+	rpi3_mon.init_ok = 0; clearp(p); p[0].value.a = 1; p[0].value.b = 0; handled = false; r = rpi3_mon_pta_invoke(31, PTT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
+	CHECK(handled && r == TEE_ERROR_BAD_STATE && p[2].value.a == 0 && p[3].value.b == 0); clearp(p); r = rpi3_mon_pta_invoke(30, PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(r == TEE_ERROR_BAD_STATE); rpi3_mon.init_ok = 1;
+	{ static uint8_t pg[128]; struct rpi3_mon_proj0 *pj = (struct rpi3_mon_proj0 *)(void *)pg; clearp(p); p[0].value.a = 0; p[0].value.b = 0; p[1].memref.buffer = pg; p[1].memref.size = 128;
+	  r = rpi3_mon_pta_invoke(20, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(r == TEE_SUCCESS && pj->mode == RPI3_MON_MODE_P && pj->mode == 2); }
+	clearp(p); handled = false; r = rpi3_mon_pta_invoke(32, PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(handled && r == TEE_ERROR_NOT_SUPPORTED);	/* 32 and above stay unknown */
+	CHECK(M.violations == 0); end();
+
+	begin("PQ10 Core 1 issues the requests; 200 periods with two packets each: exact totals, nothing missed, no event"); setup(); frozen(5000000000ull); rpi3_mon.l.hb_last_ok_ticks = M.now;
+	{ unsigned ontime = 0, late = 0, other = 0; uint32_t next = 1000;
+	  rpi3_mon_core1_attempt(); CHECK(rpi3_mon.l.pq_seq == 1 && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN);
+	  for (i = 0; i < 200; i++) { uint32_t a, bb2, s2, st2, m2, d2; mkbatch(b, 2, next);
+	    if (rpi3_mon_cmd30(&s2, &st2, &m2, &d2, &h) != RPI3_MON_R_OK || st2 != RPI3_MON_PQ_OPEN) { other++; }
+	    else { if (c31(s2, 2, b, 88, &a, &bb2) == RPI3_MON_R_OK && a == RPI3_MON_V31_ON_TIME && bb2 == 2) { ontime++; next += 2; } else late++; }
+	    M.now += P; rpi3_mon_core1_attempt(); }
+	  CHECK(ontime == 200 && late == 0 && other == 0 && rpi3_mon.l.verdict_frame.total == 400 && rpi3_mon.l.ctr_f.last_counter == 1399 && rpi3_mon.l.pq_miss_count == 0);
+	  CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_AUTH_FAIL] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_COUNTER_GAP] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_REPLAY] == 0); }
+	CHECK(M.hmac_in_hold == 0 && M.violations == 0); end();
+}
+#endif
+
 int main(void)
 {
 	printf("Real-source host harness: rpi3_can_monitor.c + the PTA glue with a mock platform (NOT a board test)\n");
 	t_vectors(); t_init(); t_layout(); t_locks(); t_health(); t_events(); t_eval(); t_c17(); t_c18(); t_c19(); t_c20(); t_c21(); t_c22(); t_c23();
 	t_glue(); t_glue_cmds(); t_core1(); t_stall(); t_c5_gaps();
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+	t_pull();
+#endif
 #ifdef CFG_RPI3_CAN_MONITOR_UART
 	t_uart();
 #endif

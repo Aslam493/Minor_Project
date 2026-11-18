@@ -29,5 +29,12 @@ strict_uart:
 	$(CC) $(STRICT) -DCFG_RPI3_CAN_MONITOR_UART -c $(OS)/core/pta/rpi3_can_monitor_pta.c -o /dev/null
 test_uart: strict_uart harness_uart
 	./harness_uart
+harness_pull: harness.c mock_platform.c vectors.h $(PLAT)/rpi3_can_monitor.c $(PLAT)/rpi3_can_monitor.h $(OS)/core/pta/rpi3_can_monitor_pta.c mock/rpi3_can_monitor_plat.h
+	$(CC) $(STRICT) -Wno-misleading-indentation -DCFG_RPI3_CAN_MONITOR_PULL harness.c mock_platform.c $(OS)/core/pta/rpi3_can_monitor_pta.c -o harness_pull
+strict_pull:
+	$(CC) $(STRICT) -DCFG_RPI3_CAN_MONITOR_PULL -c $(PLAT)/rpi3_can_monitor.c -o /dev/null
+	$(CC) $(STRICT) -DCFG_RPI3_CAN_MONITOR_PULL -c $(OS)/core/pta/rpi3_can_monitor_pta.c -o /dev/null
+test_pull: strict_pull harness_pull
+	./harness_pull
 clean:
-	rm -f harness harness_ts harness_uart
+	rm -f harness harness_ts harness_uart harness_pull
