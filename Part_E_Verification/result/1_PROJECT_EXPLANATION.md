@@ -62,6 +62,19 @@ The tag uses a **shared secret key** (symmetric, HMAC), not a private/public key
 - **It is not secret from everyone else.** Root on the Pi, or anyone with the repository, can read it. The Pi 3 has no TZASC, and OP-TEE's hardware unique key falls back to all zeros on a platform without fuses, so there is nowhere on this board to hide a key.
 - **Real systems** provision the key in a secure place into protected hardware on both sides, use key agreement with certificates, derive per-ECU keys from a master (as AUTOSAR SecOC does), or use public-key signatures so that no secret is shared at all (the signer keeps a private key; Secure World holds only the public key). Signatures need a 64-byte tag, which does not fit in one CAN-FD frame with the counter and payload. None of this is built.
 
+## 2c. How this matches the plan (Mode F is built, Design 2 is the request/reply design)
+The plan (`Secure_CAN_Monitor_Plan_8_Components.md`, from plan v3.3) has two modes, one per boot:
+
+| | Mode F (fallback, **built and tested**) | Mode D2 (Design 2, **not built**) |
+|---|---|---|
+| Where Secure World gets the packets | **Linux forwards** each frame with command 17 (push) | Core 1 reads them **itself** from a second CAN chip (chip B) over SPI; command 17 is refused |
+| What Linux does | Forwards frames, answers the heartbeat | Answers the heartbeat and **replies with a report**: the latest up to 32 frames it handled (command 24), tied to the heartbeat request (`boot_id`, `hb_seq`), due within `D_rep = D_req + R` |
+| What Secure World checks | Tag, counter, deadline of the forwarded frames | The same on chip B's own frames, **plus a cross-check of Linux's report against them**: same counter with different content = `FRAME_ALTERED`; a frame chip B saw that Linux left out = `UNACCOUNTED`; a reported frame chip B never saw with a bad tag = `FABRICATED_REPORT`; reports missing in time = `REPORT_TIMEOUT` |
+| Needs | the Pi and a sender | a **second CAN board (chip B), a CAN-FD sender and header access**: not available |
+
+So the idea "Secure World asks, Normal World replies with the packets it handled, Secure World checks the reply against its own view" **is Design 2**. The request is the heartbeat sequence number, the reply is the report, and the independent view is chip B. It is not built because the hardware for chip B was never available; the plan itself says that without it the report must say "Design 2 designed, not tested". Mode F contains no request/reply for packets: Linux pushes them, which is what the plan specifies for the fallback.
+Both modes use the same frame (CAN-FD, standard id 0x123, 48 data bytes = counter + payload + 32-byte tag + 8 bytes padding) and the same key rule: **K_frame is held only by the sender and Secure World; the consumer only relays bytes** (the forwarder and `can_replay` follow this). The `canbridge` work and the packet file made on the laptop are the Mode F input path, and are the same input a chip B sender would use later.
+
 ## 3. Component by component
 | # | Component | What we did | Result |
 |---|---|---|---|
