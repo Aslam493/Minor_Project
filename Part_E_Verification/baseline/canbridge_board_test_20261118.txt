@@ -1,0 +1,133 @@
+
+=== 0. Pi state: uptime 5379 s; monitor
+page 0: version 1 length 128 boot_id 0xdade7096 flags 0x13 mode 0
+  now_ticks 103637909108 core1_poll_age_ticks 4679 poll_count 196151157215
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+
+=== 1. can0 BEFORE (boot mode)
+mtu                 : 16
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  loopback               disabled
+  FD mode                disabled
+  ctrlmode SUPPORTED     0x000001b3  <LOOPBACK,LISTEN-ONLY,BERR-REPORTING,FD,FD-NON-ISO,CC-LEN8-DLC>
+
+=== 2. put can0 into CAN-FD + chip loopback (canfdcfg can0 test)
+mtu                 : 72
+operstate           : UP
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1
+  controller state       ERROR-ACTIVE (0)
+  loopback               ENABLED
+  FD mode                ENABLED
+
+=== 3. forwarder starts (reads can0, submits to the monitor, answers the heartbeat)
+
+=== 4. HEALTHY: sender sends 5 s of valid frames (100 ms period) THROUGH the CAN controller
+sent 49 frames over 5 s, period 100 ms, counters 1000..1048
+last counter sent: 1048
+
+=== 5. one frame each (valid, tampered, duplicate, replay, gap, wrong id, extended id)
+sent 1 frame: id 0x123 counter 1049 payload 1049
+sent 1 frame: id 0x123 counter 1050 payload 1050 (one tag bit flipped)
+sent 1 frame: id 0x123 counter 1049 payload 1049
+sent 1 frame: id 0x123 counter 1044 payload 1044
+sent 1 frame: id 0x123 counter 1059 payload 1059
+sent 1 frame: id 0x124 counter 1060 payload 1060
+sent 1 frame: id 0x80000123 counter 1060 payload 1060
+
+=== 6. SILENCE for 2.5 s (no frames): the monitor must raise a traffic TIMEOUT
+
+=== 7. traffic resumes: next frame must be ACCEPTED and raise TRAFFIC_RECOVERED
+sent 1 frame: id 0x123 counter 1060 payload 1060
+
+=== 8. forwarder output (each frame it read from can0 and the verdict the monitor gave)
+can_forwarder: can0, 45 s, heartbeat answered; monitor last_counter 0
+  frame id 0x123 counter 1000 -> RESYNC (detail 0)
+  frame id 0x123 counter 1001 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1002 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1003 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1004 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1005 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1006 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1007 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1008 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1009 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1010 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1011 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1012 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1013 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1014 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1015 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1016 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1017 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1018 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1019 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1020 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1021 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1022 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1023 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1024 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1025 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1026 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1027 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1028 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1029 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1030 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1031 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1032 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1033 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1034 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1035 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1036 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1037 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1038 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1039 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1040 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1041 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1042 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1043 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1044 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1045 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1046 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1047 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1048 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1049 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1050 -> AUTH_FAIL (detail 0)
+  frame id 0x123 counter 1049 -> DUPLICATE (detail 0)
+  frame id 0x123 counter 1044 -> REPLAY (detail 0)
+  frame id 0x123 counter 1059 -> GAP (detail 9)
+  frame id 0x124 counter 1060 -> MALFORMED (detail 3)
+  frame id 0x80000123 counter 1060 -> MALFORMED (detail 2)
+  frame id 0x123 counter 1060 -> ACCEPTED (detail 0)
+frames submitted to the monitor: 57 | verdicts: ACCEPTED 50 GAP 1 RESYNC 1 MALFORMED 2 AUTH_FAIL 1 REPLAY 1 DUPLICATE 1 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 45 LATE 1 other 0
+can0 rx_packets counter (frames received by the CAN controller): 0 -> 57 (+57)
+end state: flags 0x0f last_counter 1060 hb_state ANSWERED miss_count 0 starved 0
+
+=== 9. monitor event log (Secure World)
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352969441
+seq 2 LATE_ANSWER          counter 5380 detail 0 ticks 103663538641
+seq 3 HEARTBEAT_RECOVERED  counter 5381 detail 0 ticks 103670884475
+seq 4 COUNTER_RESYNC       counter 1000 detail 0 ticks 103718790588
+seq 5 TIMEOUT              counter 0 detail 1 ticks 103816753246
+seq 6 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 103830569618
+seq 7 TIMEOUT              counter 0 detail 1 ticks 103836329712
+seq 8 AUTH_FAIL            counter 1050 detail 0 ticks 103838449609
+seq 9 REPLAY               counter 1049 detail 2 ticks 103842471420
+seq 10 REPLAY               counter 1044 detail 1 ticks 103846549096
+seq 11 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 103850584847
+seq 12 COUNTER_GAP          counter 1059 detail 9 ticks 103850584847
+seq 13 MALFORMED            counter 1060 detail 3 ticks 103854532720
+seq 14 TIMEOUT              counter 0 detail 1 ticks 103856346374
+seq 15 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 103906910911
+seq 16 TIMEOUT              counter 0 detail 1 ticks 103912676737
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=25
+
+=== 10. restore can0 to boot mode
+mtu                 : 16
+operstate           : UP
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  loopback               disabled
+  FD mode                disabled
+messages
