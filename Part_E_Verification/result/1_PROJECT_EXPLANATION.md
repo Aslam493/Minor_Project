@@ -36,7 +36,7 @@ Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, an
 | Event log | 64 slots: 24 pinned (first 4 events of each of 6 evidence classes) + 40 ordinary; other events limited to 1 per second per class; the counters stay exact |
 | Boot ID | A random 32-bit ID per boot; old answers from a previous boot are rejected |
 
-## 2a. Where the packet comes from (two paths)
+## 2a. Where the packet comes from (three paths)
 A packet is the 44-byte message `can_id (4) | counter (4) | payload (4) | tag (32)`, where the tag is HMAC-SHA256 over the first 12 bytes with a shared key.
 
 | | Path 1: direct (all earlier tests) | Path 2: through the CAN controller (`canbridge`, added 2026-11-18) |
@@ -46,16 +46,19 @@ A packet is the 44-byte message `can_id (4) | counter (4) | payload (4) | tag (3
 | What the CAN controller does | nothing | wraps the message in a CAN-FD frame (identifier, length, CRC, acknowledge), transmits it, receives it back and hands it to Linux |
 | Who judges the tag | Secure World | Secure World (the forwarder holds **no key** and builds no packet; it only repacks the bytes) |
 
+**Path 3 (added later on 2026-11-18, the one that answers "the packet must be made before Linux"):** the packets are made on the **laptop** by `packet_gen.py`, **before Linux on the Pi is involved at all**, and saved as a file of finished packets (identifier, counter, payload, tag). The Pi only receives the file. `can_replay` turns each line into a CAN-FD frame and sends it through `can0`; it contains **no key and no HMAC code**, and no key file is copied to the Pi (the board test lists `/tmp` to show it). Then the same chain as path 2: controller, `can_forwarder`, command 17, Secure World. Result (`baseline/precreated_packets_board_test_20261118.txt`): 57 packets, controller `rx_packets` +57, the same verdicts as path 2 (50 `ACCEPTED`, 1 `RESYNC`, `AUTH_FAIL`, `DUPLICATE`, `REPLAY`, `GAP` once each, 2 `MALFORMED`, 0 BUSY, 0 errors). The file has deliberate pauses (1 s, 400 ms, 2.5 s), so the log shows traffic TIMEOUT and TRAFFIC_RECOVERED pairs: correct detections of silences in the file.
+What path 3 does and does not give: the tag is made outside the Pi and Linux on the Pi never has the key, so Linux cannot make or alter a valid packet. It can still replay, delay or drop packets, which is exactly what the monitor detects. It is not an independent device on a bus: the Pi still sends the packets, and the chip was in loopback.
+
 **On the bus** the message is one CAN-FD frame: identifier = `can_id`, data field = 48 bytes = counter (4) + payload (4) + tag (32) + 8 bytes of zero padding (CAN-FD has no 40-byte length). The padding is not authenticated. A frame that is an error frame, a remote frame or the wrong length is dropped and counted by the forwarder.
 
 **Proof the frames really came through the controller:** the sender turns the kernel's own software echo off, and the forwarder prints the controller's `rx_packets` counter before and after. In the board test 57 frames were submitted and the counter rose by exactly 57 (`baseline/canbridge_board_test_20261118.txt`). Verdicts: 50 `ACCEPTED`, 1 `RESYNC`, 1 `AUTH_FAIL`, 1 `DUPLICATE`, 1 `REPLAY`, 1 `GAP` (detail 9), 2 `MALFORMED` (wrong id, extended id), 0 BUSY, 0 errors; the traffic timeout and recovery were raised by Core 1.
 
-**What this still does not prove:** the sender is a program on the same Pi, so the tag is still made by software on the Pi. An independent sender is a second device on the bus (for example a USB-CAN adapter on the laptop, or another board), which was not available. The chip was in loopback, so the bus itself was not exercised.
+**What path 2 still does not prove:** the sender is a program on the same Pi, so the tag is still made by software on the Pi (path 3 removes that). An independent sender is a second device on the bus (for example a USB-CAN adapter on the laptop, or another board), which was not available. The chip was in loopback, so the bus itself was not exercised.
 
 ## 2b. The shared key and its limits
 The tag uses a **shared secret key** (symmetric, HMAC), not a private/public key pair.
 - **K_frame:** held by Secure World and by the sender, the same 32 bytes. **K_hb:** Secure World only (boot ID and heartbeat). **K_test:** Linux test tools only, not in the secure image.
-- **How it is shared today:** the key is a constant in the Secure World source (`rpi3_can_monitor_keys.h`), compiled into the OP-TEE image; for the tests it is copied by hand into `/tmp/kf` for the sender. No command returns it. The CAN controller and the forwarder never see it, and it never travels over the bus.
+- **How it is shared today:** the key is a constant in the Secure World source (`rpi3_can_monitor_keys.h`), compiled into the OP-TEE image. For path 1 and 2 it was copied by hand into `/tmp/kf` on the Pi for the sender; for **path 3 it stays on the laptop** (the packet file carries only finished messages and tags). No command returns it. The CAN controller and the forwarder never see it, and it never travels over the bus.
 - **It is not secret from everyone else.** Root on the Pi, or anyone with the repository, can read it. The Pi 3 has no TZASC, and OP-TEE's hardware unique key falls back to all zeros on a platform without fuses, so there is nowhere on this board to hide a key.
 - **Real systems** provision the key in a secure place into protected hardware on both sides, use key agreement with certificates, derive per-ECU keys from a master (as AUTOSAR SecOC does), or use public-key signatures so that no secret is shared at all (the signer keeps a private key; Secure World holds only the public key). Signatures need a 64-byte tag, which does not fit in one CAN-FD frame with the counter and payload. None of this is built.
 

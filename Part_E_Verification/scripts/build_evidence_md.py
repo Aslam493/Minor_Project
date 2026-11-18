@@ -48,6 +48,9 @@ INTRO = {
  "C9": ("C9 The packet path through the CAN controller (canbridge)", "**What it shows:** the packet is no longer made by `mon_client`. `can_sender` makes the message and tag and transmits it through `can0` (CAN-FD, chip loopback); the controller carries it; `can_forwarder` reads it from `can0` and submits it to the monitor. "
         "**How to read it:** section 2 shows `can0` switched into FD + loopback (`mtu 72`, `FD mode ENABLED`, `loopback ENABLED`); section 8 lists every frame the forwarder read and the verdict the monitor gave; the line `can0 rx_packets ... (+N)` counts frames received by the CAN controller, and N equals the number of frames submitted, which shows they came through the hardware; section 9 is the monitor's own event log. "
         "Some TIMEOUT / TRAFFIC_RECOVERED pairs in the log come from the pauses between the test's own commands (the deadline is 300 ms); they are correct detections. **Limit:** the sender is a program on the same Pi; the chip was in loopback; the bus itself was not exercised."),
+ "C10": ("C10 Packets made before Linux (laptop) and only replayed by the Pi", "**What it shows:** the packets (message + tag) were made on the **laptop** by `packet_gen.py` before Linux on the Pi was involved at all, and saved as a file of finished packets. The Pi receives the file and the replayer `can_replay`, which contains **no key and no HMAC code**; section 0 shows that no key file exists on the Pi. "
+        "`can_replay` sends the packets through `can0` (CAN-FD + chip loopback), `can_forwarder` reads them back from the controller and submits them, and Secure World judges them. **How to read it:** the verdicts must equal the intended ones in the file's comments, and `rx_packets` must rise by the number of frames submitted. "
+        "The file has deliberate pauses (1 s before counter 1049, 400 ms before the tampered packet, 2.5 s before the last one), so the log shows traffic TIMEOUT / TRAFFIC_RECOVERED pairs: those are correct detections of silences in the file. **Limits:** the Pi still sends the packets (Linux can replay, delay or drop them, which is what the monitor detects); the chip was in loopback; the sender is not a separate device on a bus."),
  "END": ("Cleanup and final state", "The test tools and the key were removed from the Pi's RAM disk, the Pi was rebooted, and `verify_boot` was run again. **Good result:** `/tmp` shows no tools and `verify_boot` is 16 pass, 0 FAIL."),
 }
 TITLE = {"C5b": "C5b"}
@@ -102,6 +105,15 @@ def table():
         n, acc, gap, res_, mal, af, rep, dup, con, bsy, er = sub_.groups()
         rows.append(("C9", "Packets through the CAN controller: frames submitted / frames received by the controller", "%s submitted, controller rx_packets +%s" % (n, rxm.group(1)), n == rxm.group(1)))
         rows.append(("C9", "Verdicts for those frames (valid run + one of each fault)", "ACCEPTED %s, RESYNC %s, AUTH_FAIL %s, REPLAY %s, DUPLICATE %s, GAP %s, MALFORMED %s, BUSY %s, errors %s" % (acc, res_, af, rep, dup, gap, mal, bsy, er),
+                     af == "1" and rep == "1" and dup == "1" and gap == "1" and mal == "2" and bsy == "0" and er == "0"))
+    sub2 = re.search(r"frames submitted to the monitor: (\d+) \| verdicts: ACCEPTED (\d+) GAP (\d+) RESYNC (\d+) MALFORMED (\d+) AUTH_FAIL (\d+) REPLAY (\d+) DUPLICATE (\d+) CONFLICT (\d+) \| BUSY (\d+) errors (\d+)", secs.get("C10", ("", ""))[1])
+    rx2 = re.search(r"rx_packets counter[^\n]*\(\+(\d+)\)", secs.get("C10", ("", ""))[1])
+    nokey = re.search(r"key files named kf in /tmp: (\d+)", secs.get("C10", ("", ""))[1])
+    if sub2 and rx2 and nokey:
+        n, acc, gap, res_, mal, af, rep, dup, con, bsy, er = sub2.groups()
+        rows.append(("C10", "Packets made on the laptop before Linux: key files on the Pi", "%s key files on the Pi" % nokey.group(1), nokey.group(1) == "0"))
+        rows.append(("C10", "Replayed through the CAN controller: frames submitted / controller rx_packets", "%s submitted, rx_packets +%s" % (n, rx2.group(1)), n == rx2.group(1)))
+        rows.append(("C10", "Verdicts", "ACCEPTED %s, RESYNC %s, AUTH_FAIL %s, REPLAY %s, DUPLICATE %s, GAP %s, MALFORMED %s, BUSY %s, errors %s" % (acc, res_, af, rep, dup, gap, mal, bsy, er),
                      af == "1" and rep == "1" and dup == "1" and gap == "1" and mal == "2" and bsy == "0" and er == "0"))
     if len(vb) >= 2: rows.append(("END", "verify_boot after cleanup and reboot", "%s pass, %s FAIL, %s skipped" % vb[-1], vb[-1][1] == "0"))
     return rows

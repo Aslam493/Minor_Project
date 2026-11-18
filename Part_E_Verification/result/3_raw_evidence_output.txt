@@ -554,6 +554,136 @@ operstate           : UP
 messages
 
 ################################################################
+## [C10] Packets made before Linux on the laptop (packet_gen.py), replayed through the CAN controller: can_replay -> can0 -> can_forwarder -> monitor
+################################################################
+
+laptop: making the packets (key read from the Secure World source on the laptop only)
+wrote /tmp/tmp.HiawUMtx3p/packets.txt
+laptop: 57 packets in the file; the file contains messages and tags, not the key
+
+=== 0. What is on the Pi (no key file anywhere in /tmp; can_replay and can_forwarder contain no key and no HMAC code)
+drwxrwxrwt    2 root     root           180 Jan  1 00:07 .
+drwxr-xr-x   18 root     root          1024 Jan  1 00:00 ..
+-rwx------    1 root     root         77344 Jan  1 00:07 can_forwarder
+-rwx------    1 root     root         77032 Jan  1 00:07 can_replay
+-rwx------    1 root     root         75248 Jan  1 00:07 canfdcfg
+-rwx------    1 root     root         75280 Jan  1 00:07 canmode
+-rw-r--r--    1 root     root         44985 Jan  1 00:07 messages
+-rwx------    1 root     root         77144 Jan  1 00:07 mon_client
+-rw-------    1 root     root          7019 Jan  1 00:07 packets.txt
+key files named kf in /tmp: 0
+first packet in the file:
+100 123 e8030000e803dec050969c4be2f822fd8803ba35f6a6155c4e65ac21e65fb58b48a4cd19ae11c3150000000000000000  # va
+
+=== 1. Pi state: uptime 456 s; monitor
+page 0: version 1 length 128 boot_id 0x127a6e87 flags 0x13 mode 0
+  now_ticks 9116121837 core1_poll_age_ticks 3387 poll_count 16646952964
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=0
+
+=== 2. can0 into CAN-FD + chip loopback
+mtu                 : 72
+operstate           : UP
+  data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1
+  loopback               ENABLED
+  FD mode                ENABLED
+
+=== 3. forwarder starts (reads can0, submits to the monitor, answers the heartbeat)
+
+=== 4. can_replay sends the ready-made packets through the CAN controller
+can_replay: 57 packets sent through can0 from /tmp/packets.txt (no key, no HMAC in this program), 0 malformed lines skipped
+
+=== 5. forwarder output: every frame read from can0 and the verdict from Secure World
+can_forwarder: can0, 25 s, heartbeat answered; monitor last_counter 0
+  frame id 0x123 counter 1000 -> RESYNC (detail 0)
+  frame id 0x123 counter 1001 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1002 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1003 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1004 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1005 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1006 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1007 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1008 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1009 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1010 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1011 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1012 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1013 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1014 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1015 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1016 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1017 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1018 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1019 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1020 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1021 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1022 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1023 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1024 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1025 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1026 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1027 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1028 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1029 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1030 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1031 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1032 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1033 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1034 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1035 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1036 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1037 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1038 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1039 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1040 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1041 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1042 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1043 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1044 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1045 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1046 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1047 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1048 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1049 -> ACCEPTED (detail 0)
+  frame id 0x123 counter 1050 -> AUTH_FAIL (detail 0)
+  frame id 0x123 counter 1049 -> DUPLICATE (detail 0)
+  frame id 0x123 counter 1044 -> REPLAY (detail 0)
+  frame id 0x123 counter 1059 -> GAP (detail 9)
+  frame id 0x124 counter 1060 -> MALFORMED (detail 3)
+  frame id 0x80000123 counter 1060 -> MALFORMED (detail 2)
+  frame id 0x123 counter 1060 -> ACCEPTED (detail 0)
+frames submitted to the monitor: 57 | verdicts: ACCEPTED 50 GAP 1 RESYNC 1 MALFORMED 2 AUTH_FAIL 1 REPLAY 1 DUPLICATE 1 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 25 LATE 1 other 0
+can0 rx_packets counter (frames received by the CAN controller): 0 -> 57 (+57)
+end state: flags 0x0f last_counter 1060 hb_state ANSWERED miss_count 0 starved 0
+
+=== 6. monitor event log (Secure World)
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1353130806
+seq 2 LATE_ANSWER          counter 458 detail 0 ticks 9141609756
+seq 3 HEARTBEAT_RECOVERED  counter 459 detail 0 ticks 9146904661
+seq 4 COUNTER_RESYNC       counter 1000 detail 0 ticks 9199161241
+seq 5 TIMEOUT              counter 0 detail 1 ticks 9297062042
+seq 6 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 9310512862
+seq 7 TIMEOUT              counter 0 detail 1 ticks 9316276197
+seq 8 AUTH_FAIL            counter 1050 detail 0 ticks 9318181952
+seq 9 REPLAY               counter 1049 detail 2 ticks 9322028974
+seq 10 REPLAY               counter 1044 detail 1 ticks 9325869281
+seq 11 COUNTER_GAP          counter 1059 detail 9 ticks 9329693317
+seq 12 MALFORMED            counter 1060 detail 3 ticks 9333452675
+seq 13 TIMEOUT              counter 0 detail 1 ticks 9335455936
+seq 14 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 9385404168
+seq 15 TIMEOUT              counter 0 detail 1 ticks 9391165596
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=11
+
+=== 7. restore can0 to the boot mode
+mtu                 : 16
+operstate           : UP
+  loopback               disabled
+  FD mode                disabled
+
+messages
+
+################################################################
 ## [END] Cleanup
 ################################################################
 

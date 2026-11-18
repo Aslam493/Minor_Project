@@ -1,7 +1,7 @@
 #!/bin/bash
 # make_result_folder.sh <evidence_raw.txt>  - builds result/: explanation (md+pdf), evidence file (md+pdf), raw evidence, README.
 set -e
-RAW="${1:?raw evidence file}"; CB="${2:-}"; PV="$(cd "$(dirname "$0")/.." && pwd)"; R="$PV/result"; T=$(mktemp -d)
+RAW="${1:?raw evidence file}"; CB="${2:-}"; PRE="${3:-}"; PV="$(cd "$(dirname "$0")/.." && pwd)"; R="$PV/result"; T=$(mktemp -d)
 CSS="$T/pdf.css"; cat > "$CSS" <<'C'
 <style>
 body{font-family:Helvetica,Arial,sans-serif;max-width:980px;margin:18px auto;font-size:11.5px;line-height:1.35;color:#111}
@@ -14,13 +14,17 @@ C
 mkdir -p "$R"
 cp "$PV/PROJECT_EXPLANATION.md" "$R/1_PROJECT_EXPLANATION.md"
 cp "$RAW" "$R/3_raw_evidence_output.txt"
-if [ -n "$CB" ]; then   # optional second raw file: the canbridge board test becomes section [C9]
-  python3 - "$RAW" "$CB" "$R/3_raw_evidence_output.txt" <<'PY'
+if [ -n "$CB" ] || [ -n "$PRE" ]; then   # optional second raw file: the canbridge board test becomes section [C9]
+  python3 - "$RAW" "$CB" "$PRE" "$R/3_raw_evidence_output.txt" <<'PY'
 import sys,re
-raw=open(sys.argv[1],errors="replace").read(); cb=open(sys.argv[2],errors="replace").read()
+raw=open(sys.argv[1],errors="replace").read()
 i=raw.index("\n"+"#"*64+"\n## [END]")
-sec="\n"+"#"*64+"\n## [C9] The packet path through the CAN controller (canbridge): can_sender -> can0 -> can_forwarder -> monitor\n"+"#"*64+"\n\n"+cb.strip("\n")+"\n"
-open(sys.argv[3],"w").write(raw[:i]+sec+raw[i:])
+add=""
+for path,title in ((sys.argv[2],"[C9] The packet path through the CAN controller (canbridge): can_sender -> can0 -> can_forwarder -> monitor"),
+                   (sys.argv[3],"[C10] Packets made before Linux on the laptop (packet_gen.py), replayed through the CAN controller: can_replay -> can0 -> can_forwarder -> monitor")):
+    if path:
+        add+="\n"+"#"*64+"\n## "+title+"\n"+"#"*64+"\n\n"+open(path,errors="replace").read().strip("\n")+"\n"
+open(sys.argv[4],"w").write(raw[:i]+add+raw[i:])
 PY
 fi
 python3 "$PV/scripts/build_evidence_md.py" "$R/3_raw_evidence_output.txt" "$R/2_EVIDENCE_FILE.md"
