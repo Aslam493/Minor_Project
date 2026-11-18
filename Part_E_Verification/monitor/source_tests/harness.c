@@ -22,6 +22,11 @@ TEE_Result mock_init_extra(void)
 #define EXPECT_MODE RPI3_MON_MODE_F
 #define MON_FIRST_IDX 0
 #endif
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+#define BADPAGE 3U		/* Mode P build: page 2 is the request latency page */
+#else
+#define BADPAGE 2U
+#endif
 static int nchk, nfail, tchk, tfail; static const char *cur;
 #define CHECK(c) do { nchk++; tchk++; if (!(c)) { nfail++; tfail++; printf("  FAIL line %d: %s\n", __LINE__, #c); } } while (0)
 static void begin(const char *n) { cur = n; tchk = tfail = 0; }
@@ -336,16 +341,16 @@ static void t_c20(void)
 	CHECK(p->lease_remaining_ticks == 1000000 && p->traffic_age_ticks == 1000 && (h.p2b & RPI3_MON_HP_STARVED));
 	evadd(RPI3_MON_EV_AUTH_FAIL, 1, 0); evadd(RPI3_MON_EV_AUTH_FAIL, 2, 0); evadd(RPI3_MON_EV_REPLAY, 3, 1); len = 160;
 	CHECK(rpi3_mon_cmd20(0, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_OK && p->pinned_used >= 3 && p->pinned_used == rpi3_mon.l.pinned_used && p->ev_seq == rpi3_mon.l.ev_seq);	/* the lease also expires in this call, so more than three */ end();
-	begin("EV5/N2 command 20 page 1: exact counters, totals, reserved zero; page 2 is BAD_PARAMETERS"); setup(); frozen(5000000000ull);
+	begin("EV5/N2 command 20 page 1: exact counters, totals, reserved zero; the first page after the last one is BAD_PARAMETERS"); setup(); frozen(5000000000ull);
 	for (i = 0; i < 6; i++) evadd(RPI3_MON_EV_AUTH_FAIL, (uint32_t)i, 0); for (i = 0; i < 3; i++) evadd(RPI3_MON_EV_MALFORMED, (uint32_t)i, 1); rpi3_mon.l.verdict_frame.total = 11; rpi3_mon.l.verdict_hb.total = 22;
 	memset(out, 0xEE, sizeof out); len = 160; CHECK(rpi3_mon_cmd20(1, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_OK && len == 128 && oa == 128 && ob == 1 && out[128] == 0xEE);
 	CHECK(q->version == 1 && q->length == 128 && q->rsv == 0 && q->ev_count[RPI3_MON_EV_AUTH_FAIL] == 6 && q->ev_count[RPI3_MON_EV_MALFORMED] == 3 && q->v_frame_total == 11 && q->v_hb_total == 22 && q->v_xcheck_total == 0);
-	len = 160; CHECK(rpi3_mon_cmd20(2, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS && h.p3a == 0 && h.p2b == 0); CHECK(rpi3_mon_cmd20(0, 1, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS); end();
+	len = 160; CHECK(rpi3_mon_cmd20(BADPAGE, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS && h.p3a == 0 && h.p2b == 0); CHECK(rpi3_mon_cmd20(0, 1, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS); end();
 	begin("N3/N4/N8/HP2 command 20: short buffer, BUSY, precedence, health fill rule"); setup(); frozen(5000000000ull); memset(out, 0xEE, sizeof out);
 	len = 127; CHECK(rpi3_mon_cmd20(0, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_SHORT_BUFFER && len == 128 && out[0] == 0xEE && h.p3a == 0 && h.p2b == 0);
 	len = 160; M.ext_hold = 1; CHECK(rpi3_mon_cmd20(0, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BUSY && len == 0 && oa == 0 && ob == 0 && out[0] == 0xEE && h.p3a == 1 && M.violations == 0);
 	len = 10; CHECK(rpi3_mon_cmd20(0, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_SHORT_BUFFER); M.ext_hold = 0;					/* buffer size before BUSY, the lock is never tried */
-	rpi3_mon.init_ok = 0; len = 160; CHECK(rpi3_mon_cmd20(1, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_STATE && h.p2a == 0); CHECK(rpi3_mon_cmd20(2, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS);
+	rpi3_mon.init_ok = 0; len = 160; CHECK(rpi3_mon_cmd20(1, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_STATE && h.p2a == 0); CHECK(rpi3_mon_cmd20(BADPAGE, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS);
 	len = 10; CHECK(rpi3_mon_cmd20(0, 0, out, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_STATE); rpi3_mon.init_ok = 1; len = 5; CHECK(rpi3_mon_cmd20(0, 0, NULL, &len, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS); end();
 }
 static void t_c21(void)
@@ -926,6 +931,48 @@ static void t_pull(void)
 	  CHECK(ontime == 200 && late == 0 && other == 0 && rpi3_mon.l.verdict_frame.total == 400 && rpi3_mon.l.ctr_f.last_counter == 1399 && rpi3_mon.l.pq_miss_count == 0);
 	  CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_AUTH_FAIL] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_COUNTER_GAP] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_REPLAY] == 0); }
 	CHECK(M.hmac_in_hold == 0 && M.violations == 0); end();
+
+	begin("PQ11 request latency page (command 20 page 2): exact bucket for each answer time, max, last, counts; non-answers are not timed"); setup(); frozen(5000000000ull);
+	{ uint8_t pg[160]; size_t pl; const struct rpi3_mon_proj2 *q2 = (const struct rpi3_mon_proj2 *)(const void *)pg; const uint64_t MS = RPI3_MON_TICKS_PER_MS; uint32_t sum, k, exp_n = 0;
+	  /* the page starts empty */
+	  memset(pg, 0xEE, sizeof pg); pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK && pl == 128 && oa == 128 && ob == 1 && pg[128] == 0xEE);
+	  CHECK(q2->version == 1 && q2->length == 128 && q2->n_ontime == 0 && q2->n_late == 0 && q2->last_ticks == 0 && q2->max_ticks == 0);
+	  for (sum = 0, k = 0; k < RPI3_MON_PQ_BUCKETS; k++) sum |= q2->bucket[k];
+	  CHECK(sum == 0);
+	  /* answer times in ticks after the request was issued; expected bucket = floor(ms / 2), clamped to the last bucket (>= 46 ms) */
+	  { static const struct { uint64_t at; unsigned bucket; bool late; } T[] = {
+		{ 1 * MS / 2, 0, false }, { 2 * MS - 1, 0, false }, { 2 * MS, 1, false }, { 3 * MS, 1, false }, { 4 * MS, 2, false }, { 7 * MS, 3, false },
+		{ 20 * MS, 10, false }, { 38 * MS, 19, false }, { 40 * MS, 20, false },			/* exactly D_p is still on time (strict >) */
+		{ 40 * MS + 1, 20, true }, { 45 * MS, 22, true }, { 46 * MS, 23, true }, { 48 * MS - 1, 23, true }, { 48 * MS, 23, true }, { 49 * MS, 23, true }, { 500 * MS, 23, true } };	/* 48 ms is the first value whose index would be 24, one past the table */
+	    unsigned t; uint64_t mx = 0, last = 0; unsigned nl = 0, no = 0, bk[RPI3_MON_PQ_BUCKETS] = {0};
+	    for (t = 0; t < sizeof T / sizeof T[0]; t++) {
+		M.now += P; pq_issue(); M.now += T[t].at; mkbatch(b, 0, 0);
+		CHECK(c31(t + 1, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == (T[t].late ? RPI3_MON_V31_LATE : RPI3_MON_V31_ON_TIME));
+		bk[T[t].bucket]++; if (T[t].late) nl++; else no++; if (T[t].at > mx) mx = T[t].at; last = T[t].at; exp_n++;
+		pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK && q2->rsv == 0 && q2->bucket[T[t].bucket] == bk[T[t].bucket] && q2->n_ontime == no && q2->n_late == nl && q2->max_ticks == mx && q2->last_ticks == last);
+	    }
+	    pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK);
+	    for (k = 0, sum = 0; k < RPI3_MON_PQ_BUCKETS; k++) { sum += q2->bucket[k]; CHECK(q2->bucket[k] == bk[k]); }
+	    CHECK(sum == q2->n_ontime + q2->n_late && sum == exp_n);	/* every timed answer is in exactly one bucket */
+	  }
+	  /* answers that are not an answer to the open request are not timed */
+	  M.now += P; pq_issue(); M.now += 5 * MS; pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK); { uint32_t before_on = q2->n_ontime, before_late = q2->n_late; uint64_t before_max = q2->max_ticks; uint32_t before_last = q2->last_ticks;
+	    CHECK(c31(rpi3_mon.l.pq_seq + 1, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_UNISSUED);		/* ahead */
+	    CHECK(c31(rpi3_mon.l.pq_seq - 1, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_STALE);			/* behind */
+	    CHECK(c31(rpi3_mon.l.pq_seq, 33, b, 44, &oa, &ob) == RPI3_MON_R_BAD_PARAMETERS);						/* parameter error */
+	    pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK && q2->n_ontime == before_on && q2->n_late == before_late && q2->max_ticks == before_max && q2->last_ticks == before_last);
+	    CHECK(c31(rpi3_mon.l.pq_seq, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME);			/* the real answer is timed */
+	    CHECK(c31(rpi3_mon.l.pq_seq, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_DUPLICATE);			/* a second answer is not */
+	    pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK && q2->n_ontime == before_on + 1 && q2->n_late == before_late && q2->last_ticks == 5 * MS && q2->max_ticks == before_max); }
+	  /* a missed request that is never answered adds no sample (it is counted as a miss, not as a time) */
+	  pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK); { uint32_t n0 = q2->n_ontime + q2->n_late; M.now += P; pq_issue(); M.now += 3 * P; pq_eval(); M.now += P; pq_issue();
+	    pl = 160; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_OK && q2->n_ontime + q2->n_late == n0 && rpi3_mon.l.pq_miss_count >= 1); }
+	  /* the page is read-only state: BUSY and parameter handling are those of the other pages; page 3 does not exist; no lock rule broken */
+	  pl = 160; M.ext_hold = 1; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_BUSY && pl == 0); M.ext_hold = 0;
+	  pl = 160; CHECK(rpi3_mon_cmd20(3, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_BAD_PARAMETERS);
+	  pl = 127; CHECK(rpi3_mon_cmd20(2, 0, pg, &pl, &oa, &ob, &h) == RPI3_MON_R_SHORT_BUFFER && pl == 128);
+	  CHECK(M.hmac_in_hold == 0 && M.violations == 0); }
+	end();
 }
 #endif
 

@@ -33,6 +33,22 @@ M = [  # (name, target 'c' or 'g', old, new)
  ("glue: command 17 is not refused in Mode P", 'g', "	if (cmd_id == PTA_RPI3_CAN_SPI_POC_CMD_MON_SUBMIT_FRAME)\n		return TEE_ERROR_NOT_SUPPORTED;\n", ""),
  ("glue: command 31 accepts MEMREF_OUTPUT", 'g', "if (pt != PT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT))\n		return TEE_ERROR_BAD_PARAMETERS;\n	r = rpi3_mon_cmd31", "if (pt != PT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT))\n		return TEE_ERROR_BAD_PARAMETERS;\n	r = rpi3_mon_cmd31"),
  ("glue: command 30 does not copy the batch size to the caller", 'g', "		params[1].value.a = mb;\n", ""),
+ ("P6 bucket width is 4 ms", 'c', "uint64_t k = el / RPI3_MON_PQ_BUCKET_TICKS;", "uint64_t k = el / (2 * RPI3_MON_PQ_BUCKET_TICKS);"),
+ ("P6 no clamp to the last bucket", 'c', "	if (k >= RPI3_MON_PQ_BUCKETS)\n		k = RPI3_MON_PQ_BUCKETS - 1U;\n", ""),
+ ("P6 clamp is off by one", 'c', "	if (k >= RPI3_MON_PQ_BUCKETS)\n		k = RPI3_MON_PQ_BUCKETS - 1U;", "	if (k > RPI3_MON_PQ_BUCKETS)\n		k = RPI3_MON_PQ_BUCKETS - 1U;"),
+ ("P6 a LATE answer is counted as ON_TIME", 'c', "		l->pq_n_late++;", "		l->pq_n_ontime++;"),
+ ("P6 the bucket is not counted", 'c', "	l->pq_bucket[k]++;\n", ""),
+ ("P6 max is never updated", 'c', "	if (el > l->pq_max_lat)\n		l->pq_max_lat = el;\n", ""),
+ ("P6 max keeps the smallest", 'c', "if (el > l->pq_max_lat)", "if (el < l->pq_max_lat)"),
+ ("P6 last is never updated", 'c', "	l->pq_last_lat = el > 0xFFFFFFFFULL ? 0xFFFFFFFFU : (uint32_t)el;\n", ""),
+ ("P6 time measured from the last good answer, not the issue", 'c', "now >= l->pq_issue_ticks ? now - l->pq_issue_ticks : 0;", "now >= l->pq_last_ok_ticks ? now - l->pq_last_ok_ticks : 0;"),
+ ("P6 an ON_TIME answer is not timed", 'c', "		rpi3_mon_pq_note_latency(l, now, false);\n", ""),
+ ("P6 a LATE answer is not timed", 'c', "		rpi3_mon_pq_note_latency(l, now, true);\n", ""),
+ ("P6 page 3 is accepted", 'c', "page >= 3", "page >= 4"),
+ ("P6 page 2 returns page 1", 'c', "		rpi3_mon_build_proj2((volatile uint64_t *)loc.w, l);", "		rpi3_mon_build_proj1((volatile uint64_t *)loc.w, l);"),
+ ("P6 last bucket is not copied to the page", 'c', "	for (i = 0; i < RPI3_MON_PQ_BUCKETS; i++)\n		p.bucket[i] = l->pq_bucket[i];", "	for (i = 0; i < RPI3_MON_PQ_BUCKETS - 1U; i++)\n		p.bucket[i] = l->pq_bucket[i];"),
+ ("P6 reserved word is not zero", 'c', "	p.rsv = 0;\n	p.max_ticks", "	p.rsv = 1;\n	p.max_ticks"),
+ ("P6 page has the wrong length field", 'c', "	p.version = 1;\n	p.length = 128;\n	p.n_ontime", "	p.version = 1;\n	p.length = 127;\n	p.n_ontime")
 ]
 def run(k):
     name, tgt, old, new = M[k]; src = C if tgt == 'c' else G

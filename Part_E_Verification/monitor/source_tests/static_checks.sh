@@ -15,7 +15,7 @@ chk(){ if [ "$2" = 1 ]; then ok "$1"; else bad "$1"; fi; }
 strip(){ python3 "$HERE/strip_comments.py" "$1"; }
 # body of one function (from its signature line to the closing brace at column 0)
 fbody(){ strip "$C" | awk -v n="$1" '$0 ~ ("^[A-Za-z_].*[ \t*]" n "\\(") {f=1} f{print} f&&/^}/{exit}'; }
-CRIT="rpi3_mon_pq_issue_if_due rpi3_mon_pq_answer rpi3_mon_uart_snapshot rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1"
+CRIT="rpi3_mon_pq_issue_if_due rpi3_mon_pq_answer rpi3_mon_uart_snapshot rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1 rpi3_mon_pq_note_latency rpi3_mon_build_proj2"
 ALLSRC="$( (strip "$C"; strip "$H"; strip "$PL"; strip "$G") )"
 
 echo "static_checks: final monitor code (stages 1-6)"
@@ -133,10 +133,12 @@ c31=$(fbody rpi3_mon_cmd31)
 chk "PQ1 command 31 judges packets only through frame_prepare, takes the HMAC before each hold, and has no HMAC call of its own" $([ "$(echo "$c31" | grep -c 'rpi3_mon_hmac(')" = 0 ] && [ -n "$(echo "$c31" | grep -n 'rpi3_mon_frame_prepare(' | head -1)" ] && [ "$(echo "$c31" | grep -n 'rpi3_mon_frame_prepare(' | head -1 | cut -d: -f1)" -lt "$(echo "$c31" | grep -n 'rpi3_mon_hold(' | head -1 | cut -d: -f1)" ] && echo 1 || echo 0)
 chk "PQ2 the batch is bounded: n is checked against RPI3_MON_PQ_MAX_BATCH before the loop, and the loop runs at most max(n,1) times" $([ "$(echo "$c31" | grep -n 'RPI3_MON_PQ_MAX_BATCH' | head -1 | cut -d: -f1)" -lt "$(echo "$c31" | grep -n 'for (' | head -1 | cut -d: -f1)" ] && echo "$c31" | grep -q 'i < rounds' && echo 1 || echo 0)
 off_c=$(strip "$C" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f'); off_h=$(strip "$H" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f')
-chk "PQ3 flag off: nothing of Mode P (pq_ fields, PQ_ constants, commands 30 and 31) is left outside the CFG_RPI3_CAN_MONITOR_PULL blocks of the source and header" $([ "$(echo "$off_c$off_h" | grep -cE '\bpq_|RPI3_MON_PQ_|rpi3_mon_cmd3[01]|rpi3_mon_pq_|RPI3_MON_V31')" = 0 ] && echo 1 || echo 0)
+chk "PQ3 flag off: nothing of Mode P (pq_ fields, PQ_ constants, commands 30 and 31) is left outside the CFG_RPI3_CAN_MONITOR_PULL blocks of the source and header" $([ "$(echo "$off_c$off_h" | grep -cE '\bpq_|RPI3_MON_PQ_|rpi3_mon_cmd3[01]|rpi3_mon_pq_|RPI3_MON_V31|proj2|PQ_BUCKET')" = 0 ] && echo 1 || echo 0)
 off_g=$(strip "$G" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f')
 chk "PQ4 flag off: the PTA glue has no command 30, 31 or Mode P refusal of command 17 outside the flag block" $([ "$(echo "$off_g" | grep -cE 'cmd30|cmd31|GET_PACKET_REQUEST|SUBMIT_PACKETS')" = 0 ] && echo 1 || echo 0)
 chk "PQ5 Mode P refuses command 17 in the glue (inside the flag block, before any parameter check) and commands 30 and 31 use exact parameter types" $(strip "$G" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1} f' | grep -q 'SUBMIT_FRAME' && strip "$G" | grep -q 'PT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT)' && strip "$G" | grep -c 'PT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT)' | grep -qE '^[2-9]' && echo 1 || echo 0)
+chk "PQ9 the request latency is noted only by rpi3_mon_pq_answer, once for ON_TIME and once for LATE (2 call sites); the helper is in the critical-section list (no memcpy, no call to anything forbidden)" $([ "$(grep -c 'rpi3_mon_pq_note_latency(' "$C")" = 3 ] && [ "$(awk '/^RPI3_MON_CRIT uint32_t rpi3_mon_pq_answer/,/^}/' "$C" | grep -c 'rpi3_mon_pq_note_latency(')" = 2 ] && echo 1 || echo 0)
+chk "PQ10 status page 2 exists only in Mode P: built by one call in command 20, the page limit is 3 with the flag and 2 without" $([ "$(grep -c 'rpi3_mon_build_proj2(' "$C")" = 2 ] && [ "$(grep -c 'page >= 3' "$C")" = 1 ] && [ "$(grep -c 'page >= 2' "$C")" = 1 ] && echo 1 || echo 0)
 chk "PQ6 the two Mode P compile-time guards (D_p < P, T > P + D_p + sender period + jitter) are present" $([ "$(grep -c '_Static_assert(RPI3_MON_PQ_\|_Static_assert(RPI3_MON_T_TRAFFIC_MS > RPI3_MON_PQ_' "$H")" = 2 ] && echo 1 || echo 0)
 echo "static_checks: $pass pass, $fail FAIL"
 [ "$fail" -eq 0 ]
