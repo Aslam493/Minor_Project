@@ -32,3 +32,13 @@
 - Missed-request rules seen on the board: TIMEOUT detail 3 (heartbeat never answered) and detail 4 (packet request never answered) at 70 s after boot, because no forwarder ran during the boot grace; HEARTBEAT_RECOVERED detail 0 and 1 once it started; TIMEOUT detail 4 again after the forwarder ended.
 - **Two script expectations were wrong, not the monitor:** the script first expected REPLAY 1 and TRAFFIC_RECOVERED 1 and printed 2 FAIL. REPLAY has two events by design (detail 1 older, detail 2 duplicate; the demo has both), and the demo pauses (1000, 400, 2500 ms) all exceed the 300 ms deadline, so 3 recoveries is right. I checked this in the source and in the event log (timestamps), corrected the script, and did not re-run it (a re-run needs a reboot because the counters are now past 1060). The unedited first-run output stays in the log file.
 - NOT measured yet: reply-time p50/p99/max (idle and under load), CPU cost of tight polling, `board_full_check.sh --mode-p`.
+
+## ON HOLD until tomorrow (user decision, 2026-11-18): timing runs and full check
+The user said to do these on 2026-11-19. State left behind: the Pi runs the Mode P image (sha256 `1646bd9f6978...`, 8 GB spare card), booted, `can0` restored to the boot mode, `/tmp` clean. Nothing else was changed.
+Steps for tomorrow (each phase needs a fresh boot because Secure World keeps its maximum since boot; reboots and board time need the user's go at that point):
+1. Reboot, wait 90 s, `verify_boot`, then `scripts/modeP_timing_test.sh 10.237.27.187 idle 600` (Linux and Secure World side p50/p99/max, LATE_ANSWER).
+2. Reboot, `scripts/modeP_timing_test.sh 10.237.27.187 load 600` (3 busy processes on cores 0, 2, 3).
+3. If late replies appear: tune the forwarder (`spin`, pinned to cores 0, 2, 3 only), report the CPU cost, re-measure.
+4. Reboot, copy the tools and run `board_full_check.sh --mode-p` (command-17 checks skip with the reason; F2 R4/R4b is the expected KNOWN).
+5. Record everything in `baseline/`, update this file, commit. Rollback image: `rpi3-sdcard-monitor-hardened-c16384.img`.
+Also open: correct the sentence "Linux can't forge a packet because it has no key" in the documents and PDFs (wording given by the user: the forwarder does not hold the key, but a root attacker could extract the prototype key; forgery is prevented only against a bus attacker).
