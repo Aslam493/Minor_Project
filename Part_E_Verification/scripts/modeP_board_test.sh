@@ -33,10 +33,12 @@ say "4b. EXPECTED vs ACTUAL (packets reached Secure World only through command 3
 ok=0; bad=0
 chk() { if [ "$2" = "$3" ]; then echo "  PASS  $1: $3"; ok=$((ok+1)); else echo "  FAIL  $1: expected $2, got $3"; bad=$((bad+1)); fi; }
 chk "altered packet (one tag bit flipped) -> AUTH_FAIL events" 1 $(( $(evc AUTH_FAIL) - B_AF ))
-chk "old packet (counter 5 below the last) -> REPLAY events" 1 $(( $(evc REPLAY) - B_RP ))
+# REPLAY detail 1 = older counter, detail 2 = same counter again (DUPLICATE); the demo file has one of each. (First board run expected 1 by mistake; corrected 2026-11-18, see MODE_P_RECORD.md.)
+chk "old packet (detail 1) + repeated packet (detail 2) -> REPLAY events" 2 $(( $(evc REPLAY) - B_RP ))
 chk "counter jump of 10 -> COUNTER_GAP events" 1 $(( $(evc COUNTER_GAP) - B_GP ))
 chk "wrong CAN id + extended id -> MALFORMED events" 2 $(( $(evc MALFORMED) - B_ML ))
-chk "silence then a valid packet -> TRAFFIC_RECOVERED events" 1 $(( $(evc TRAFFIC_RECOVERED) - B_TR ))
+# the demo pauses 1000 ms, 400 ms and 2500 ms are all longer than the 300 ms traffic deadline, so there are 3 recoveries (first run expected 1 by mistake)
+chk "three pauses longer than 300 ms, each followed by a valid packet -> TRAFFIC_RECOVERED events" 3 $(( $(evc TRAFFIC_RECOVERED) - B_TR ))
 echo "  LATE_ANSWER events during this functional run (informational, not a pass condition): $(( $(evc LATE_ANSWER) - B_LA ))"
 echo "  RESULT: $ok PASS, $bad FAIL"
 say "5. monitor event log (Secure World)"; $M events --all | grep -v returned

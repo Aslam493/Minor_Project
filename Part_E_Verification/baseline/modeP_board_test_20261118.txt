@@ -1,0 +1,142 @@
+wrote /tmp/tmp.DKi2fyZgAc/packets.txt
+
+==================================================================
+0. The Pi and the monitor (no key file on the Pi: 0 key files)
+==================================================================
+page 0: version 1 length 128 boot_id 0x630e6a94 flags 0x13 mode 2
+  now_ticks 6200468083 core1_poll_age_ticks 4787 poll_count 11109868209
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=1 pta_lock_timeouts=0 skip_total=1
+
+==================================================================
+1. can0 into CAN-FD + chip loopback
+==================================================================
+mtu                 : 72
+  data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1
+  loopback               ENABLED
+  FD mode                ENABLED
+
+==================================================================
+2. PUSH is refused in Mode P: the old forwarder (command 17) replays 5 packets; Secure World must judge none
+==================================================================
+can_replay: 5 packets sent through can0 from /tmp/few.txt (no key, no HMAC in this program), 0 malformed lines skipped
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 5
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+can0 rx_packets counter (frames received by the CAN controller): 0 -> 5 (+5)
+page 1: version 1 length 128 verdict totals frame 0 heartbeat 6 crosscheck 0
+
+==================================================================
+3. PULL: forwarder holds the packets and answers Secure World's requests; can_replay sends the ready-made packets through the CAN controller
+==================================================================
+can_replay: 57 packets sent through can0 from /tmp/packets.txt (no key, no HMAC in this program), 0 malformed lines skipped
+
+==================================================================
+4. forwarder output (requests answered, what was sent in each reply, what Secure World judged)
+==================================================================
+can_forwarder: can0, 25 s, heartbeat answered, PULL mode (frames are held until Secure World asks); monitor last_counter 0
+  request 6272: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6274: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6276: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6278: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6280: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6282: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6284: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6286: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6287: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6290: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6292: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6294: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6296: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6297: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6300: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6301: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6303: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6306: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6307: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6310: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6311: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6314: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6315: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6318: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6319: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6322: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6323: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6325: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6327: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6329: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6331: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6333: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6335: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6337: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6339: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6341: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6343: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6345: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6347: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6349: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6351: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6353: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6355: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6357: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6359: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6361: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6363: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6365: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6367: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6387: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6395: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6399: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6403: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6407: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6411: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6415: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 6464: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+PULL: frames received from can0 and queued: 57 | requests answered: 497 (ON_TIME 497, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 57 | still queued: 0 | dropped by the queue: 0
+Secure World judged 57 packets in this run; events it raised: AUTH_FAIL 1 REPLAY 2 TIMEOUT 4 MALFORMED 2 COUNTER_GAP 1 COUNTER_RESYNC 1 TRAFFIC_RECOVERED 3 HEARTBEAT_RECOVERED 1
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 26 LATE 0 other 0
+can0 rx_packets counter (frames received by the CAN controller): 5 -> 62 (+57)
+end state: flags 0x0f last_counter 1060 hb_state ANSWERED miss_count 0 starved 0
+
+==================================================================
+4b. EXPECTED vs ACTUAL (packets reached Secure World only through command 31; the old forwarder in step 2 judged none)
+==================================================================
+  PASS  altered packet (one tag bit flipped) -> AUTH_FAIL events: 1
+  FAIL  old packet (counter 5 below the last) -> REPLAY events: expected 1, got 2
+  PASS  counter jump of 10 -> COUNTER_GAP events: 1
+  PASS  wrong CAN id + extended id -> MALFORMED events: 2
+  FAIL  silence then a valid packet -> TRAFFIC_RECOVERED events: expected 1, got 3
+  LATE_ANSWER events during this functional run (informational, not a pass condition): 0
+  RESULT: 3 PASS, 2 FAIL
+
+==================================================================
+5. monitor event log (Secure World)
+==================================================================
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352782732
+seq 2 TIMEOUT              counter 0 detail 4 ticks 1352782732
+seq 3 HEARTBEAT_RECOVERED  counter 307 detail 0 ticks 6227578709
+seq 4 HEARTBEAT_RECOVERED  counter 6210 detail 1 ticks 6350377036
+seq 5 COUNTER_RESYNC       counter 1000 detail 0 ticks 6409977370
+seq 6 TIMEOUT              counter 0 detail 1 ticks 6507699426
+seq 7 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 6521359595
+seq 8 TIMEOUT              counter 0 detail 1 ticks 6527122743
+seq 9 AUTH_FAIL            counter 1050 detail 0 ticks 6529030135
+seq 10 REPLAY               counter 1049 detail 2 ticks 6532870072
+seq 11 REPLAY               counter 1044 detail 1 ticks 6536835061
+seq 12 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 6540639899
+seq 13 COUNTER_GAP          counter 1059 detail 9 ticks 6540639899
+seq 14 MALFORMED            counter 1060 detail 3 ticks 6544372275
+seq 15 TIMEOUT              counter 0 detail 1 ticks 6546408035
+seq 16 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 6595592681
+seq 17 TIMEOUT              counter 0 detail 1 ticks 6601354711
+seq 18 TIMEOUT              counter 0 detail 4 ticks 6832819161
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=90
+
+==================================================================
+6. restore can0 to the boot mode
+==================================================================
+mtu                 : 16
+  loopback               disabled
+  FD mode                disabled
+
+messages
