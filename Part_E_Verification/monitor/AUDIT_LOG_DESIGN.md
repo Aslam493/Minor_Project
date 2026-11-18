@@ -36,3 +36,6 @@ Secure World cannot write the SD card. A Linux logger (`mon_logger`) reads the a
 
 ## 6. Decisions taken by me (change on request)
 Separate audit ring (the alarm log keeps its limiter); 128 records; command 32; the SD card file written by Linux; chain tag later. Nothing is built yet.
+
+## Execution plan
+The multi-agent execution plan (agents, file ownership, waves, gates, risks, decisions D1-D4, time) is in `AUDIT_LOG_PLAN.md` (2026-11-18). Execution starts 2026-11-19 after the Mode P timing runs.
