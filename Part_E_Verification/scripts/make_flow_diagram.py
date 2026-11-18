@@ -38,42 +38,42 @@ def lanes(s, top=92, bottom=H - 40):
         s.text(LX(i) + 145, top - 14, name, 14, bold=True, color=EDGE[k], anchor="middle")
 
 def page1():
-    s = Svg()
-    s.text(20, 30, "Full flow: how one packet travels and how Secure World asks for it and judges it (Mode P, the user's design)", 20, bold=True)
+    PH = 900
+    s = Svg(W, PH)
+    s.text(20, 30, "Full flow: ONE way for the packet (CAN bus -> MCP2518FD -> Linux), then how Secure World asks for it and judges it (Mode P)", 20, bold=True)
     s.text(20, 52, "Status: Mode P is implemented and host-tested but NOT flashed. Heartbeat request/reply, frame checks and the path through the CAN controller are tested on the Pi.", 13, color="#a3263d", bold=True)
-    lanes(s)
+    lanes(s, 92, PH - 40)
     bx = lambda i: LX(i) + 15
-    gap = lambda i, j: (bx(i) + 260 + bx(j)) // 2       # centre of the gap between lane i's boxes and lane j's boxes
-    # lane 0 laptop
-    h1 = s.box(bx(0), 105, 260, ["1  packet_gen.py makes the packets", "id | counter | payload | TAG", "TAG = HMAC-SHA256(key, first 12 bytes)", "saves a FILE of finished packets", "(the key stays on the laptop only)"], "lap")
-    # lane 2 linux: can_replay
-    s.box(bx(2), 210, 260, ["2  can_replay (no key, no HMAC)", "reads a line, builds a CAN-FD frame"], "linux")
-    s.arrow([(bx(0) + 260, 150), (bx(2) - 24, 150), (bx(2) - 24, 238), (bx(2), 238)], "copy the file (scp) = today", lx=bx(0) + 270, ly=142)
-    s.arrow([(bx(0) + 130, 105 + h1), (bx(0) + 130, 330), (bx(1), 330)], "real bus: needs a CAN-FD\nadapter (not available)", dashed=True, color="#b8650a", lx=bx(0) + 138, ly=300)
-    s.box(bx(2), 318, 260, ["3  Linux driver (mcp251xfd)", "writes the frame to the chip over SPI"], "linux")
-    s.arrow([(bx(2) + 130, 266), (bx(2) + 130, 318)], "")
-    s.box(bx(1), 318, 260, ["4  MCP2518FD controller", "wraps the data in a CAN-FD frame", "(id, length, CRC), transmits it,", "chip loopback receives it back", "(real bus later: frame from the wire)"], "shield")
-    s.arrow([(bx(2), 350), (bx(1) + 260, 350)], "SPI", lx=gap(1, 2), ly=342, anchor="middle")
-    s.box(bx(2), 450, 260, ["5  can_forwarder", "frame returns as a RECEIVED frame", "on can0 (rx_packets +1)", "rebuilds the 44-byte message", "puts it in a QUEUE and HOLDS it", "(nothing goes to Secure World yet)"], "linux")
-    s.arrow([(bx(1) + 130, 318 + 16 + 17 * 5), (bx(1) + 130, 500), (bx(2), 500)], "received frame", lx=bx(1) + 138, ly=486)
-    # lane 4 core1 and lane 3 state
-    s.box(bx(4), 105, 260, ["6  Core 1 loop (about every 448 us)", "every 50 ms: post PACKET REQUEST n", "into the monitor state (arrow)", "sends nothing, never waits"], "core1")
+    gap = lambda i, j: (bx(i) + 260 + bx(j)) // 2
+    # the packet path, left to right
+    s.box(bx(0), 105, 260, ["1  packet_gen.py makes the packets", "id | counter | payload | TAG", "TAG = HMAC-SHA256(key, first 12 bytes)", "the sender puts them on the CAN bus", "(the key stays with the sender)"], "lap")
+    s.box(bx(1), 105, 260, ["2  MCP2518FD receives the frame", "from the wire, checks the CAN CRC,", "keeps it in its receive buffer,", "raises an interrupt to Linux", "(it only carries the packet; it", "does not make the data or the tag)"], "shield")
+    s.arrow([(bx(0) + 260, 150), (bx(1), 150)], "CAN bus", lx=gap(0, 1), ly=142, anchor="middle")
+    s.box(bx(2), 105, 260, ["3  Linux driver (mcp251xfd)", "reads the frame from the chip over SPI", "and delivers it as a received frame", "on can0 (rx_packets + 1)"], "linux")
+    s.arrow([(bx(1) + 260, 150), (bx(2), 150)], "SPI", lx=gap(1, 2), ly=142, anchor="middle")
+    s.box(bx(2), 245, 260, ["4  can_forwarder", "rebuilds the 44-byte message", "puts it in a QUEUE and HOLDS it", "(nothing goes to Secure World yet)"], "linux")
+    s.arrow([(bx(2) + 130, 105 + 16 + 17 * 4), (bx(2) + 130, 245)], "")
+    # today's shortcut, clearly separate
+    s.add('<rect x="%d" y="250" width="260" height="150" rx="8" fill="#eeeeee" stroke="#777" stroke-width="2" stroke-dasharray="7,5"/>' % bx(0))
+    for i, l in enumerate(["TODAY ONLY (no CAN-FD adapter)", "a shortcut for steps 1 and 2:", "the packet file is copied to the Pi", "(scp); can_replay (no key) writes", "each frame into the chip over SPI and", "the chip's loopback returns it.", "From step 3 on everything is the same."]):
+        s.text(bx(0) + 10, 271 + 17 * i, l, 12, bold=(i == 0), color="#333")
+    s.arrow([(bx(0) + 260, 350), (bx(1) + 130, 350), (bx(1) + 130, 105 + 16 + 17 * 6)], "today only", dashed=True, color="#777", lx=bx(0) + 270, ly=342)
+    # Secure World side
+    s.box(bx(4), 105, 260, ["5  Core 1 loop (about every 448 us)", "every 50 ms: post PACKET REQUEST n", "into the monitor state (arrow)", "sends nothing, never waits"], "core1")
     s.box(bx(3), 105, 260, ["Monitor state (Secure World RAM)", "request n | OPEN | issued at t", "last counter | event log | counters"], "sw")
     s.arrow([(bx(4), 140), (bx(3) + 260, 140)], "")
-    # call 30
-    s.box(bx(2), 590, 260, ["7  can_forwarder asks:", "CALL command 30", "'get packet request'"], "linux")
-    s.box(bx(3), 590, 260, ["Command 30 (PTA)", "returns: request n, OPEN,", "max batch 32, due in 40 ms"], "sw")
-    s.arrow([(bx(2) + 260, 625), (bx(3), 625)], "SMC", lx=gap(2, 3), ly=617, anchor="middle")
-    s.arrow([(bx(3), 655), (bx(2) + 260, 655)], "returns", dashed=True, lx=gap(2, 3), ly=672, anchor="middle")
-    # call 31 and verify
-    s.box(bx(2), 710, 260, ["8  takes the oldest (up to 32)", "packets from the queue", "CALL command 31", "(request n, packets)"], "linux")
-    hv = s.box(bx(3), 700, 260, ["9  VERIFY in Secure World", "a. request n: ON_TIME / LATE /", "   STALE / UNISSUED / DUPLICATE", "b. each packet: length 44, id 0x123", "c. copy once, HMAC(key) outside lock", "d. tag equal? no = AUTH_FAIL", "e. counter: RESYNC / ACCEPTED / GAP /", "   REPLAY / DUPLICATE / CONFLICT", "f. valid = refresh 300 ms deadline", "   and record the event"], "sw")
-    s.arrow([(bx(2) + 260, 760), (bx(3), 760)], "SMC +\npackets", lx=gap(2, 3), ly=736, anchor="middle")
-    s.box(bx(2), 900, 260, ["10  reply: request verdict +", "number of packets judged", "forwarder removes judged packets", "from the queue; the rest wait"], "linux")
-    s.arrow([(bx(3), 700 + hv - 22), (gap(2, 3), 700 + hv - 22), (gap(2, 3), 930), (bx(2) + 260, 930)], "", dashed=True)
-    s.box(bx(4), 590, 260, ["11  by the clock (reads the state)", "no reply within 40 ms: MISSED,", "   miss count + 1", "3 misses in a row: ONE TIMEOUT", "   (detail 4)", "no valid packet for 300 ms:", "   traffic TIMEOUT (detail 1)"], "core1")
-    s.arrow([(bx(4), 650), (bx(3) + 260, 650)], "")
-    s.text(20, H - 12, "Solid arrow = a call or data going forward. Dashed = the value coming back, or an option that needs hardware we do not have. SMC = the call into Secure World (libteec, /dev/tee0, OP-TEE driver, TF-A at EL3, OP-TEE). Every crossing is a call that LINUX starts.", 12, color="#444")
+    s.box(bx(2), 440, 260, ["6  can_forwarder asks:", "CALL command 30", "'get packet request'"], "linux")
+    s.box(bx(3), 440, 260, ["Command 30 (PTA)", "returns: request n, OPEN,", "max batch 32, due in 40 ms"], "sw")
+    s.arrow([(bx(2) + 260, 475), (bx(3), 475)], "SMC", lx=gap(2, 3), ly=467, anchor="middle")
+    s.arrow([(bx(3), 505), (bx(2) + 260, 505)], "returns", dashed=True, lx=gap(2, 3), ly=522, anchor="middle")
+    s.box(bx(2), 570, 260, ["7  takes the oldest (up to 32)", "packets from the queue", "CALL command 31", "(request n, packets)"], "linux")
+    hv = s.box(bx(3), 560, 260, ["8  VERIFY in Secure World", "a. request n: ON_TIME / LATE /", "   STALE / UNISSUED / DUPLICATE", "b. each packet: length 44, id 0x123", "c. copy once, HMAC(key) outside lock", "d. tag equal? no = AUTH_FAIL", "e. counter: RESYNC / ACCEPTED / GAP /", "   REPLAY / DUPLICATE / CONFLICT", "f. valid = refresh 300 ms deadline", "   and record the event"], "sw")
+    s.arrow([(bx(2) + 260, 610), (bx(3), 610)], "SMC +\npackets", lx=gap(2, 3), ly=586, anchor="middle")
+    s.box(bx(2), 760, 260, ["9  reply: request verdict +", "number of packets judged", "forwarder removes judged packets", "from the queue; the rest wait"], "linux")
+    s.arrow([(bx(3), 560 + hv - 22), (gap(2, 3), 560 + hv - 22), (gap(2, 3), 790), (bx(2) + 260, 790)], "", dashed=True)
+    s.box(bx(4), 440, 260, ["10  by the clock (reads the state)", "no reply within 40 ms: MISSED,", "   miss count + 1", "3 misses in a row: ONE TIMEOUT", "   (detail 4)", "no valid packet for 300 ms:", "   traffic TIMEOUT (detail 1)"], "core1")
+    s.arrow([(bx(4), 475), (bx(3) + 260, 475)], "")
+    s.text(20, PH - 12, "Solid arrow = a call or data going forward. Dashed = the value coming back, or today's shortcut. SMC = the call into Secure World (libteec, /dev/tee0, OP-TEE driver, TF-A at EL3, OP-TEE). Every crossing between Linux and Secure World is a call that LINUX starts.", 12, color="#444")
     return s.render()
 
 def page2():
