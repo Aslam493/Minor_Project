@@ -1,3 +1,7 @@
 tools/monitor_client/mon_client
 tools/monitor_client/c5_board_tests
 tools/monitor_client/c6_negative_raw
+tools/monitor_client/can_sender
+tools/monitor_client/can_forwarder
+tools/monitor_client/canbridge_test
+tools/monitor_client/*.o
