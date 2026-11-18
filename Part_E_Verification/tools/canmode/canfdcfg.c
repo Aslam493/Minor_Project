@@ -9,6 +9,8 @@
  *   canfdcfg IFACE set BITRATE DBITRATE fd|nofd loopback|noloopback      (interface must be down; DBITRATE ignored with nofd)
  *   canfdcfg IFACE test      = down, set 500000 2000000 fd loopback, up   (the mode used by the canbridge tests)
  *   canfdcfg IFACE normal    = down, set 500000 - nofd noloopback, up     (back to the boot mode)
+ *   canfdcfg IFACE bus       = down, set 500000 2000000 fd noloopback, up (real bus: the Pi's controller is a normal-mode RECEIVER that also
+ *                              acknowledges frames; do NOT use listen-only, a sender on a one-receiver bus needs an acknowledge)
  */
 #include <errno.h>
 #include <net/if.h>
@@ -79,13 +81,18 @@ static int setmode(int idx, uint32_t br, uint32_t dbr, int fd, int loop)
 int main(int argc, char **argv)
 {
 	int idx;
-	if (argc < 3 || strncmp(argv[1], "can", 3)) { fprintf(stderr, "usage: canfdcfg canN down|up|set BR DBR fd|nofd loopback|noloopback|test|normal\n"); return 2; }
+	if (argc < 3 || strncmp(argv[1], "can", 3)) { fprintf(stderr, "usage: canfdcfg canN down|up|set BR DBR fd|nofd loopback|noloopback|test|bus|normal\n"); return 2; }
 	idx = (int)if_nametoindex(argv[1]);
 	if (!idx) { fprintf(stderr, "no interface %s\n", argv[1]); return 1; }
 	if (!strcmp(argv[2], "down")) return updown(idx, 0) ? 1 : 0;
 	if (!strcmp(argv[2], "up")) return updown(idx, 1) ? 1 : 0;
 	if (!strcmp(argv[2], "set") && argc >= 7)
 		return setmode(idx, (uint32_t)strtoul(argv[3], NULL, 0), (uint32_t)strtoul(argv[4], NULL, 0), !strcmp(argv[5], "fd"), !strcmp(argv[6], "loopback")) ? 1 : 0;
+	if (!strcmp(argv[2], "bus")) {
+		if (updown(idx, 0)) return 1;
+		if (setmode(idx, 500000, 2000000, 1, 0)) { updown(idx, 1); return 1; }
+		return updown(idx, 1) ? 1 : 0;
+	}
 	if (!strcmp(argv[2], "test") || !strcmp(argv[2], "normal")) {
 		int t = !strcmp(argv[2], "test");
 		if (updown(idx, 0)) return 1;
