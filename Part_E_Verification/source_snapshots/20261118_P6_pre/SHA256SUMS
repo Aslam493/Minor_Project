@@ -1,0 +1,6 @@
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./SHA256SUMS
+627dad20c6ce94108382c183ec7a78b627b30197c473329cfef19f13c086e1d8  ./README.txt
+37c0715ee992922061828478f73f0656735832b6a73926338357276c399e3ac6  ./files/core/pta/rpi3_can_monitor_pta.c
+b9f481d3eb69df3789f866259a714a8a395ad0887d37cfa69a3c08b3df438226  ./files/lib/libutee/include/pta_rpi3_can_spi_poc.h
+df3ce2ec95f5e71db1103ee878ae9c287ca15a41ef409667469c132686c56503  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.h
+f6847588ef8711f63fe2a8d998e405d7f7a2bc031ac563dc09bfd5920e815941  ./files/core/arch/arm/plat-rpi3/rpi3_can_monitor.c
