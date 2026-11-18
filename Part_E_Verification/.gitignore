@@ -6,3 +6,5 @@ tools/monitor_client/can_forwarder
 tools/monitor_client/canbridge_test
 tools/monitor_client/*.o
 tools/monitor_client/can_replay
+monitor/source_tests/harness_pull
+monitor/source_tests/static_checks.sh.pre_pull

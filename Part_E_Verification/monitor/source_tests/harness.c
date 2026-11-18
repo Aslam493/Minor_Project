@@ -36,7 +36,11 @@ static void setup(void)
 	memset(&rpi3_mon, 0, sizeof rpi3_mon); (void)rpi3_mon_init();
 	M.timer_reads = 0; M.mask_calls = M.unmask_calls = 0; M.violations = 0; M.ntrace = 0; mock_hmac_calls = 0;
 }
-static void frozen(uint64_t t) { M.tmode = 1; M.now = t; rpi3_mon.init_ticks = t; }	/* the boot grace period has not passed unless a test says so */
+static void frozen(uint64_t t) { M.tmode = 1; M.now = t; rpi3_mon.init_ticks = t;
+#ifdef CFG_RPI3_CAN_MONITOR_PULL
+	rpi3_mon.l.pq_last_ok_ticks = 1;	/* Mode P: treat the packet requests as answered once, so the tests of the older features are not disturbed by a TIMEOUT detail 4 after the grace period; the PQ tests set it themselves */
+#endif
+}	/* the boot grace period has not passed unless a test says so */
 static uint32_t take(void) { struct rpi3_mon_wait w; uint32_t e = 0; rpi3_mon_wait_init(&w); if (rpi3_mon_acquire(&w, &e) != RPI3_MON_OK) abort(); return e; }
 static void put(uint32_t e) { rpi3_mon_release(e); }
 static void make_frame(uint8_t f[44], uint32_t id, uint32_t counter, uint32_t payload, bool good)
@@ -836,7 +840,8 @@ static void t_pull(void)
 	M.now += P; pq_issue(); M.now += D + 100; mkbatch(b, 2, 102);											/* request 3 is answered late */
 	CHECK(c31(3, 2, b, 88, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_LATE && ob == 2 && rpi3_mon.l.pq_state == RPI3_MON_PQ_LATE_ANSWERED && rpi3_mon.l.pq_miss_count == 1);
 	CHECK(rpi3_mon.l.verdict_frame.total == 4 && rpi3_mon.l.ctr_f.last_counter == 103);								/* late packets are still judged */
-	CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_UNISSUED_ANSWER] == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_STALE_ANSWER] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_DUP_ANSWER] == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 1);
+	CHECK(c31(3, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_DUPLICATE && rpi3_mon.l.pq_state == RPI3_MON_PQ_LATE_ANSWERED);	/* a request answered late is also answered once */
+	CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_UNISSUED_ANSWER] == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_STALE_ANSWER] == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_DUP_ANSWER] == 3 && rpi3_mon.l.ev_count[RPI3_MON_EV_LATE_ANSWER] == 1);
 	ev = last_ev(RPI3_MON_EV_LATE_ANSWER); CHECK(ev && ev->detail == 1 && ev->counter == 3);									/* detail 1 = packet request, counter = request number */
 	ev = last_ev(RPI3_MON_EV_STALE_ANSWER); CHECK(ev && ev->detail == 1 && ev->counter == 1);
 	CHECK(M.hmac_in_hold == 0 && M.violations == 0); end();
@@ -882,12 +887,13 @@ static void t_pull(void)
 
 	begin("PQ8 missed requests: 3 misses after the grace give ONE TIMEOUT detail 4; a prompt reply recovers; never answered after the grace also"); setup(); frozen(0); M.now = 2 * RPI3_MON_G_TICKS; rpi3_mon.init_ticks = 0;
 	rpi3_mon.l.hb_last_ok_ticks = M.now;													/* keep the heartbeat out of this test */
-	for (i = 1; i <= 3; i++) { pq_issue(); M.now += D + 100; pq_eval(); M.now += P; }
+	rpi3_mon.l.pq_last_ok_ticks = M.now;
+	for (i = 1; i <= 3; i++) { pq_issue(); M.now += D + 100; pq_eval(); M.now += P; if (i == 2) CHECK(rpi3_mon.l.pq_miss_count == 2 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0); }
 	CHECK(rpi3_mon.l.pq_miss_count == 3 && rpi3_mon.l.pq_timeout_raised && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1 && last_ev(RPI3_MON_EV_TIMEOUT)->detail == 4);
 	pq_eval(); M.now += P; pq_issue(); M.now += D + 100; pq_eval(); CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1);						/* exactly once */
 	M.now += P; pq_issue(); CHECK(c31(rpi3_mon.l.pq_seq, 0, NULL, 0, &oa, &ob) == RPI3_MON_R_OK && oa == RPI3_MON_V31_ON_TIME && rpi3_mon.l.pq_miss_count == 0 && !rpi3_mon.l.pq_timeout_raised);
 	ev = last_ev(RPI3_MON_EV_HB_RECOVERED); CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_HB_RECOVERED] == 1 && ev && ev->detail == 1);
-	setup(); frozen(0); M.now = 2 * RPI3_MON_G_TICKS; rpi3_mon.init_ticks = 0; rpi3_mon.l.hb_last_ok_ticks = M.now; pq_eval();
+	setup(); frozen(0); M.now = 2 * RPI3_MON_G_TICKS; rpi3_mon.init_ticks = 0; rpi3_mon.l.hb_last_ok_ticks = M.now; rpi3_mon.l.pq_last_ok_ticks = 0; pq_eval();
 	CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 1 && last_ev(RPI3_MON_EV_TIMEOUT)->detail == 4);								/* never answered */
 	setup(); frozen(5000000000ull); rpi3_mon.l.hb_last_ok_ticks = M.now; pq_issue(); M.now += D + 100; pq_eval(); CHECK(rpi3_mon.l.pq_miss_count == 1 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0);	/* inside the grace: counted, no timeout */
 	CHECK(M.violations == 0); end();
@@ -903,7 +909,7 @@ static void t_pull(void)
 	    clearp(p); handled = false; r = rpi3_mon_pta_invoke(31, ty[k], p, &handled); CHECK(handled && r == TEE_ERROR_BAD_PARAMETERS && p[0].value.a == 0xABABABABu && p[2].value.a == 0xABABABABu); } }
 	clearp(p); p[1].memref.buffer = b; p[1].memref.size = 44; handled = false; { unsigned tries = M.trylock_calls; uint32_t acq = M.timer_reads;
 	  r = rpi3_mon_pta_invoke(17, PTT(VALUE_OUTPUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(handled && r == TEE_ERROR_NOT_SUPPORTED && p[0].value.a == 0xABABABABu && M.trylock_calls == tries && M.timer_reads == acq); }
-	rpi3_mon.init_ok = 0; clearp(p); p[0].value.a = 1; p[0].value.b = 0; handled = false; r = rpi3_mon_pta_invoke(31, PTT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
+	rpi3_mon.init_ok = 0; clearp(p); p[0].value.a = 1; p[0].value.b = 0; p[1].memref.buffer = NULL; p[1].memref.size = 0; handled = false; r = rpi3_mon_pta_invoke(31, PTT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled);
 	CHECK(handled && r == TEE_ERROR_BAD_STATE && p[2].value.a == 0 && p[3].value.b == 0); clearp(p); r = rpi3_mon_pta_invoke(30, PTT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(r == TEE_ERROR_BAD_STATE); rpi3_mon.init_ok = 1;
 	{ static uint8_t pg[128]; struct rpi3_mon_proj0 *pj = (struct rpi3_mon_proj0 *)(void *)pg; clearp(p); p[0].value.a = 0; p[0].value.b = 0; p[1].memref.buffer = pg; p[1].memref.size = 128;
 	  r = rpi3_mon_pta_invoke(20, PTT(VALUE_INOUT, MEMREF_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT), p, &handled); CHECK(r == TEE_SUCCESS && pj->mode == RPI3_MON_MODE_P && pj->mode == 2); }
@@ -912,11 +918,11 @@ static void t_pull(void)
 
 	begin("PQ10 Core 1 issues the requests; 200 periods with two packets each: exact totals, nothing missed, no event"); setup(); frozen(5000000000ull); rpi3_mon.l.hb_last_ok_ticks = M.now;
 	{ unsigned ontime = 0, late = 0, other = 0; uint32_t next = 1000;
-	  rpi3_mon_core1_attempt(); CHECK(rpi3_mon.l.pq_seq == 1 && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN);
+	  M.daif = MON_DAIF_ALL; rpi3_mon_core1_attempt(); M.daif = 0; CHECK(rpi3_mon.l.pq_seq == 1 && rpi3_mon.l.pq_state == RPI3_MON_PQ_OPEN);
 	  for (i = 0; i < 200; i++) { uint32_t a, bb2, s2, st2, m2, d2; mkbatch(b, 2, next);
 	    if (rpi3_mon_cmd30(&s2, &st2, &m2, &d2, &h) != RPI3_MON_R_OK || st2 != RPI3_MON_PQ_OPEN) { other++; }
 	    else { if (c31(s2, 2, b, 88, &a, &bb2) == RPI3_MON_R_OK && a == RPI3_MON_V31_ON_TIME && bb2 == 2) { ontime++; next += 2; } else late++; }
-	    M.now += P; rpi3_mon_core1_attempt(); }
+	    M.now += P; M.daif = MON_DAIF_ALL; rpi3_mon_core1_attempt(); M.daif = 0; }
 	  CHECK(ontime == 200 && late == 0 && other == 0 && rpi3_mon.l.verdict_frame.total == 400 && rpi3_mon.l.ctr_f.last_counter == 1399 && rpi3_mon.l.pq_miss_count == 0);
 	  CHECK(rpi3_mon.l.ev_count[RPI3_MON_EV_AUTH_FAIL] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_TIMEOUT] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_COUNTER_GAP] == 0 && rpi3_mon.l.ev_count[RPI3_MON_EV_REPLAY] == 0); }
 	CHECK(M.hmac_in_hold == 0 && M.violations == 0); end();

@@ -15,7 +15,7 @@ chk(){ if [ "$2" = 1 ]; then ok "$1"; else bad "$1"; fi; }
 strip(){ python3 "$HERE/strip_comments.py" "$1"; }
 # body of one function (from its signature line to the closing brace at column 0)
 fbody(){ strip "$C" | awk -v n="$1" '$0 ~ ("^[A-Za-z_].*[ \t*]" n "\\(") {f=1} f{print} f&&/^}/{exit}'; }
-CRIT="rpi3_mon_uart_snapshot rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1"
+CRIT="rpi3_mon_pq_issue_if_due rpi3_mon_pq_answer rpi3_mon_uart_snapshot rpi3_mon_ev_append rpi3_mon_traffic_refresh rpi3_mon_evaluate rpi3_mon_hb_issue_if_due rpi3_mon_frame_equal rpi3_mon_frame_store rpi3_mon_frame_apply rpi3_mon_frame_record rpi3_mon_build_proj0 rpi3_mon_build_proj1"
 ALLSRC="$( (strip "$C"; strip "$H"; strip "$PL"; strip "$G") )"
 
 echo "static_checks: final monitor code (stages 1-6)"
@@ -46,12 +46,13 @@ chk "H1 informational: loops exist in critical helpers (bounded by constants; ch
 cf=$(for f in $(strip "$C" | grep -oE '^[A-Za-z_][^(]*[ \t*](rpi3_mon_[a-z0-9_]+)\(' | sed -E 's/.*[ \t*](rpi3_mon_[a-z0-9_]+)\($/\1/' | sort -u); do fbody "$f" | grep -qE '\bMON_PLAT_(MAC_[A-Z]+|RNG)\b|crypto_' && echo -n "$f "; done)
 chk "F27 MAC/RNG/crypto primitives appear only in rpi3_mon_hmac and rpi3_mon_init_crypto ($cf)" $([ "$cf" = "rpi3_mon_hmac rpi3_mon_init_crypto " ] && echo 1 || echo 0)
 hf=$(for f in $(strip "$C" | grep -oE '^[A-Za-z_][^(]*[ \t*](rpi3_mon_[a-z0-9_]+)\(' | sed -E 's/.*[ \t*](rpi3_mon_[a-z0-9_]+)\($/\1/' | sort -u); do fbody "$f" | grep -q 'rpi3_mon_hmac(' && [ "$f" != rpi3_mon_hmac ] && echo -n "$f "; done)
-chk "F27 rpi3_mon_hmac is called only from cmd17, cmd22 and init_crypto ($hf)" $([ "$hf" = "rpi3_mon_cmd17 rpi3_mon_cmd22 rpi3_mon_init_crypto " ] && echo 1 || echo 0)
+chk "F27 rpi3_mon_hmac is called only from frame_prepare (the part of command 17 before the lock, shared with command 31), cmd22 and init_crypto ($hf)" $([ "$hf" = "rpi3_mon_cmd22 rpi3_mon_frame_prepare rpi3_mon_init_crypto " ] && echo 1 || echo 0)
 core1=$( (fbody rpi3_mon_core1_attempt; fbody rpi3_mon_core1_entry_check; strip "$H" | awk '/rpi3_mon_core1_pass/{f=1} f{print} f&&/^}/{exit}') )
 chk "F27 Core 1 functions (attempt, entry check, pass) mention no hmac/mac/crypto/rng/malloc/free" $([ "$(echo "$core1" | grep -ciE 'hmac|mac_|crypto|rng|malloc|free\(|mempool')" = 0 ] && echo 1 || echo 0)
 chk "F27 the monitor sources contain no heap allocation" $([ "$(echo "$ALLSRC" | grep -cE '\b(malloc|calloc|realloc|free|nex_[a-z_]+|mempool_[a-z_]+)\(')" = 0 ] && echo 1 || echo 0)
-c17=$(fbody rpi3_mon_cmd17); l_h=$(echo "$c17" | grep -n 'rpi3_mon_hmac(' | head -1 | cut -d: -f1); l_l=$(echo "$c17" | grep -n 'rpi3_mon_hold(' | head -1 | cut -d: -f1)
-chk "F13 in command 17 the HMAC call comes before the lock is taken (line $l_h < $l_l)" $([ -n "$l_h" ] && [ -n "$l_l" ] && [ "$l_h" -lt "$l_l" ] && echo 1 || echo 0)
+c17=$(fbody rpi3_mon_cmd17); l_h=$(echo "$c17" | grep -n 'rpi3_mon_frame_prepare(' | head -1 | cut -d: -f1); l_l=$(echo "$c17" | grep -n 'rpi3_mon_hold(' | head -1 | cut -d: -f1)
+chk "F13 in command 17 the prepare step (which holds the HMAC call) comes before the lock is taken (line $l_h < $l_l)" $([ -n "$l_h" ] && [ -n "$l_l" ] && [ "$l_h" -lt "$l_l" ] && echo 1 || echo 0)
+prep=$(fbody rpi3_mon_frame_prepare); chk "F13b frame_prepare contains the HMAC call and takes no lock (no hold, no acquire, no trylock)" $([ "$(echo "$prep" | grep -c 'rpi3_mon_hmac(')" = 1 ] && [ "$(echo "$prep" | grep -cE 'rpi3_mon_hold\(|rpi3_mon_acquire\(|TRYLOCK|spinlock')" = 0 ] && echo 1 || echo 0)
 chk "KEY keys are referenced only as arguments of rpi3_mon_hmac and in their own header" $([ "$(strip "$C" | grep -n 'rpi3_mon_key_' | grep -vE 'rpi3_mon_hmac\(|^[0-9]+:static const uint8_t rpi3_mon_key_|^[0-9]+:\s*const uint8_t \*key|rpi3_mon_key_(frame|hb)\[' | wc -l)" = 0 ] && echo 1 || echo 0)
 chk "KEY glue and bindings never mention the key names" $([ "$( (strip "$G"; strip "$PL") | grep -c 'rpi3_mon_key_\|RPI3_MON_KEY_')" = 0 ] && echo 1 || echo 0)
 chk "KEY test key is not instantiated in the logic file" $([ "$(strip "$C" | grep -c 'KEY_TEST')" = 0 ] && echo 1 || echo 0)
@@ -90,7 +91,7 @@ same=1; for f in $(cat "$SNAP0/modified_files.txt"); do
   cmp -s "$SNAP0/files/$f" "$f" || { same=0; echo "     changed: $f"; }; done
 chk "BOUNDARY the 6 modified files that must not change are byte-identical to the pre-change snapshot (incl. thread asm, rpi3_can_fiq.c)" $same
 cmp -s "$SNAP0/files/core/arch/arm/plat-rpi3/platform_config.h" core/arch/arm/plat-rpi3/platform_config.h; 
-for f in core/pta/rpi3_can_spi_poc.c:1:25 lib/libutee/include/pta_rpi3_can_spi_poc.h:0:20 core/arch/arm/plat-rpi3/rpi3_can_server.c:0:22; do
+for f in core/pta/rpi3_can_spi_poc.c:1:25 lib/libutee/include/pta_rpi3_can_spi_poc.h:0:31 core/arch/arm/plat-rpi3/rpi3_can_server.c:0:22; do
   n=${f%%:*}; r=${f#*:}; rm_=${r%%:*}; ad=${r#*:}; d1=$(diff "$SNAP0/files/$n" "$n" | grep -c '^<'); d2=$(diff "$SNAP0/files/$n" "$n" | grep -c '^>')
   chk "BOUNDARY $n differs from the pre-change snapshot by exactly $ad added and $rm_ removed lines (got +$d2 -$d1)" $([ "$d1" = "$rm_" ] && [ "$d2" = "$ad" ] && echo 1 || echo 0); done
 chk "BOUNDARY the one removed line in rpi3_can_spi_poc.c is the PTA flags initializer" $([ "$(diff "$SNAP0/files/core/pta/rpi3_can_spi_poc.c" core/pta/rpi3_can_spi_poc.c | grep '^<' | tr -d '\t ')" = "<.flags=PTA_DEFAULT_FLAGS," ] && echo 1 || echo 0)
@@ -121,5 +122,15 @@ chk "UART2 UART mapping only in rpi3_mon_uart_init; readiness only in rpi3_mon_u
 chk "UART3 the service takes no lock, makes no trace/heap/crypto call, and only the snapshot (a critical-section helper) runs in the hold" $(fbody rpi3_mon_uart_service | grep -qE '\b(MON_PLAT_(TRYLOCK|UNLOCK|MASK_ALL|UNMASK|MAC|RNG|PANIC|EMSG)|memcpy|memset|malloc|free|printf|IMSG|DMSG|EMSG|crypto_[a-z_]+)\b' && echo 0 || echo 1)
 chk "UART4 the snapshot is called only from the Core 1 lock attempt, the service only from the Core 1 pass (header)" $([ "$(strip "$C" | grep -c 'RPI3_MON_UART_SNAPSHOT')" = 1 ] && fbody rpi3_mon_core1_attempt | grep -q 'RPI3_MON_UART_SNAPSHOT' && [ "$(grep -c 'RPI3_MON_UART_SERVICE()' "$H" 2>/dev/null)" -ge 1 ] && echo 1 || echo 0)
 chk "UART5 flag off: every UART hook expands to nothing (no reference left in an off build)" $([ "$(grep -A2 '^#else' "$H" 2>/dev/null | grep -c '((void)0)')" -ge 1 ] && echo 1 || echo 0)
+# ---- Mode P (CFG_RPI3_CAN_MONITOR_PULL, design MODE_P_PULL_DESIGN.md)
+c31=$(fbody rpi3_mon_cmd31)
+chk "PQ1 command 31 judges packets only through frame_prepare, takes the HMAC before each hold, and has no HMAC call of its own" $([ "$(echo "$c31" | grep -c 'rpi3_mon_hmac(')" = 0 ] && [ -n "$(echo "$c31" | grep -n 'rpi3_mon_frame_prepare(' | head -1)" ] && [ "$(echo "$c31" | grep -n 'rpi3_mon_frame_prepare(' | head -1 | cut -d: -f1)" -lt "$(echo "$c31" | grep -n 'rpi3_mon_hold(' | head -1 | cut -d: -f1)" ] && echo 1 || echo 0)
+chk "PQ2 the batch is bounded: n is checked against RPI3_MON_PQ_MAX_BATCH before the loop, and the loop runs at most max(n,1) times" $([ "$(echo "$c31" | grep -n 'RPI3_MON_PQ_MAX_BATCH' | head -1 | cut -d: -f1)" -lt "$(echo "$c31" | grep -n 'for (' | head -1 | cut -d: -f1)" ] && echo "$c31" | grep -q 'i < rounds' && echo 1 || echo 0)
+off_c=$(strip "$C" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f'); off_h=$(strip "$H" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f')
+chk "PQ3 flag off: nothing of Mode P (pq_ fields, PQ_ constants, commands 30 and 31) is left outside the CFG_RPI3_CAN_MONITOR_PULL blocks of the source and header" $([ "$(echo "$off_c$off_h" | grep -cE '\bpq_|RPI3_MON_PQ_|rpi3_mon_cmd3[01]|rpi3_mon_pq_|RPI3_MON_V31')" = 0 ] && echo 1 || echo 0)
+off_g=$(strip "$G" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1; next} f&&/^#(else|endif)/{f=0; next} !f')
+chk "PQ4 flag off: the PTA glue has no command 30, 31 or Mode P refusal of command 17 outside the flag block" $([ "$(echo "$off_g" | grep -cE 'cmd30|cmd31|GET_PACKET_REQUEST|SUBMIT_PACKETS')" = 0 ] && echo 1 || echo 0)
+chk "PQ5 Mode P refuses command 17 in the glue (inside the flag block, before any parameter check) and commands 30 and 31 use exact parameter types" $(strip "$G" | awk '/#ifdef CFG_RPI3_CAN_MONITOR_PULL/{f=1} f' | grep -q 'SUBMIT_FRAME' && strip "$G" | grep -q 'PT(VALUE_INOUT, MEMREF_INPUT, VALUE_OUTPUT, VALUE_OUTPUT)' && strip "$G" | grep -c 'PT(VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT, VALUE_OUTPUT)' | grep -qE '^[2-9]' && echo 1 || echo 0)
+chk "PQ6 the two Mode P compile-time guards (D_p < P, T > P + D_p + sender period + jitter) are present" $([ "$(grep -c '_Static_assert(RPI3_MON_PQ_\|_Static_assert(RPI3_MON_T_TRAFFIC_MS > RPI3_MON_PQ_' "$H")" = 2 ] && echo 1 || echo 0)
 echo "static_checks: $pass pass, $fail FAIL"
 [ "$fail" -eq 0 ]
