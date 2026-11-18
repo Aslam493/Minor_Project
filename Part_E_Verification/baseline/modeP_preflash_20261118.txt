@@ -1,0 +1,37 @@
+# Mode P pre-flash verification, 2026-11-18T18:54:07+05:30
+optee_os HEAD: 05543140e452b7bf7b048a626921ca105bb2d916  status: [0 changed files]
+== make test
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o /dev/null
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -Wno-misleading-indentation harness.c mock_platform.c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o harness
+ok   EV3 evidence flood: after the pinned quota AUTH_FAIL and REPLAY are limited per class, nothing else is evicted   2 checks
+ok   C17-3 AUTH_FAIL changes no counter or deadline state                     2 checks
+total: 440 checks, 0 failed
+== make test_ts
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -DCFG_RPI3_CAN_MONITOR_TEST_STATS -c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o /dev/null
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -Wno-misleading-indentation -DCFG_RPI3_CAN_MONITOR_TEST_STATS harness.c mock_platform.c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o harness_ts
+ok   EV3 evidence flood: after the pinned quota AUTH_FAIL and REPLAY are limited per class, nothing else is evicted   2 checks
+ok   C17-3 AUTH_FAIL changes no counter or deadline state                     2 checks
+total: 1499 checks, 0 failed
+== make test_uart
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -DCFG_RPI3_CAN_MONITOR_UART -c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o /dev/null
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -Wno-misleading-indentation -DCFG_RPI3_CAN_MONITOR_UART harness.c mock_platform.c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o harness_uart
+ok   EV3 evidence flood: after the pinned quota AUTH_FAIL and REPLAY are limited per class, nothing else is evicted   2 checks
+ok   C17-3 AUTH_FAIL changes no counter or deadline state                     2 checks
+total: 457 checks, 0 failed
+== make test_pull
+cc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -I mock -I /home/aslam/Minor_Project/optee_full/optee_os/core/arch/arm/plat-rpi3 -I /home/aslam/Minor_Project/optee_full/optee_os/lib/libutee/include -I . -Wno-misleading-indentation -DCFG_RPI3_CAN_MONITOR_PULL harness.c mock_platform.c /home/aslam/Minor_Project/optee_full/optee_os/core/pta/rpi3_can_monitor_pta.c -o harness_pull
+ok   EV3 evidence flood: after the pinned quota AUTH_FAIL and REPLAY are limited per class, nothing else is evicted   2 checks
+ok   C17-3 AUTH_FAIL changes no counter or deadline state                     2 checks
+ok   PQ5 parameter errors change nothing; an empty reply is valid             7 checks
+total: 538 checks, 0 failed
+== static_checks
+  PASS     PQ4 flag off: the PTA glue has no command 30, 31 or Mode P refusal of command 17 outside the flag block
+  PASS     PQ5 Mode P refuses command 17 in the glue (inside the flag block, before any parameter check) and commands 30 and 31 use exact parameter types
+  PASS     PQ6 the two Mode P compile-time guards (D_p < P, T > P + D_p + sender period + jitter) are present
+static_checks: 65 pass, 0 FAIL
+== mutation_pull
+caught       glue: command 17 is not refused in Mode P   [caught (failed tests: GLUE parameter mapping: o; PQ9 PTA glue: commands 30)]
+caught       glue: command 31 accepts MEMREF_OUTPUT   [caught (failed tests: PQ9 PTA glue: commands 30)]
+caught       glue: command 30 does not copy the batch size to the caller   [caught (failed tests: PQ9 PTA glue: commands 30)]
+caught 27 of 27; skipped 0; survivors: []
+DONE

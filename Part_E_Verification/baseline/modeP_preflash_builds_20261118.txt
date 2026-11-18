@@ -1,0 +1,18 @@
+# builds from optee_os 05543140e, 2026-11-18T18:56:21+05:30
+off: make exit=0 warnings=0 error-lines=5 disassembly-lines=146867 tee-pager_v2.bin sha256=ec81b37539e9e68d
+on: make exit=0 warnings=0 error-lines=5 disassembly-lines=149749 tee-pager_v2.bin sha256=972142bc72b61b75
+pull: make exit=0 warnings=0 error-lines=5 disassembly-lines=150257 tee-pager_v2.bin sha256=93e99b0771aef1a0
+debug: make exit=0 warnings=0 error-lines=5 disassembly-lines=149771 tee-pager_v2.bin sha256=3e1679a4dad13368
+image's BL32 (modeP_on) tee-pager_v2.bin sha256=cb7dc2a298cafee6
+== static checks with object code (ON_DIS=pf_on, PULL_DIS=pf_pull)
+static_checks: final monitor code (stages 1-6)
+  SKIPPED  H1 object-code checks (set ON_DIS to the Monitor-ON tee.elf disassembly)
+static_checks: 65 pass, 0 FAIL
+== mutation_real (144 mutants)
+caught (failed checks)                   command 21 wrong parameter types
+caught (failed checks)                   BUSY values not written
+caught (failed checks)                   short-buffer size not returned
+caught (failed checks)                   legacy refusal logs nothing
+caught (failed checks)                   BUSY mapped to a different error
+caught 137 of 144; survivors: ["no 'now < t0' term (unsigned wrap already fails closed)", 'init does not clear the lock explicitly (memset already zeroes it)', 'counter wrap guard removed']
+DONE
