@@ -113,6 +113,12 @@ if [ -n "${ON_DIS:-}" ] && [ -f "$ON_DIS" ]; then
   python3 "$HERE/h1_objcheck.py" "$C" "$ON_DIS" > /dev/null 2>&1; chk "H1 object code: critical-section helpers that exist as symbols call no memcpy/hook/crypto/trace" $([ $? = 0 ] && echo 1 || echo 0)
   rm -f /tmp/hold_memcpy.$$
   chk "TESTSTATS the normal Monitor-ON image contains no test-only code (no rpi3_mon_tstats, rpi3_mon_ts_*, rpi3_mon_pta_test_* symbol)" $([ "$(grep -cE '<(rpi3_mon_tstats|rpi3_mon_ts_[a-z0-9_]+|rpi3_mon_pta_test_[a-z]+)>:' "$ON_DIS")" = 0 ] && echo 1 || echo 0)
+  if [ -n "${PULL_DIS:-}" ] && [ -f "$PULL_DIS" ] && [ -s "$PULL_DIS" ]; then
+    chk "PQ7 object code: the flag-OFF image has no Mode P symbol (no rpi3_mon_cmd30/31, pq_answer, pq_issue)" $([ "$(grep -cE '<rpi3_mon_(cmd3[01]|pq_[a-z_]+)(\.[a-z0-9.]+)?>:' "$ON_DIS")" = 0 ] && echo 1 || echo 0)
+    chk "PQ8 object code: the flag-ON image has commands 30 and 31, and the monitor object checks pass on it too" $([ "$(grep -cE '<rpi3_mon_cmd(30|31)>:' "$PULL_DIS")" = 2 ] && python3 "$HERE/hold_memcpy_check.py" "$PULL_DIS" > /dev/null 2>&1 && python3 "$HERE/h1_objcheck.py" "$C" "$PULL_DIS" > /dev/null 2>&1 && echo 1 || echo 0)
+  else
+    echo "  SKIPPED  PQ7/PQ8 Mode P object-code checks (set PULL_DIS to the disassembly of the CFG_RPI3_CAN_MONITOR_PULL=y tee.elf; ON_DIS is then the flag-off one)"
+  fi
 else
   echo "  SKIPPED  H1 object-code checks (set ON_DIS to the Monitor-ON tee.elf disassembly)"
 fi
