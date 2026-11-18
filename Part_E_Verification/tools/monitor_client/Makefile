@@ -31,3 +31,5 @@ can_forwarder: can_forwarder.c canbridge.o mon_client.o
 # host test (native compiler, link errors for TEEC symbols ignored because the test never calls them)
 canbridge_test: canbridge_test.c canbridge.c mon_client.c canbridge.h mon_client.h
 	gcc -std=gnu11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -I$(TEEC_INC) -I$(OS)/lib/libutee/include -Wl,--unresolved-symbols=ignore-all -o $@ canbridge_test.c canbridge.c mon_client.c
+can_replay: can_replay.c canbridge.o mon_client.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDADD)

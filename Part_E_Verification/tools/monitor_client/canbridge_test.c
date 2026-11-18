@@ -40,6 +40,20 @@ int main(void)
 	cb_pack(key, 0x123 | CAN_RTR_FLAG, 5, 7, 0, &f); CHECK(cb_unpack(&f, msg) == CB_RTR, "remote frame rejected");
 	cb_pack(key, 0x123 | CAN_EFF_FLAG, 5, 7, 0, &f); cb_unpack(&f, msg);
 	CHECK(msg[3] == 0x80 && msg[0] == 0x23 && msg[1] == 0x01, "extended-id flag reaches the message as bit 31 (the monitor will call it MALFORMED)");
+	{ /* packet-file parser */
+		char ln[256]; uint32_t dl = 0; struct canfd_frame g; int k;
+		cb_pack(key, 0x123, 5, 0xC0DE0005, 0, &f);
+		strcpy(ln, "250 123 "); for (k = 0; k < 48; k++) sprintf(ln + 8 + 2 * k, "%02x", f.data[k]);
+		CHECK(cb_parse_line(ln, &dl, &g) == 0 && dl == 250 && g.can_id == 0x123 && g.len == 48 && !memcmp(g.data, f.data, 48), "packet-file line is parsed back to the same frame");
+		strcat(ln, "  # comment"); CHECK(cb_parse_line(ln, &dl, &g) == 0, "trailing comment allowed");
+		CHECK(cb_parse_line("# only a comment", &dl, &g) == 1 && cb_parse_line("   ", &dl, &g) == 1 && cb_parse_line("", &dl, &g) == 1, "comment and blank lines are skipped");
+		strcpy(ln, "0 80000123 "); for (k = 0; k < 48; k++) sprintf(ln + 11 + 2 * k, "%02X", f.data[k]);
+		CHECK(cb_parse_line(ln, &dl, &g) == 0 && g.can_id == 0x80000123u, "extended-id flag and upper-case hex are kept");
+		strcpy(ln, "10 123 00"); CHECK(cb_parse_line(ln, &dl, &g) < 0, "too-short data is refused");
+		strcpy(ln, "10 123 "); for (k = 0; k < 48; k++) sprintf(ln + 7 + 2 * k, "%02x", f.data[k]); ln[10] = 'z'; CHECK(cb_parse_line(ln, &dl, &g) < 0, "non-hex data is refused");
+		strcpy(ln, "10 123 "); for (k = 0; k < 48; k++) sprintf(ln + 7 + 2 * k, "%02x", f.data[k]); strcat(ln, "00"); CHECK(cb_parse_line(ln, &dl, &g) < 0, "data longer than 48 bytes is refused");
+		CHECK(cb_parse_line("abc 123 00", &dl, &g) < 0 && cb_parse_line("99999999 123 00", &dl, &g) < 0, "bad or huge delay is refused");
+	}
 	printf("canbridge_test: %d checks, %d failed\n", n_pass + n_fail, n_fail);
 	return n_fail != 0;
 }

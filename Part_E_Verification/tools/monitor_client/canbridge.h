@@ -28,6 +28,13 @@ void cb_pack(const uint8_t key[32], uint32_t can_id, uint32_t counter, uint32_t 
  * the monitor as an id with bit 31 set, which the monitor judges MALFORMED. */
 int cb_unpack(const struct canfd_frame *f, uint8_t msg[MON_FRAME_LEN]);
 
+/* Packet file (made BEFORE Linux is involved, on the laptop by tools/monitor_client/packet_gen.py): one packet per line,
+ *     DELAY_MS  ID_HEX  DATA_HEX
+ * DELAY_MS = wait after the previous packet, ID_HEX = CAN identifier with flag bits (0x80000123 = extended id), DATA_HEX = 96 hex digits (48 bytes).
+ * '#' starts a comment. The replayer needs no key and no HMAC: it only turns these bytes into a CAN-FD frame. Returns 0 on success, 1 for a
+ * blank or comment line (skip it), -1 for a malformed line. */
+int cb_parse_line(const char *line, uint32_t *delay_ms, struct canfd_frame *f);
+
 const char *cb_reason(int r);
 
 #endif

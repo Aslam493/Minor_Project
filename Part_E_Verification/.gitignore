@@ -5,3 +5,4 @@ tools/monitor_client/can_sender
 tools/monitor_client/can_forwarder
 tools/monitor_client/canbridge_test
 tools/monitor_client/*.o
+tools/monitor_client/can_replay
