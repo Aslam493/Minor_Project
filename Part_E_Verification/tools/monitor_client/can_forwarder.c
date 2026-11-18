@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b; struct mon_status2 s2a, s2b; int have2 = 0;
 	struct sockaddr_can ad; struct ifreq ifr; struct mon_ctx c; struct mon_health h; struct mon_status0 s0; TEEC_Result r;
 	unsigned long verdict[8] = {0}, got = 0, drop[4] = {0}, ans_on = 0, ans_late = 0, ans_other = 0, busy = 0, errs = 0, rx0, rx1;
-	uint32_t seq, st, last_answered = 0xFFFFFFFFu, v, d; uint64_t nonce, end;
+	uint32_t seq, st, last_answered = 0xFFFFFFFFu, v, d; uint64_t nonce, end, last_hb_poll = 0;
 	static const char *const vn[8] = {"ACCEPTED", "GAP", "RESYNC", "MALFORMED", "AUTH_FAIL", "REPLAY", "DUPLICATE", "CONFLICT"};
 
 	while (a < argc && argv[a][0] == '-' && argv[a][1] == '-') {
@@ -140,7 +140,8 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-		if (hb) {
+		if (hb && now_ms() - last_hb_poll >= 50) {		/* a request lives 500 ms and a new one comes every 1000 ms: looking every 50 ms is plenty, and it keeps command 22 from hammering the monitor lock when --spin is used */
+			last_hb_poll = now_ms();
 			r = mon_get_nonce(&c, &nonce, &seq, &st, &h);
 			if (!r && (st == 1 || st == 3) && nonce != 0 && seq != last_answered) {
 				RETRY(mon_submit_answer(&c, seq, nonce, &v, &d, &h), r);
