@@ -1,1 +1,3 @@
 tools/monitor_client/mon_client
+tools/monitor_client/c5_board_tests
+tools/monitor_client/c6_negative_raw
