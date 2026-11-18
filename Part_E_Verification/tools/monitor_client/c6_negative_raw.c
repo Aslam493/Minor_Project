@@ -58,8 +58,12 @@ static void take(struct snap *s)
 		printf("  !! status1 failed\n");
 	memcpy(s->ev, b.ev_count, sizeof s->ev); s->last_counter = a.last_counter; s->idle_uses = a.idle_uses; s->ev_ack = a.ev_ack; s->vf = b.v_frame_total; s->vh = b.v_hb_total; s->vx = b.v_xcheck_total;
 }
+/* The TIMEOUT counter is excluded: Core 1 raises TIMEOUT on its own (traffic or heartbeat deadline) when a previous test has just stopped its
+ * sender or responder, which can land inside a comparison window. Found 2026-11-18: after c5_board_tests, the only difference in R4b was
+ * "event type 2 (TIMEOUT) 8 -> 9"; everything a wrong-parameter call could change stayed identical (baseline/r4b_race_experiment_20261118.txt). */
 static int same(const struct snap *a, const struct snap *b)
-{ return !memcmp(a->ev, b->ev, sizeof a->ev) && a->last_counter == b->last_counter && a->idle_uses == b->idle_uses && a->ev_ack == b->ev_ack && a->vf == b->vf && a->vh == b->vh && a->vx == b->vx; }
+{ uint32_t ea[MON_EVENT_TYPES], eb[MON_EVENT_TYPES]; memcpy(ea, a->ev, sizeof ea); memcpy(eb, b->ev, sizeof eb); ea[2] = eb[2] = 0;	/* 2 = RPI3_MON_EV_TIMEOUT */
+  return !memcmp(ea, eb, sizeof ea) && a->last_counter == b->last_counter && a->idle_uses == b->idle_uses && a->ev_ack == b->ev_ack && a->vf == b->vf && a->vh == b->vh && a->vx == b->vx; }
 
 int main(void)
 {
@@ -95,7 +99,9 @@ int main(void)
 	/* R4: monitor commands 17..23 with wrong parameter types */
 	printf("== monitor commands 17-23 with wrong parameter types\n");
 	{ take(&a); ok = 1; for (uint32_t c = 17; c <= 23; c++) { uint32_t r1 = raw(c, PT_ALL_MEMREF), r2 = raw(c, PT_NONE4); if (r1 != BAD_PARAMETERS || r2 != BAD_PARAMETERS) { ok = 0; printf("     cmd %u: 0x%08x / 0x%08x\n", c, r1, r2); } }
-	  take(&b); PASSF(ok, "R4", "commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS"); PASSF(same(&a, &b), "R4b", "no counter, verdict total, event, last_counter, idle use or acknowledgement changed"); }
+	  take(&b); PASSF(ok, "R4", "commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS"); PASSF(same(&a, &b), "R4b", "no counter, verdict total, event, last_counter, idle use or acknowledgement changed");
+	  if (!same(&a, &b)) { unsigned t; for (t = 0; t < MON_EVENT_TYPES; t++) if (a.ev[t] != b.ev[t]) printf("     diff: event type %u count %u -> %u\n", t, a.ev[t], b.ev[t]);
+	    printf("     diff: last_counter %u -> %u, idle_uses %u -> %u, ev_ack %u -> %u, v_frame %u -> %u, v_hb %u -> %u, v_xcheck %u -> %u\n", a.last_counter, b.last_counter, a.idle_uses, b.idle_uses, a.ev_ack, b.ev_ack, a.vf, b.vf, a.vh, b.vh, a.vx, b.vx); } }
 
 	/* R5: short buffers deliver the required size */
 	printf("== short buffers\n");
