@@ -3,7 +3,7 @@
 M.Tech minor project. A **detection-only** monitor that runs in the **Secure World** (OP-TEE, with TF-A) on a Raspberry Pi 3 B. It watches a CAN message stream and a heartbeat from Linux, and records evidence when something is wrong.
 
 **What it claims:** it detects forged, replayed, missing and delayed frames, and a Linux side that stops answering.
-**What it does not claim:** it does not prevent anything. The Pi 3 has no TZASC, so Secure World cannot stop Linux from doing anything. The keys are prototype values that root Linux can read. The event log is in RAM, with no hash chain. **Every frame judged so far was CAN loopback or injected by a software sender through the Secure World interface. No result is evidence about a real CAN bus.**
+**What it does not claim:** it does not prevent anything. The Pi 3 has no TZASC, so Secure World cannot stop Linux from doing anything. The keys are prototype values that root Linux can read. The event log is in RAM, with no hash chain. **Every frame judged so far was either injected directly through the Secure World interface by a software tool (`mon_client`), or sent by a program on the same Pi through the CAN controller in loopback mode (the `canbridge` path, section 2a). No frame came from another device on a real bus, so no result is evidence about real bus timing or a real, independent sender.**
 
 ## 1. Architecture in one picture
 ```
@@ -23,7 +23,7 @@ M.Tech minor project. A **detection-only** monitor that runs in the **Secure Wor
                                                    │ missed answers                           │
                                                    └─────────────────────────────────────────┘
 ```
-Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, and Secure World checks them. The independent second CAN path (Design 2, chip B) is not built.
+Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, and Secure World checks them (the forwarder is `can_forwarder`, section 2a). The independent second CAN path (Design 2, chip B) is not built.
 
 ## 2. How detection works
 | Mechanism | Rule |
@@ -36,6 +36,29 @@ Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, an
 | Event log | 64 slots: 24 pinned (first 4 events of each of 6 evidence classes) + 40 ordinary; other events limited to 1 per second per class; the counters stay exact |
 | Boot ID | A random 32-bit ID per boot; old answers from a previous boot are rejected |
 
+## 2a. Where the packet comes from (two paths)
+A packet is the 44-byte message `can_id (4) | counter (4) | payload (4) | tag (32)`, where the tag is HMAC-SHA256 over the first 12 bytes with a shared key.
+
+| | Path 1: direct (all earlier tests) | Path 2: through the CAN controller (`canbridge`, added 2026-11-18) |
+|---|---|---|
+| Who makes the packet and the tag | `mon_client`, on the Pi, in Linux | `can_sender`, a program on the same Pi that stands in for the sending ECU |
+| Route | `mon_client` -> `/dev/tee0` -> Secure World | `can_sender` -> **can0 (MCP2518FD, chip loopback)** -> Linux -> `can_forwarder` -> `/dev/tee0` -> Secure World |
+| What the CAN controller does | nothing | wraps the message in a CAN-FD frame (identifier, length, CRC, acknowledge), transmits it, receives it back and hands it to Linux |
+| Who judges the tag | Secure World | Secure World (the forwarder holds **no key** and builds no packet; it only repacks the bytes) |
+
+**On the bus** the message is one CAN-FD frame: identifier = `can_id`, data field = 48 bytes = counter (4) + payload (4) + tag (32) + 8 bytes of zero padding (CAN-FD has no 40-byte length). The padding is not authenticated. A frame that is an error frame, a remote frame or the wrong length is dropped and counted by the forwarder.
+
+**Proof the frames really came through the controller:** the sender turns the kernel's own software echo off, and the forwarder prints the controller's `rx_packets` counter before and after. In the board test 57 frames were submitted and the counter rose by exactly 57 (`baseline/canbridge_board_test_20261118.txt`). Verdicts: 50 `ACCEPTED`, 1 `RESYNC`, 1 `AUTH_FAIL`, 1 `DUPLICATE`, 1 `REPLAY`, 1 `GAP` (detail 9), 2 `MALFORMED` (wrong id, extended id), 0 BUSY, 0 errors; the traffic timeout and recovery were raised by Core 1.
+
+**What this still does not prove:** the sender is a program on the same Pi, so the tag is still made by software on the Pi. An independent sender is a second device on the bus (for example a USB-CAN adapter on the laptop, or another board), which was not available. The chip was in loopback, so the bus itself was not exercised.
+
+## 2b. The shared key and its limits
+The tag uses a **shared secret key** (symmetric, HMAC), not a private/public key pair.
+- **K_frame:** held by Secure World and by the sender, the same 32 bytes. **K_hb:** Secure World only (boot ID and heartbeat). **K_test:** Linux test tools only, not in the secure image.
+- **How it is shared today:** the key is a constant in the Secure World source (`rpi3_can_monitor_keys.h`), compiled into the OP-TEE image; for the tests it is copied by hand into `/tmp/kf` for the sender. No command returns it. The CAN controller and the forwarder never see it, and it never travels over the bus.
+- **It is not secret from everyone else.** Root on the Pi, or anyone with the repository, can read it. The Pi 3 has no TZASC, and OP-TEE's hardware unique key falls back to all zeros on a platform without fuses, so there is nowhere on this board to hide a key.
+- **Real systems** provision the key in a secure place into protected hardware on both sides, use key agreement with certificates, derive per-ECU keys from a master (as AUTOSAR SecOC does), or use public-key signatures so that no secret is shared at all (the signer keeps a private key; Secure World holds only the public key). Signatures need a 64-byte tag, which does not fit in one CAN-FD frame with the counter and payload. None of this is built.
+
 ## 3. Component by component
 | # | Component | What we did | Result |
 |---|---|---|---|
@@ -46,7 +69,7 @@ Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, an
 | **C5** | Heartbeat and traffic deadline | Implemented and tested the challenge/answer protocol and the traffic deadline; two real reboots | Board test: 26 PASS, 0 FAIL, 1 skip (earlier run); the current test set has 25 PASS, 1 expected FAIL (T21d, see C6) |
 | **C6** | Hardening | Legacy debug and hardware commands refused in the hardened profile; test-only commands compiled out; idle-lease caps; negative tests with wrong parameter types. Wrote two more Secure World changes (`IDLE_EXPIRED` event, UART `ALIVE` line) | Negative tests 12 PASS, idle caps 6 PASS. The two changes are host-tested and built but **not flashed**, so T21d fails by design |
 | **C7** | Independent CAN (chip B) | Designed only (needs a second CAN board and a sender) | **Not built** |
-| **C8** | Soaks and final report | 1 h and 6.3 h soaks with a software sender; 21 reboots; final on-Pi check; this report | Soaks: no false alarm in steady state; 21 boots gave 21 distinct boot IDs; final check 48 PASS, 0 FAIL, 1 KNOWN, 1 SKIP |
+| **C8** | Soaks and final report | 1 h and 6.3 h soaks with a software sender; 21 reboots; final on-Pi check; the `canbridge` path through the CAN controller; this report | Soaks: no false alarm in steady state; 21 boots gave 21 distinct boot IDs; final check 48 PASS, 0 FAIL, 1 KNOWN, 1 SKIP |
 
 ## 4. Main results (details are in the evidence file)
 - **Detects, on the board:** a flipped tag bit, altered payload, wrong id, replay, duplicate, conflict, counter gap, a sender that stops (`TIMEOUT` 296.5 ms after the last frame), a counter restart, a counter wrap, heartbeat misuse (wrong, old, repeated or unissued answers), a late answer, and no consumer at boot.
@@ -67,7 +90,7 @@ Only **Design 1 ("Mode F")** is built: Linux forwards frames to Secure World, an
 | One lost monitoring sample during the soak (SSH) | Reported as a FAIL of the analyser's criterion C1 |
 
 ## 6. What is not done (stated, not hidden)
-Design 2 / chip B (C7); real CAN-bus traffic; CAN and SPI floods; the gap histogram; the stalled-UART test (T23); the `ALIVE` line and `IDLE_EXPIRED` on the board (written, not flashed); production keys; prevention of any kind. The boot-ID uniqueness check is a sample of 21, not a proof.
+Design 2 / chip B (C7); a sender on a second device and real CAN-bus traffic (the chip was only in loopback); CAN and SPI floods; the gap histogram; the stalled-UART test (T23); the `ALIVE` line and `IDLE_EXPIRED` on the board (written, not flashed); production keys; prevention of any kind. The boot-ID uniqueness check is a sample of 21, not a proof.
 
 ## 7. How to show it live
 `bash scripts/demo_live.sh 10.237.27.187` runs a narrated demo (healthy traffic, then a tampered, duplicate, replayed, skipped and malformed frame, a heartbeat answer, and silence). For a single verdict on the Pi, copy the tools and run `sh /tmp/board_full_check.sh` on a freshly rebooted Pi (about 4 minutes). The recorded outputs are in the evidence file as a fallback.

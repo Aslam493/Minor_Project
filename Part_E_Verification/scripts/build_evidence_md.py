@@ -45,6 +45,9 @@ INTRO = {
  "C7": ("C7 Independent CAN path (chip B)", "**Not built.** The design exists; it needs a second CAN board and a sender, which were not available. Nothing in this evidence file claims it works."),
  "C8": ("C8 Soaks, reboots, mutation testing, document check", "**What it shows:** the 7.27 h soak judged by `analyze_soak.py` against criteria fixed in advance (one sample was lost to SSH, so its criterion C1 is a FAIL and its `[exit 1]` below is that; "
         "everything else passes); 21 boots gave 21 distinct boot IDs; the mutation test (144 planted bugs in the real source) caught 141 and the 3 survivors are equivalent; every path cited in the documents exists."),
+ "C9": ("C9 The packet path through the CAN controller (canbridge)", "**What it shows:** the packet is no longer made by `mon_client`. `can_sender` makes the message and tag and transmits it through `can0` (CAN-FD, chip loopback); the controller carries it; `can_forwarder` reads it from `can0` and submits it to the monitor. "
+        "**How to read it:** section 2 shows `can0` switched into FD + loopback (`mtu 72`, `FD mode ENABLED`, `loopback ENABLED`); section 8 lists every frame the forwarder read and the verdict the monitor gave; the line `can0 rx_packets ... (+N)` counts frames received by the CAN controller, and N equals the number of frames submitted, which shows they came through the hardware; section 9 is the monitor's own event log. "
+        "Some TIMEOUT / TRAFFIC_RECOVERED pairs in the log come from the pauses between the test's own commands (the deadline is 300 ms); they are correct detections. **Limit:** the sender is a program on the same Pi; the chip was in loopback; the bus itself was not exercised."),
  "END": ("Cleanup and final state", "The test tools and the key were removed from the Pi's RAM disk, the Pi was rebooted, and `verify_boot` was run again. **Good result:** `/tmp` shows no tools and `verify_boot` is 16 pass, 0 FAIL."),
 }
 TITLE = {"C5b": "C5b"}
@@ -93,6 +96,13 @@ def table():
     if mu: rows.append(("C8", "Mutation testing (planted bugs in the real source)", "%s of %s caught (3 equivalent survivors)" % mu, mu[0] == "141"))
     cp = last("C8", r"cited paths checked: (\d+) \| unresolved: (\d+)")
     if cp: rows.append(("C8", "Paths cited in the documents", "%s checked, %s unresolved" % cp, cp[1] == "0"))
+    sub_ = re.search(r"frames submitted to the monitor: (\d+) \| verdicts: ACCEPTED (\d+) GAP (\d+) RESYNC (\d+) MALFORMED (\d+) AUTH_FAIL (\d+) REPLAY (\d+) DUPLICATE (\d+) CONFLICT (\d+) \| BUSY (\d+) errors (\d+)", secs.get("C9", ("", ""))[1])
+    rxm = re.search(r"rx_packets counter[^\n]*\(\+(\d+)\)", secs.get("C9", ("", ""))[1])
+    if sub_ and rxm:
+        n, acc, gap, res_, mal, af, rep, dup, con, bsy, er = sub_.groups()
+        rows.append(("C9", "Packets through the CAN controller: frames submitted / frames received by the controller", "%s submitted, controller rx_packets +%s" % (n, rxm.group(1)), n == rxm.group(1)))
+        rows.append(("C9", "Verdicts for those frames (valid run + one of each fault)", "ACCEPTED %s, RESYNC %s, AUTH_FAIL %s, REPLAY %s, DUPLICATE %s, GAP %s, MALFORMED %s, BUSY %s, errors %s" % (acc, res_, af, rep, dup, gap, mal, bsy, er),
+                     af == "1" and rep == "1" and dup == "1" and gap == "1" and mal == "2" and bsy == "0" and er == "0"))
     if len(vb) >= 2: rows.append(("END", "verify_boot after cleanup and reboot", "%s pass, %s FAIL, %s skipped" % vb[-1], vb[-1][1] == "0"))
     return rows
 
