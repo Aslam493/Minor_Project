@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Bring up the CAN-FD shield's SocketCAN interfaces after S11modules has
+# loaded spi_bcm2835/mcp251xfd. Bitrate per STEP11_CAN_HARDWARE_SPEC.md.
+#
+# can1 is allowed to fail here: as of KNOWLEDGE.md Incident 5's third
+# addendum, spi0.1 does not currently detect its MCP251xFD chip (hardware
+# wiring/seating issue), so this must not block boot while that's unresolved.
+
+BITRATE=500000
+
+# CAN-FD (2026-11-21): BusyBox 'ip' accepts 'dbitrate' but never sends it, and the kernel then refuses 'fd on' (EOPNOTSUPP). canfdcfg (tools/canmode/
+# canfdcfg.c, static, rtnetlink) sets 500000 nominal / 2000000 data, FD on, no loopback, then brings the interface up. If the tool is missing the
+# old classic 500000 path below is used, so a missing file can never stop CAN from coming up.
+bring_up() {
+	iface="$1"
+	[ -d "/sys/class/net/$iface" ] || return 1
+	if [ -x /usr/sbin/canfdcfg ]; then
+		/usr/sbin/canfdcfg "$iface" bus
+	else
+		ip link set "$iface" type can bitrate "$BITRATE" && ip link set "$iface" up
+	fi
+}
+
+start() {
+	printf 'Starting CAN interfaces: '
+	ok=""
+	for iface in can0 can1; do
+		if bring_up "$iface"; then
+			ok="$ok $iface"
+		fi
+	done
+	if [ -n "$ok" ]; then
+		echo "OK ($ok)"
+	else
+		echo "FAIL (no CAN interfaces present)"
+	fi
+	return 0
+}
+
+stop() {
+	printf 'Stopping CAN interfaces: '
+	for iface in can0 can1; do
+		[ -d "/sys/class/net/$iface" ] && ip link set "$iface" down
+	done
+	echo "OK"
+}
+
+case "$1" in
+	start|stop)
+		"$1";;
+	restart|reload)
+		stop
+		start;;
+	*)
+		echo "Usage: $0 {start|stop|restart|reload}"
+		exit 1
+esac
