@@ -15,3 +15,6 @@ on the sender by `tools/monitor_client/laptop_can_send.py`.
 | step7.sh | 7a, 7b, 7c first run |
 | step7_clean.sh, step7c4.sh | 7b clean rerun, 7c corrected run |
 | step7_rerun_INVALID_poller_load.sh | the rerun that polled status twice per 0.3 s; INVALID, kept as a record (see the report) |
+
+## Burst study (2026-11-21, Phase 1, measurement only)
+`burst_run.py` (orchestrator, run on the laptop), `tools/monitor_client/burst_packets.py` (packet file + expected counts written before sending), `tools/monitor_client/burst_send.py` (sender, `naive` or `retry`). Results: `baseline/burst_20261121_*`, report section 10 of `REAL_BUS_RESULTS.md`.

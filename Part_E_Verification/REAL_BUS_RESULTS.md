@@ -119,3 +119,58 @@ C3 is **closed** (root cause fixed in the image build, verified on the board). F
 - `ACCEPTED` is not directly counted in Mode P (inferred), and the forwarder cannot see verdicts there.
 - Addresses are DHCP: receiver 10.237.27.77, sender 10.237.27.144 tonight; a reboot can change them.
 - Prototype keys, no TZASC, detection only: unchanged (section 7).
+
+
+## 10. Burst behaviour (2026-11-21), Phase 1: measurement only, nothing was changed
+
+Question: what happens to frames when the sender bursts instead of sending 10 per second? Real bus, receiver Mode P image with N-04, FD 500000/2000000, forwarder `--pull --verbose --stats`, a second `candump -d` on the receiver. Tools: `tools/monitor_client/burst_packets.py` (makes the file and writes the **expected counts before anything is sent**), `burst_send.py` (sender; `naive` = a send refused with ENOBUFS is lost, `retry` = repeated), `scripts/real_bus/burst_run.py` (orchestrator, collects every stage before and after, nothing is polled during a burst). Logs: `baseline/burst_20261121_*` (one report, one `.expected.txt`, one `candump.log` per run, `burst_20261121_SUMMARY.txt`).
+Each burst: N valid packets + 4 planted frames (bad tag, old counter, duplicate, wrong ID) + one jump of 2 counters = N+4 frames on the wire; with no loss Secure World must judge N+4: AUTH_FAIL 1, REPLAY 2, MALFORMED 1, COUNTER_GAP 1.
+Harness control (10 s of normal traffic through the same setup, before the bursts): 100 in, 100 judged at every stage, 0 loss, window 9.92 s in the Secure World clock against 9.90 s in `candump` (two independent clocks agree).
+
+### 10.1 Where frames were lost, per N (every row adds up)
+
+| run | on the wire | lost at the sender (ENOBUFS) | on the bus (sender tx) | lost in the receiver chip FIFO | lost in the forwarder's socket | lost in the forwarder queue | judged | lost in total | time first to last judged | sender burst time | frames judged per second |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| N150 naive | 154 | **97** | 57 | 0 | 0 | 0 | 57 | 97 | 0.53 s | 0.013 s | 107 |
+| N150 retry | 154 | 0 | 154 | 0 | 0 | 0 | **154** | **0** | 1.50 s | 0.040 s | 103 |
+| N500 naive | 504 | **424** | 80 | 0 | 0 | 0 | 80 | 424 | 0.79 s | 0.020 s | 101 |
+| N500 retry | 504 | 0 | 504 | **17** (5 overflow events) | **249** | 0 | 238 | 266 | 2.31 s | 0.139 s | 103 |
+| N1000 naive | 1004 | **689** | 315 | 0 | **77** | 0 | 238 | 766 | 2.31 s | 0.086 s | 103 |
+| N1000 retry | 1004 | 0 | 1004 | 0 | **765** | 0 | 239 | 765 | 2.34 s | 0.280 s | 102 |
+| normal 10 s (after the bursts) | 100 | 0 | 100 | 0 | 0 | 0 | **100, all ACCEPTED** | 0 | 9.92 s | 10 s | 10 |
+
+Other stages, all clean in every run: sender `tx_errors` 0 and `tx_dropped` 0; receiver `rx_dropped` 0; `rx_fifo_errors` 0; forwarder queue `dropped by the queue` 0 and `still queued` 0; frames handed to Secure World = frames judged; PTA lock timeouts 0; `starved` 0; `init_ok` 1; Core 1 poll age at most 7778 ticks (0.4 ms); heartbeat ANSWERED, 0 misses at the end of every run.
+
+### 10.2 What the numbers show (measured unless marked as inferred)
+
+1. **Sender.** A plain burst loop loses most frames at the sender: the interface's transmit queue is 10 frames (`qlen 10`) with a 4-frame hardware ring, so a loop that sends faster than the bus (about 3600 frames/s accepted at best) gets ENOBUFS. 97 of 154, 424 of 504, 689 of 1004 were lost this way with the naive policy. With retry the sender delivered everything it was given and the bus carried all of it (sender tx = frames sent in all retry runs).
+2. **Receiver chip.** Once: N500 retry lost 17 frames in the MCP2518FD (its receive FIFO holds 20 objects, interrupt coalescing is off, `rx_over_errors` +5). It did not repeat in N1000 retry at a higher rate, so this loss is intermittent and small, not the main problem.
+3. **The forwarder's socket is where the big loss happens.** In the three runs that put more than about 240 frames into the forwarder's socket, exactly **238, 238 and 239** frames reached the forwarder, however many were sent. The forwarder's own queue (256) never filled. (Inferred: the raw socket's receive buffer, `rmem_default` 212,992 bytes, holds about 238 FD frames, about 895 bytes charged per frame; the kernel drops later frames. Not read from the kernel directly, the same constant in three runs is the evidence.) The socket keeps the **oldest** frames: in N1000 retry the monitor's `last_counter` ended at exactly the 238th valid counter plus the bad tag.
+4. **Why the forwarder cannot keep up (read from the code and the timings).** Its loop reads one frame per iteration, then makes a call into Secure World (about 3.8 ms). Idle iterations are 13.8 ms (10 ms poll wait + the call); with frames waiting it still reaches only about **103 frames per second**, the same in every run (154 in 1.50 s, 238 in 2.31 s). The Mode P design ceiling (32 packets per reply, one reply per 50 ms = 640 per second) was never reached: replies carried at most 12 packets.
+5. **Secure World was not the bottleneck.** Nothing it was handed was lost, no lock timeouts, never starved, heartbeat answered.
+6. **Replies get late under burst load.** Linux-side reply time (fetch to reply) p99 was 9.3 ms idle and 43 to 55 ms in the burst runs (max 59 to 147 ms); the Mode P deadline is 40 ms; LATE_ANSWER / STALE_ANSWER events appeared in 5 of 6 burst runs and once at the start of the final normal run (max 35 ms, no frame lost). Cause not established (the burst loads the 3 usable CPUs with SPI interrupts, `candump` and the forwarder); `candump` itself adds load and was running in every run, including the control, which had no late answers.
+
+### 10.3 Verdicts against the planted frames
+
+| run | judged | AUTH_FAIL (exp. 1) | REPLAY (exp. 2) | MALFORMED (exp. 1) | COUNTER_GAP (exp. 1) | note |
+|---|---|---|---|---|---|---|
+| N150 retry | 154 of 154 | 1 | 2 | 1 | 1 | **exactly as planted**; ACCEPTED = 149 as expected |
+| N150 naive | 57 | 0 | 0 | 0 | **43** | each hole left by a lost frame is a GAP |
+| N500 naive | 80 | 0 | 0 | 0 | **65** | same |
+| N500 retry | 238 | 0 | 1 | 0 | **6** | bad tag lost in the chip FIFO; only the frames before the socket filled were judged; `last_counter` 249 short of the end |
+| N1000 naive | 238 | 0 | 0 | 0 | **223** | same |
+| N1000 retry | 239 | 1 | 0 | 0 | 0 | the first 239 frames, nothing after |
+| normal 10 s | 100 | 0 | 0 | 0 | 0 | 100 ACCEPTED |
+
+### 10.4 Event accounting (code read: `rpi3_mon_ev_append`)
+
+- Counters are exact. An event of a type that was recorded less than 1 s earlier is **counted but not recorded** (after the first 4 of each evidence class, which are pinned). In the naive runs 42, 64 and 220 `COUNTER_GAP` events were suppressed against 1 to 3 recorded; the log alone would hide the real size of the loss.
+- **`ev_lost` is not a reliable "events lost" figure.** `ack` is a bookmark only and the code never clears a ring slot that has been used, so once the 40 ordinary slots have been filled once since boot, every further ordinary event counts as lost whether or not it was read. `ev_lost` rose by 3 and 7 in the two 1000-frame runs with only 8 or 9 events recorded; this is that effect, not event pressure.
+
+### 10.5 The prediction written before the runs was wrong
+
+Model (design limits: 640 packets/s, queue 256 with drop-oldest, about 290 us per frame): N500 loses about 155 and N1000 about 560 at the **forwarder queue**, total drain 0.25 s and 0.7 s. Measured: the loss is **earlier** (the kernel socket in front of the forwarder, 249 and 765), the forwarder queue lost 0, and the drain takes 1.5 to 2.3 s because the forwarder ingests about 103 frames per second, not 640. The model ignored that the forwarder reads one frame per loop iteration and that every iteration costs a call into Secure World.
+
+### 10.6 Limits of this measurement
+
+One run per cell (no repeats, so the chip loss of 17 is a single observation); the sender is a Python loop; `candump` runs alongside the forwarder; the time to drain comes from the Secure World event clock (first TRAFFIC_RECOVERED to the last traffic TIMEOUT minus the 300 ms deadline, checked against `candump` in the control); the socket capacity is inferred, not read; the cause of the late replies is open. Phase 2 (causes and proposed fixes) waits for the user's OK.
