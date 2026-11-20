@@ -1,6 +1,6 @@
 #!/bin/bash
 # Card swap helper. NEVER writes to any device: it checks and then PRINTS the sudo commands for the user to run.
-#   card_helper.sh check <image>      find the one removable USB disk, refuse anything but the 8 GB spare (7730102272 bytes), unmount its partitions,
+#   card_helper.sh check <image> [--allow-old-dtb]   refuses an image whose DTB is not N-04 (e8ac38fa...) unless --allow-old-dtb; find the one removable USB disk, refuse anything but the 8 GB spare (7730102272 bytes), unmount its partitions,
 #                                     verify the image against SHA256SUMS, print the exact dd + cmp commands
 #   card_helper.sh identify           while the card is mounted in the laptop: say which known firmware its armstub8.bin is
 #   card_helper.sh pi <ip>            after the card is in the Pi: drop the stale SSH host key for <ip> (backup first) and show the board identity
@@ -11,7 +11,17 @@ IMG_DIR="$(cd "$(dirname "$0")/../build_scratch/candidate_image" && pwd)"
 SPARE=7730102272
 case "${1:-}" in
 check)
-  img="${2:?usage: card_helper.sh check <image file name or path>}"; [ -f "$img" ] || img="$IMG_DIR/$img"; [ -f "$img" ] || { echo "image not found"; exit 2; }
+  img="${2:?usage: card_helper.sh check <image file name or path> [--allow-old-dtb]}"; [ -f "$img" ] || img="$IMG_DIR/$img"; [ -f "$img" ] || { echo "image not found"; exit 2; }
+  # N-04 guard (added 2026-11-21): the image's boot partition must carry the N-04 device tree (reserves the secure DRAM 0x10000000-0x10ffffff).
+  # An image without it silently removed the reservation on 2026-11-18 (board_full_check C3). Rollback to an older image: add --allow-old-dtb.
+  dtb_want=$(grep ' candidate-bcm2710-rpi-3-b.dtb$' "$IMG_DIR/../../monitor/n04/SHA256SUMS" | cut -d' ' -f1)
+  case "$dtb_want" in e8ac38fa*) ;; *) echo "REFUSED: cannot read the N-04 hash (monitor/n04/SHA256SUMS)"; exit 7;; esac
+  poff=$(( $(sfdisk -d "$img" 2>/dev/null | awk '/start=/ {gsub(",","",$4); print $4; exit}') * 512 ))
+  dtb_have=$(mcopy -n -i "$img@@$poff" ::bcm2710-rpi-3-b.dtb - 2>/dev/null | sha256sum | cut -d' ' -f1)
+  if [ "$dtb_have" != "$dtb_want" ]; then
+    if [ "${3:-}" = "--allow-old-dtb" ]; then echo "WARNING: this image's DTB is ${dtb_have:0:8}..., not N-04 (${dtb_want:0:8}...): the secure-DRAM reservation will be MISSING (board_full_check C3 will FAIL). Allowed because of --allow-old-dtb (rollback)."
+    else echo "REFUSED: the image's bcm2710-rpi-3-b.dtb is ${dtb_have:0:8}..., not the N-04 DTB ${dtb_want:0:8}.... Compose the image with scripts/compose_image.sh, or add --allow-old-dtb only for a rollback."; exit 7; fi
+  else echo "OK: image DTB is N-04 (${dtb_have:0:8}...)"; fi
   disks=$(lsblk -dnb -o NAME,SIZE,TRAN,RM | awk '$3=="usb" && $4=="1" {print $1" "$2}')
   [ "$(echo "$disks" | grep -c .)" = 1 ] || { echo "REFUSED: expected exactly one removable USB disk, found: ${disks:-none}"; exit 3; }
   dev=/dev/$(echo "$disks" | cut -d' ' -f1); size=$(echo "$disks" | cut -d' ' -f2)

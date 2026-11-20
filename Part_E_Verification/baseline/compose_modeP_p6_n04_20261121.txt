@@ -1,0 +1,6 @@
+OK   DTB read back from build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04.img: sha256 e8ac38faebc78f87... (N-04)
+OK   boot-partition files that differ from the base: bcm2710-rpi-3-b.dtb 
+OK   first 1048576 bytes (partition table) identical to the base
+OK   root filesystem partition (byte 68157440 on) identical to the base
+IMAGE build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04.img sha256 cf9547249aea5a06e64de782004f2b4473cfc797c6717f8b9cae73d63f647e3f
+compose_image: ALL CHECKS PASS
