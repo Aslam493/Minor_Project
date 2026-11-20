@@ -2,7 +2,7 @@
 
 **What this is.** The first tests on a **real CAN-FD bus**, with the frames created by a **separate sender Pi** and not injected through the PTA.
 Steps 1 to 7 passed. Step 8 (the receiver's full check) found one **open regression (C3)** and two expected Mode P differences. Details below.
-Status of this file: written on 2026-11-21 before the C3 fix; it is updated at the end (section 9).
+Status of this file: first written before the C3 fix; updated at the end of the night (section 9). Sections 1 to 8 describe the first runs as they were; section 9 supersedes the open items.
 
 ## 1. Setup as tested
 
@@ -85,7 +85,7 @@ My mistakes tonight, in order:
 - **No TZASC** on the Pi 3: Normal World memory protection is not hardware-enforced; N-04 is only a DTB reservation.
 - **Detection only**, no prevention claim.
 - Mode P timing under load is sensitive (finding in section 5); timing runs (idle/load) are still to be done.
-- Steps 1 to 7 ran with the receiver's `can0` in FD **at runtime only**; it is not permanent (reboot restores classic 500000).
+- Steps 1 to 7 ran with the receiver's `can0` in FD **at runtime only**. (Since section 9 it is permanent on both Pis.)
 - A `TIMEOUT` detail is not always visible in the log (one event per second per class); counters are the exact record.
 - Not tested: `can1`, the second controller (Design 2 / C7).
 
@@ -95,4 +95,27 @@ Scripts: `scripts/real_bus/` (README there). Packet files are generated with `pa
 
 ## 9. Update at the end of the night
 
-(Filled in below as the later steps finish.)
+### 9.1 Everything that happened after the first report (in order)
+
+| # | What | Result | Evidence |
+|---|---|---|---|
+| 1 | First report committed and pushed | done (`6c3a2ef`) | this file |
+| 2 | C3 root-cause fix: `scripts/compose_image.sh` always installs the N-04 DTB (`e8ac38fa...`); `modeP_p6_image_build.sh` uses it; `card_helper.sh check` refuses an image whose DTB is not N-04 (exit 7, negative controls on the p6 and hardened c16384 images; `--allow-old-dtb` for a rollback, with a warning) | new image `rpi3-sdcard-monitor-modeP-p6-n04.img` sha256 `cf954724...e3f`; **only `bcm2710-rpi-3-b.dtb` differs** from the p6 image, partition table and root filesystem byte-identical | `baseline/compose_modeP_p6_n04_20261121.txt` |
+| 3 | User flashed the 8 GB card (`dd` + `cmp` = MATCH), receiver booted. Both Pis got NEW DHCP addresses: receiver 10.237.27.77, sender 10.237.27.144 (the old receiver address 10.237.27.187 no longer answered) | `/proc/device-tree/reserved-memory/optee_secure@10000000` present | `baseline/verify_boot_modeP_n04_20261121.txt` |
+| 4 | `verify_boot` on the new image | 16 pass, 0 FAIL, 2 skipped | same file |
+| 5 | `board_full_check.sh --mode-p`, first run | **C3 PASS** (31 PASS, 1 FAIL, 4 SKIP; the 1 FAIL was F2 R3/R4) | `baseline/board_full_check_modeP_n04_20261121.txt` |
+| 6 | Real-bus recheck on the new image (FD on both, 60 s at 10/s + 1 bad tag) | 601 frames in, 601 judged, 1551 requests all ON_TIME, only COUNTER_RESYNC (counter 1) and AUTH_FAIL (counter 601), `last_counter` 600, init_ok=1, starved=0, 0 lock timeouts | `baseline/real_bus_recheck_after_n04_20261121.txt` |
+| 7 | F2 made mode-aware: `c6_negative_raw --mode-p` (R3: commands 30 and 31 exist in Mode P, wrong types give BAD_PARAMETERS; R4: command 17 is refused, NOT_SUPPORTED; R4b unchanged; Mode F expectations unchanged and checked: without the flag the same image still shows the 2 FAIL); `board_full_check.sh` passes the flag and tolerates no F2 failure | `board_full_check.sh --mode-p`: **32 PASS, 0 FAIL, 0 KNOWN, 4 SKIP** (C3, C4, F2, H1, H2 PASS) | `baseline/board_full_check_modeP_n04_modeaware_20261121.txt` |
+| 8 | FD permanent: sender `can0-up.service` (500000/2000000 FD); receiver `/usr/sbin/canfdcfg` + new `/etc/init.d/S12can` (fallback to classic if the tool is missing; backup `/root/S12can.orig-classic`, not in `/etc/init.d`). Both Pis rebooted with the user's OK | after the reboot, with nothing set by hand: both FD 500000/2000000, mtu 72, ERROR-ACTIVE; 5 FD frames of 48 bytes crossed, receiver rx 0 to 5, 0 errors | `baseline/fd_permanent_after_reboot_20261121.txt`, `scripts/receiver_fd/` |
+| 9 | `can1` investigation (read-only) | device tree correct and identical on both Pis and equal to the shield spec; a direct SPI READ probe of CE1 returns all zeros at 3 speeds and 2 modes, the same probe on chip A returns real values: **board-level hardware cause, not configuration** (physical checks listed) | `baseline/CAN1_INVESTIGATION_20261121.md` |
+
+### 9.2 Step 8 status now
+C3 is **closed** (root cause fixed in the image build, verified on the board). F2 R3/R4 are closed as Mode P expectations, not tolerated failures. Mode F expectations are unchanged. Remaining SKIPs (4): E1-E12, F1, F3 and G need command 17, refused in Mode P by design; they are covered for Mode F by the earlier Mode F runs (`baseline/board_full_check_fresh_20261116.txt`).
+
+### 9.3 Open items
+- The Buildroot overlay (`optee_full/build/br-ext/board/rpi3/overlay/etc/init.d/S12can`) and the root filesystem of the composed images still carry the OLD classic `S12can` and no `canfdcfg`. A new image composed from the Sep-20 base would lose permanent FD on the receiver exactly as the DTB was lost: add `S12can` and `usr/sbin/canfdcfg` to the overlay or to `compose_image.sh` first. The overlay is in a nested checkout and was deliberately not touched.
+- Mode P timing runs (idle and under load, `scripts/modeP_timing_test.sh`), which also need a fresh boot each, are not done. The poller incident (section 5) shows why they matter.
+- `can1`: physical checks 1 to 4 of `CAN1_INVESTIGATION_20261121.md`.
+- `ACCEPTED` is not directly counted in Mode P (inferred), and the forwarder cannot see verdicts there.
+- Addresses are DHCP: receiver 10.237.27.77, sender 10.237.27.144 tonight; a reboot can change them.
+- Prototype keys, no TZASC, detection only: unchanged (section 7).

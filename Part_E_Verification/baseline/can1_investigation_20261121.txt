@@ -1,0 +1,93 @@
+##### RECEIVER (10.237.27.77)
+spi node: /proc/device-tree/soc/spi@7e204000
+--- /proc/device-tree/soc/spi@7e204000/mcp251xfd@0
+status: absent
+reg= 00 00 00 00
+interrupts= 00 00 00 19 00 00 00 08
+spi-max-frequency= 01 31 2d 00
+clocks= 00 00 00 9a
+pinctrl-0= 00 00 00 99
+interrupt-parent= 00 00 00 07
+--- /proc/device-tree/soc/spi@7e204000/mcp251xfd@1
+status: absent
+reg= 00 00 00 01
+interrupts= 00 00 00 18 00 00 00 08
+spi-max-frequency= 01 31 2d 00
+clocks= 00 00 00 9c
+pinctrl-0= 00 00 00 9b
+interrupt-parent= 00 00 00 07
+--- spi controller props
+status= 6f 6b 61 79 00
+cs-gpios= 00 00 00 07 00 00 00 08 00 00 00 01 00 00 00 07 00 00 00 07 00 00 00 01
+#address-cells #size-cells clocks compatible cs-gpios dma-names dmas interrupts mcp251xfd@0 mcp251xfd@1 name phandle pinctrl-0 pinctrl-names reg spidev@0 spidev@1 status 
+--- spi devices
+spi0.0
+spi0.1
+/sys/bus/spi/devices/spi0.0 -> driver: mcp251xfd  modalias: spi:mcp251xfd
+/sys/bus/spi/devices/spi0.1 -> driver:   modalias: spi:mcp251xfd
+--- dmesg
+[   10.462602] spi_master spi0: will run message pump with realtime priority
+[   10.511798] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+[   10.534147] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+[   10.559157] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) su
+--- irq
+ 96:          2          3          5  ARMCTRL-level  86 Edge      3f204000.spi
+186:          2          0          3  pinctrl-bcm2835  25 Level     spi0.0
+
+##### SENDER (10.237.27.144)
+spi node: /proc/device-tree/soc/spi@7e204000
+--- /proc/device-tree/soc/spi@7e204000/mcp251xfd@0
+status: absent
+reg= 00 00 00 00
+interrupts= 00 00 00 19 00 00 00 08
+spi-max-frequency= 01 31 2d 00
+clocks= 00 00 00 9d
+pinctrl-0= 00 00 00 9c
+interrupt-parent= 00 00 00 07
+--- /proc/device-tree/soc/spi@7e204000/mcp251xfd@1
+status: absent
+reg= 00 00 00 01
+interrupts= 00 00 00 18 00 00 00 08
+spi-max-frequency= 01 31 2d 00
+clocks= 00 00 00 9f
+pinctrl-0= 00 00 00 9e
+interrupt-parent= 00 00 00 07
+--- spi controller props
+status= 6f 6b 61 79 00
+cs-gpios= 00 00 00 07 00 00 00 08 00 00 00 01 00 00 00 07 00 00 00 07 00 00 00 01
+#address-cells clocks compatible cs-gpios dma-names dmas interrupts mcp251xfd@0 mcp251xfd@1 name phandle pinctrl-0 pinctrl-names reg #size-cells spidev@0 spidev@1 status 
+--- spi devices
+spi0.0
+spi0.1
+/sys/bus/spi/devices/spi0.0 -> driver: mcp251xfd  modalias: spi:mcp251xfd
+/sys/bus/spi/devices/spi0.1 -> driver:   modalias: spi:mcp251xfd
+--- dmesg
+[   20.874904] spi_master spi0: will run message pump with realtime priority
+[   20.912452] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+[   20.912527] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+[   20.968441] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) su
+--- irq
+111:          0          1          3          1 ARMCTRL-level  86 Edge      3f204000.spi
+201:          1          0          1          3 pinctrl-bcm2835  25 Level     spi0.0
+mode 0   500000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+mode 0  2000000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+mode 0 10000000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+mode 3   500000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+mode 3  2000000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+mode 3 10000000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=00000000
+--- state of can0 (chip A) after the probe:
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 72 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+0 0 
+ 7: op -- -- | hi // GPIO7 = output
+24: ip    -- | hi // GPIO24 = input
+### positive control: same probe on chip A (CE0)
+/dev/spidev0.0
+mode 0   500000 Hz: OSC=00000000 IOCON=00000000 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=60079804
+mode 0  2000000 Hz: OSC=60040000 IOCON=03000303 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=60079804
+mode 0 10000000 Hz: OSC=60040000 IOCON=03000303 CRC=00000000 ECCCON=00000000 DEVID=00000000 C1CON=60079804
+### restore chip A to the CAN driver
+mcp251xfd
+5: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 72 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  dbitrate 2000000 dsample-point 0.750
