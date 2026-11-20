@@ -1,0 +1,49 @@
+##### FD on both sides
+receiver canfdcfg exit=0
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1
+  controller state       ERROR-ACTIVE (0)
+  loopback               disabled
+  listen-only            disabled
+  FD mode                ENABLED
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 72 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  bitrate 500000 sample-point 0.875
+	  dbitrate 2000000 dsample-point 0.750
+
+##### 60 s at 10/s + 1 bad tag, Mode P forwarder
+ev_seq before=7
+can0 before: rx_packets=0 rx_errors=0 tx_packets=0 
+sent 601 CAN-FD frames on can0 (no key, no HMAC in this script)
+PULL: frames received from can0 and queued: 601 | requests answered: 1551 (ON_TIME 1551, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 601 | still queued: 0 | dropped by the queue: 0
+heartbeat answers: ON_TIME 79 LATE 0 other 0
+can0 rx_packets counter (frames received by the CAN controller): 0 -> 601 (+601)
+end state: flags 0x0f last_counter 600 hb_state ANSWERED miss_count 0 starved 0
+can0 after: rx_packets=601 rx_errors=0 tx_packets=0 
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+-- status
+page 0: version 1 length 128 boot_id 0xca41ea7f flags 0x1f mode 2
+  now_ticks 7355687407 core1_poll_age_ticks 3319 poll_count 13303371645
+  skip_count 0 skip_total 210 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 600 hb_seq 365 hb_state MISSED hb_miss_count 3 idle_uses 0
+  traffic_age_ticks 314849845 hb_last_ok_age_ticks 71430930 lease_remaining_ticks 0
+  ev_seq 13 ev_ack 0 ev_lost 0 pinned_used 5
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=210
+page 1: version 1 length 128 verdict totals frame 601 heartbeat 82 crosscheck 0
+  AUTH_FAIL            1
+  TIMEOUT              7
+  COUNTER_RESYNC       1
+  HEARTBEAT_RECOVERED  4
+  LEGACY_CMD_REFUSED   27
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=210
+-- events from seq 8
+seq 8 HEARTBEAT_RECOVERED  counter 5632 detail 1 ticks 5791686935
+seq 9 COUNTER_RESYNC       counter 1 detail 0 ticks 5890737110
+seq 10 AUTH_FAIL            counter 601 detail 0 ticks 7042669769
+seq 11 TIMEOUT              counter 0 detail 1 ticks 7046601994
+seq 12 TIMEOUT              counter 0 detail 4 ticks 7292610843
+  returned 5, more=1, ev_lost=0
+seq 13 TIMEOUT              counter 0 detail 2 ticks 7350205331
+  returned 1, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=210

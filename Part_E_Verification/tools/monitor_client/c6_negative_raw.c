@@ -1,7 +1,13 @@
 /*
  * c6_negative_raw: board negative tests (plan unit U2, T25 and bad parameters) through RAW TEEC_InvokeCommand calls.
  *
- *   usage: c6_negative_raw
+ *   usage: c6_negative_raw [--mode-p]
+ *     --mode-p   the flashed image is the Mode P (pull) image. Only R3 and R4 differ, each with its reason next to the expectation:
+ *                R3: commands 30 and 31 exist in Mode P (fetch the packet request / reply to it), so they are not "unknown ids": wrong
+ *                    parameter types give BAD_PARAMETERS, not NOT_SUPPORTED. All other ids beyond 23 are still NOT_SUPPORTED.
+ *                R4: command 17 is REFUSED in Mode P (NOT_SUPPORTED, before its parameters are looked at); commands 18-23 still
+ *                    answer BAD_PARAMETERS. R4b (no state changed) is the same in both modes.
+ *     Without the flag every expectation is the Mode F one, unchanged.
  *
  * SAFETY: every call that could act (legacy ids 0,3,6,7,13,14 and the chip-A debug readers) is sent with DELIBERATELY WRONG parameter
  * types. The legacy handlers check their parameter types before they do anything (pta/rpi3_can_spi_poc.c), so even if a refusal were
@@ -65,8 +71,9 @@ static int same(const struct snap *a, const struct snap *b)
 { uint32_t ea[MON_EVENT_TYPES], eb[MON_EVENT_TYPES]; memcpy(ea, a->ev, sizeof ea); memcpy(eb, b->ev, sizeof eb); ea[2] = eb[2] = 0;	/* 2 = RPI3_MON_EV_TIMEOUT */
   return !memcmp(ea, eb, sizeof ea) && a->last_counter == b->last_counter && a->idle_uses == b->idle_uses && a->ev_ack == b->ev_ack && a->vf == b->vf && a->vh == b->vh && a->vx == b->vx; }
 
-int main(void)
+int main(int argc, char **argv)
 {
+	int modep = argc > 1 && !strcmp(argv[1], "--mode-p");
 	static const uint32_t refused[] = { 0, 3, 6, 7, 13, 14 }, readers[] = { 4, 5, 8, 9, 10, 11, 15, 16 }, kept[] = { 1, 2, 12 };
 	struct mon_status0 s0; struct mon_health h; uint32_t e0[MON_EVENT_TYPES], e1[MON_EVENT_TYPES]; struct snap a, b; unsigned i, ok;
 	if (mon_open(&C)) { fprintf(stderr, "cannot open the PTA session\n"); return 2; }
@@ -92,14 +99,24 @@ int main(void)
 
 	/* R3: ids beyond 23 */
 	printf("== unknown ids\n");
-	{ static const uint32_t unk[] = { 24, 25, 26, 27, 28, 29, 30, 40, 100, 0x1000, 0xFFFFFFFFu }; take(&a); ok = 1;
-	  for (i = 0; i < sizeof unk / sizeof unk[0]; i++) { uint32_t r1 = raw(unk[i], PT_ALL_MEMREF), r2 = raw(unk[i], PT_NONE4); if (r1 != NOT_SUPPORTED || r2 != NOT_SUPPORTED) { ok = 0; printf("     id 0x%x: 0x%08x / 0x%08x\n", unk[i], r1, r2); } }
-	  take(&b); PASSF(ok && same(&a, &b), "R3", "ids 24-30, 40, 100, 0x1000, 0xFFFFFFFF x 2 patterns -> NOT_SUPPORTED, monitor state unchanged"); }
+	{ static const uint32_t unk_f[] = { 24, 25, 26, 27, 28, 29, 30, 40, 100, 0x1000, 0xFFFFFFFFu };	/* Mode F: 30 does not exist */
+	  static const uint32_t unk_p[] = { 24, 25, 26, 27, 28, 29, 32, 40, 100, 0x1000, 0xFFFFFFFFu };	/* Mode P: 30 and 31 exist, tested below */
+	  const uint32_t *unk = modep ? unk_p : unk_f; const unsigned nunk = modep ? sizeof unk_p / sizeof unk_p[0] : sizeof unk_f / sizeof unk_f[0];
+	  take(&a); ok = 1;
+	  for (i = 0; i < nunk; i++) { uint32_t r1 = raw(unk[i], PT_ALL_MEMREF), r2 = raw(unk[i], PT_NONE4); if (r1 != NOT_SUPPORTED || r2 != NOT_SUPPORTED) { ok = 0; printf("     id 0x%x: 0x%08x / 0x%08x\n", unk[i], r1, r2); } }
+	  if (modep) for (i = 30; i <= 31; i++) {	/* Mode P only: these two exist (fetch request / reply), so wrong parameter types are BAD_PARAMETERS */
+	    uint32_t r1 = raw(i, PT_ALL_MEMREF), r2 = raw(i, PT_NONE4); if (r1 != BAD_PARAMETERS || r2 != BAD_PARAMETERS) { ok = 0; printf("     Mode P id %u: 0x%08x / 0x%08x\n", i, r1, r2); } }
+	  take(&b);
+	  if (modep) PASSF(ok && same(&a, &b), "R3", "Mode P: ids 24-29, 32, 40, 100, 0x1000, 0xFFFFFFFF x 2 patterns -> NOT_SUPPORTED; ids 30 and 31 (they exist in Mode P) x 2 patterns -> BAD_PARAMETERS; monitor state unchanged");
+	  else PASSF(ok && same(&a, &b), "R3", "ids 24-30, 40, 100, 0x1000, 0xFFFFFFFF x 2 patterns -> NOT_SUPPORTED, monitor state unchanged"); }
 
 	/* R4: monitor commands 17..23 with wrong parameter types */
 	printf("== monitor commands 17-23 with wrong parameter types\n");
-	{ take(&a); ok = 1; for (uint32_t c = 17; c <= 23; c++) { uint32_t r1 = raw(c, PT_ALL_MEMREF), r2 = raw(c, PT_NONE4); if (r1 != BAD_PARAMETERS || r2 != BAD_PARAMETERS) { ok = 0; printf("     cmd %u: 0x%08x / 0x%08x\n", c, r1, r2); } }
-	  take(&b); PASSF(ok, "R4", "commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS"); PASSF(same(&a, &b), "R4b", "no counter, verdict total, event, last_counter, idle use or acknowledgement changed");
+	{ take(&a); ok = 1; for (uint32_t c = 17; c <= 23; c++) { uint32_t r1 = raw(c, PT_ALL_MEMREF), r2 = raw(c, PT_NONE4); uint32_t want = (modep && c == 17) ? NOT_SUPPORTED : BAD_PARAMETERS;	/* Mode P: command 17 is refused before its parameters are checked */
+	    if (r1 != want || r2 != want) { ok = 0; printf("     cmd %u: 0x%08x / 0x%08x (wanted 0x%08x)\n", c, r1, r2, want); } }
+	  take(&b); if (modep) PASSF(ok, "R4", "Mode P: command 17 x 2 wrong patterns -> NOT_SUPPORTED (refused in Mode P); commands 18-23 -> BAD_PARAMETERS");
+	  else PASSF(ok, "R4", "commands 17-23 x 2 wrong patterns -> BAD_PARAMETERS");
+	  PASSF(same(&a, &b), "R4b", "no counter, verdict total, event, last_counter, idle use or acknowledgement changed");
 	  if (!same(&a, &b)) { unsigned t; for (t = 0; t < MON_EVENT_TYPES; t++) if (a.ev[t] != b.ev[t]) printf("     diff: event type %u count %u -> %u\n", t, a.ev[t], b.ev[t]);
 	    printf("     diff: last_counter %u -> %u, idle_uses %u -> %u, ev_ack %u -> %u, v_frame %u -> %u, v_hb %u -> %u, v_xcheck %u -> %u\n", a.last_counter, b.last_counter, a.idle_uses, b.idle_uses, a.ev_ack, b.ev_ack, a.vf, b.vf, a.vh, b.vh, a.vx, b.vx); } }
 

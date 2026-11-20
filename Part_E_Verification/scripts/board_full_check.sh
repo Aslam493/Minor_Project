@@ -196,11 +196,13 @@ else
     else fail "F1 c5_board_tests: ${sum:-no SUMMARY line}; failed: $fl"; fi
   else skip "F1 c5_board_tests ($WHY)"; fi
   if [ $MODEP = 1 ]; then
-    out=$("$DIR/c6_negative_raw" 2>&1); sum=$(echo "$out" | grep '^SUMMARY' | tail -1); nfl=$(echo "$out" | grep -E '^  FAIL' | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')
+    # 2026-11-21: c6_negative_raw --mode-p states the Mode P expectations (with the reason next to each, see its header): R3 ids 30 and 31 exist in
+    # Mode P (BAD_PARAMETERS for wrong types, not NOT_SUPPORTED); R4 command 17 is refused in Mode P (NOT_SUPPORTED before its parameters are checked).
+    # R4b (no state changed) is the same in both modes. No failure is tolerated any more: the old "R4/R4b = KNOWN" exception is gone.
+    out=$("$DIR/c6_negative_raw" --mode-p 2>&1); sum=$(echo "$out" | grep '^SUMMARY' | tail -1); nfl=$(echo "$out" | grep -E '^  FAIL' | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')
     echo "$out" | grep -E '^  FAIL' | sed 's/^/     /'
-    if [ -z "$nfl" ]; then pass "F2 legacy/debug commands refused, bad parameters rejected (T25): $sum"
-    elif [ "$nfl" = "R4 R4b" ] || [ "$nfl" = "R4" ]; then known "F2 c6_negative_raw: $sum. Only R4/R4b failed: they expect command 17 to answer BAD_PARAMETERS for wrong parameter types; in Mode P command 17 is refused first (NOT_SUPPORTED), by design"
-    else fail "F2 c6_negative_raw: $sum; failed: $nfl"; fi
+    if [ -n "$sum" ] && [ -z "$nfl" ]; then pass "F2 legacy/debug commands refused, bad parameters rejected (T25, Mode P expectations): $sum"
+    else fail "F2 c6_negative_raw --mode-p: ${sum:-no SUMMARY line}; failed: $nfl"; fi
   else
   out=$("$DIR/c6_negative_raw" 2>&1); rc=$?; sum=$(echo "$out" | grep '^SUMMARY' | tail -1)
   echo "$out" | grep -E '^  FAIL' | sed 's/^/     /'
