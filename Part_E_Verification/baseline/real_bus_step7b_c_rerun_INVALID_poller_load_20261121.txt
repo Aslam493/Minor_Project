@@ -1,0 +1,99 @@
+################ 7b (rerun): forwarder frozen 2 s, status polled every ~0.3 s during the run
+ev_seq=59
+before:  TIMEOUT 27; COUNTER_GAP 11; TRAFFIC_RECOVERED 10; HEARTBEAT_RECOVERED 14;
+STOP at uptime 2092.87
+CONT at uptime 2094.94
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+after:   TIMEOUT 34; COUNTER_GAP 11; TRAFFIC_RECOVERED 12; HEARTBEAT_RECOVERED 20;
+-- events from seq 60
+seq 60 HEARTBEAT_RECOVERED  counter 41446 detail 1 ticks 40398599185
+seq 61 LATE_ANSWER          counter 41468 detail 1 ticks 40420552192
+seq 62 STALE_ANSWER         counter 41490 detail 1 ticks 40442054495
+seq 63 LATE_ANSWER          counter 41501 detail 1 ticks 40452529842
+seq 64 STALE_ANSWER         counter 41523 detail 1 ticks 40474240245
+  returned 5, more=1, ev_lost=44
+seq 65 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 40476212030
+seq 66 LATE_ANSWER          counter 41532 detail 1 ticks 40482468451
+seq 67 STALE_ANSWER         counter 41543 detail 1 ticks 40493596001
+seq 68 LATE_ANSWER          counter 41555 detail 1 ticks 40504683371
+seq 69 TIMEOUT              counter 0 detail 4 ticks 40506534142
+  returned 5, more=1, ev_lost=44
+seq 70 HEARTBEAT_RECOVERED  counter 41558 detail 1 ticks 40507159799
+seq 71 STALE_ANSWER         counter 41568 detail 1 ticks 40517789656
+seq 72 TIMEOUT              counter 0 detail 4 ticks 40535546587
+seq 73 HEARTBEAT_RECOVERED  counter 41626 detail 1 ticks 40573198132
+seq 74 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 40573198132
+  returned 5, more=1, ev_lost=44
+seq 75 STALE_ANSWER         counter 41628 detail 1 ticks 40575584191
+seq 76 LATE_ANSWER          counter 41638 detail 1 ticks 40584980525
+seq 77 TIMEOUT              counter 0 detail 4 ticks 40586757825
+seq 78 STALE_ANSWER         counter 41650 detail 1 ticks 40596670318
+seq 79 LATE_ANSWER          counter 41673 detail 1 ticks 40618760459
+  returned 5, more=1, ev_lost=44
+seq 80 STALE_ANSWER         counter 41684 detail 1 ticks 40630014673
+seq 81 STALE_ANSWER         counter 41706 detail 1 ticks 40651151761
+seq 82 STALE_ANSWER         counter 41728 detail 1 ticks 40672058565
+seq 83 LATE_ANSWER          counter 41741 detail 1 ticks 40684520808
+seq 84 TIMEOUT              counter 0 detail 1 ticks 40711367369
+  returned 5, more=1, ev_lost=44
+seq 85 STALE_ANSWER         counter 41772 detail 1 ticks 40714601632
+seq 86 LATE_ANSWER          counter 41773 detail 1 ticks 40715460268
+seq 87 HEARTBEAT_RECOVERED  counter 41775 detail 1 ticks 40716919359
+seq 88 LATE_ANSWER          counter 41805 detail 1 ticks 40746407433
+seq 89 STALE_ANSWER         counter 41807 detail 1 ticks 40748453200
+  returned 5, more=1, ev_lost=44
+seq 90 STALE_ANSWER         counter 41829 detail 1 ticks 40769671903
+seq 91 TIMEOUT              counter 0 detail 4 ticks 40786851012
+  returned 2, more=0, ev_lost=44
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=454
+
+################ 7c (rerun): heartbeat responder OFF (~6 s) then ON, one-command swap; status polled
+ev_seq=92
+before:  TIMEOUT 35; COUNTER_GAP 11; TRAFFIC_RECOVERED 12; HEARTBEAT_RECOVERED 20;
+SWAP (heartbeat back ON) at uptime 2120.60
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+after:   TIMEOUT 39; COUNTER_GAP 12; TRAFFIC_RECOVERED 13; HEARTBEAT_RECOVERED 24;
+-- events from seq 93
+seq 93 LATE_ANSWER          counter 41976 detail 1 ticks 40911694882
+seq 94 HEARTBEAT_RECOVERED  counter 41978 detail 1 ticks 40913166666
+seq 95 STALE_ANSWER         counter 41988 detail 1 ticks 40923297489
+seq 96 STALE_ANSWER         counter 42008 detail 1 ticks 40943104791
+seq 97 LATE_ANSWER          counter 42020 detail 1 ticks 40954121373
+  returned 5, more=1, ev_lost=80
+seq 98 TIMEOUT              counter 0 detail 4 ticks 40954985893
+seq 99 HEARTBEAT_RECOVERED  counter 42023 detail 1 ticks 40956463092
+seq 100 STALE_ANSWER         counter 42032 detail 1 ticks 40967118852
+seq 101 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 40972951403
+seq 102 LATE_ANSWER          counter 42045 detail 1 ticks 40978250566
+  returned 5, more=1, ev_lost=80
+seq 103 STALE_ANSWER         counter 42077 detail 1 ticks 41009768920
+seq 104 LATE_ANSWER          counter 42079 detail 1 ticks 41011099103
+seq 105 LATE_ANSWER          counter 42101 detail 1 ticks 41032434884
+seq 106 STALE_ANSWER         counter 42103 detail 1 ticks 41034514195
+seq 107 STALE_ANSWER         counter 42123 detail 1 ticks 41054068009
+  returned 5, more=1, ev_lost=80
+seq 108 COUNTER_GAP          counter 1161 detail 1 ticks 41066766086
+seq 109 HEARTBEAT_RECOVERED  counter 2121 detail 0 ticks 41066838050
+seq 110 STALE_ANSWER         counter 42148 detail 1 ticks 41078413052
+seq 111 LATE_ANSWER          counter 42150 detail 1 ticks 41079732595
+seq 112 STALE_ANSWER         counter 42171 detail 1 ticks 41100239169
+  returned 5, more=1, ev_lost=80
+seq 113 LATE_ANSWER          counter 42186 detail 1 ticks 41114460946
+seq 114 STALE_ANSWER         counter 42216 detail 1 ticks 41144053519
+seq 115 LATE_ANSWER          counter 42229 detail 1 ticks 41156060831
+seq 116 LATE_ANSWER          counter 42252 detail 1 ticks 41178300657
+seq 117 STALE_ANSWER         counter 42254 detail 1 ticks 41180615232
+  returned 5, more=1, ev_lost=80
+seq 118 LATE_ANSWER          counter 42276 detail 1 ticks 41201488425
+seq 119 TIMEOUT              counter 0 detail 1 ticks 41207251336
+seq 120 STALE_ANSWER         counter 42300 detail 1 ticks 41225224767
+seq 121 STALE_ANSWER         counter 42320 detail 1 ticks 41244712977
+seq 122 LATE_ANSWER          counter 42321 detail 1 ticks 41244970821
+  returned 5, more=1, ev_lost=80
+seq 123 TIMEOUT              counter 0 detail 4 ticks 41245909289
+seq 124 HEARTBEAT_RECOVERED  counter 42323 detail 1 ticks 41246417958
+seq 125 LATE_ANSWER          counter 42342 detail 1 ticks 41265348147
+seq 126 STALE_ANSWER         counter 42353 detail 1 ticks 41276139234
+seq 127 TIMEOUT              counter 0 detail 4 ticks 41282642933
+  returned 5, more=0, ev_lost=80
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=480

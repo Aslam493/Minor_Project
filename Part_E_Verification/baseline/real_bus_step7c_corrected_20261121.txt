@@ -1,0 +1,27 @@
+################ 7c (corrected): start with a HEALTHY heartbeat, then responder OFF ~6 s, then ON again
+state with heartbeat answered:  last_counter 1471 hb_seq 2247 hb_state ANSWERED hb_miss_count 0 idle_uses 0  traffic_age_ticks 808178084 hb_last_ok_age_ticks 13206068 lease_remaining_ticks 0  TIMEOUT 48 
+ev_seq=152 (events after this are the test's)
+before:  TIMEOUT 48; COUNTER_GAP 13; TRAFFIC_RECOVERED 16; HEARTBEAT_RECOVERED 31;
+SWAP 1: heartbeat responder OFF (traffic still forwarded)
+-- one read about 5 s after the heartbeat responder stopped:
+ last_counter 1541 hb_seq 2256 hb_state OPEN hb_miss_count 4 idle_uses 0
+ traffic_age_ticks 1375742 hb_last_ok_age_ticks 101509014 lease_remaining_ticks 0
+ TIMEOUT 49
+SWAP 2: heartbeat responder back ON
+sent 150 CAN-FD frames on can0 (no key, no HMAC in this script)
+-- one read at the end of the stream, heartbeat answered again:
+ last_counter 1621 hb_seq 2268 hb_state ANSWERED hb_miss_count 0 idle_uses 0
+ traffic_age_ticks 79400067 hb_last_ok_age_ticks 7430752 lease_remaining_ticks 0
+ TIMEOUT 50
+after:   TIMEOUT 51; COUNTER_GAP 13; TRAFFIC_RECOVERED 17; HEARTBEAT_RECOVERED 32;
+-- events from seq 153
+seq 153 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 43530883808
+seq 154 STALE_ANSWER         counter 44724 detail 1 ticks 43567411289
+seq 155 TIMEOUT              counter 0 detail 2 ticks 43629129675
+seq 156 HEARTBEAT_RECOVERED  counter 2258 detail 0 ticks 43698470398
+seq 157 TIMEOUT              counter 0 detail 1 ticks 43822657105
+  returned 5, more=1, ev_lost=112
+seq 158 STALE_ANSWER         counter 45066 detail 1 ticks 43898658604
+seq 159 TIMEOUT              counter 0 detail 4 ticks 43905388789
+  returned 2, more=0, ev_lost=112
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=636

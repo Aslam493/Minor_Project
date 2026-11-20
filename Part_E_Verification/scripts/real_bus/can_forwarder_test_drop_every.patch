@@ -1,0 +1,12 @@
+--- can_forwarder.c.orig	2026-11-21 00:07:07.310283742 +0530
++++ can_forwarder.c	2026-11-21 00:07:07.377196146 +0530
+@@ -113,6 +113,9 @@
+ 			why = cb_unpack(&f, msg);
+ 			if (why != CB_OK) { drop[why]++; if (verbose) printf("  dropped by the forwarder: %s (id 0x%x, len %u)\n", cb_reason(why), f.can_id, f.len); }
+ 			else if (pull) {
++				/* TEST ONLY (env FWD_TEST_DROP_EVERY=N): Linux silently loses every Nth frame it received, to show that Secure World sees the gap */
++				{ static unsigned long seen, tdrop; const char *e = getenv("FWD_TEST_DROP_EVERY"); unsigned long n_ = e ? strtoul(e, NULL, 0) : 0;
++				  if (n_ && ++seen % n_ == 0) { tdrop++; if (verbose) printf("  TEST: dropped frame %lu on purpose (%lu so far)\n", seen, tdrop); received++; continue; } }
+ 				if (cb_q_push(&q, msg) && verbose) printf("  queue full: the oldest packet was dropped\n");
+ 				received++;
+ 			} else {

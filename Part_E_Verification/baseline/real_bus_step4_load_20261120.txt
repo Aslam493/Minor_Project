@@ -1,0 +1,21 @@
+==== BEFORE
+-- receiver
+rx_packets=23 rx_errors=0 rx_dropped=1 rx_over_errors=0 rx_fifo_errors=0 tx_packets=2 tx_errors=0 
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+-- sender
+rx_packets=23 rx_errors=0 tx_packets=21 tx_errors=0 tx_dropped=0 
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  0          0          0          0          0          0         nu
+==== SEND
+sent 1000 in 9.990 s late(>1 period): 0
+==== AFTER
+-- receiver
+rx_packets=1023 rx_errors=0 rx_dropped=1 rx_over_errors=0 rx_fifo_errors=0 tx_packets=2 tx_errors=0 
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+-- sender
+rx_packets=1023 rx_errors=0 tx_packets=1021 tx_errors=0 tx_dropped=0 
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  0          0          0          0          0          0         nu
+receiver log lines: 1000

@@ -1,0 +1,14 @@
+##### Step 3c: reverse direction, receiver -> sender (one classic frame 321#CAFEF00D and one FD 48-byte frame)
+-- before
+rx_packets=21 tx_packets=0 rx_errors=0 tx_errors=0 
+rx_packets=21 tx_packets=21 rx_errors=0 tx_errors=0 
+recv-send classic exit=0
+recv-send fd exit=0
+ (000.000000)  can0  RX - -  321   [4]  CA FE F0 0D
+ (000.003519)  can0  RX B -  321  [48]  AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00 11 22 33 44 55 66 77 00 00
+-- after
+rx_packets=23 tx_packets=2 rx_errors=0 tx_errors=0 
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+rx_packets=23 tx_packets=21 rx_errors=0 tx_errors=0 
+	  0          0          0          0          0          0         nu

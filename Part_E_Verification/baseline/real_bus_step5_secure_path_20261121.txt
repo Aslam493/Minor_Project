@@ -1,0 +1,58 @@
+==== image: page 0: version 1 length 128 boot_id 0xc7bf4b68 flags 0x13 mode 2
+==== BEFORE: receiver can0
+rx_packets=1023 rx_errors=0 rx_dropped=1 tx_packets=2 
+  controller state       ERROR-ACTIVE (0)
+  FD mode                ENABLED
+  error counters (TEC/REC) tx 0  rx 0
+==== SENDER starts: 600 packets, 1 per 100 ms (10/s, 60 s)
+sent 600 CAN-FD frames on can0 (no key, no HMAC in this script)
+==== forwarder output (verdict counts and tail)
+612
+  request 30621: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30623: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30625: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30627: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30629: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30631: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30633: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30635: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30637: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30639: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30641: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30643: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30645: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 30647: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+PULL: frames received from can0 and queued: 600 | requests answered: 1490 (ON_TIME 1490, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 600 | still queued: 0 | dropped by the queue: 0
+SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n 1490 (ON_TIME 1490, LATE 0); p50 in bucket 12-14 ms, p99 in bucket 24-26 ms, slowest in bucket 36-38 ms (2 ms buckets, upper edge is the bound); max since boot 37.214 ms
+LINUX-SIDE reply time, request fetched -> reply returned: n 1490 (lost 0) p50 3869 us, p99 9357 us, max 9837 us
+LINUX-SIDE gap between two request fetches (worst wait before Linux looks): n 4799 (lost 0) p50 13804 us, p99 26050 us, max 34377 us
+CPU COST of this process: 30303 ms CPU in 75059 ms wall = 40.4 % of one core; 10 ms poll() polling; 4800 request fetches; pinned to cores: (not pinned)
+Secure World judged 600 packets in this run; events it raised: TIMEOUT 1 COUNTER_RESYNC 1 HEARTBEAT_RECOVERED 2
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 76 LATE 0 other 0
+can0 rx_packets counter (frames received by the CAN controller): 1023 -> 1623 (+600)
+end state: flags 0x0f last_counter 600 hb_state ANSWERED miss_count 0 starved 0
+==== AFTER: receiver can0
+rx_packets=1623 rx_errors=0 rx_dropped=1 tx_packets=2 
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+==== monitor status
+page 0: version 1 length 128 boot_id 0xc7bf4b68 flags 0x1f mode 2
+  now_ticks 30267619421 core1_poll_age_ticks 4489 poll_count 56814248044
+  skip_count 0 skip_total 186 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 600 hb_seq 1558 hb_state MISSED hb_miss_count 5 idle_uses 0
+  traffic_age_ticks 304371263 hb_last_ok_age_ticks 110655124 lease_remaining_ticks 0
+  ev_seq 7 ev_ack 0 ev_lost 0 pinned_used 4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=186
+==== monitor events
+seq 1 TIMEOUT              counter 0 detail 3 ticks 1352736101
+seq 2 TIMEOUT              counter 0 detail 4 ticks 1352736101
+seq 3 HEARTBEAT_RECOVERED  counter 29360 detail 1 ticks 28719151468
+seq 4 COUNTER_RESYNC       counter 1 detail 0 ticks 28813011898
+seq 5 TIMEOUT              counter 0 detail 1 ticks 29969009506
+  returned 5, more=1, ev_lost=0
+seq 6 TIMEOUT              counter 0 detail 4 ticks 30161758983
+seq 7 TIMEOUT              counter 0 detail 2 ticks 30223313040
+  returned 2, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=186

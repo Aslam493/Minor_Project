@@ -1,0 +1,10 @@
+=== sender@10.237.27.170
+hostname=sender
+6.18.50+rpt-rpi-v7
+ 18:23:25 up 17 min,  2 users,  load average: 0.00, 0.03, 0.05
+Raspberry Pi 3 Model B Rev 1.2
+=== root@10.237.27.187
+hostname=buildroot
+6.7.0-rc6-v8
+ 00:17:11 up 17 min,  load average: 0.00, 0.00, 0.00
+Raspberry Pi 3 Model B

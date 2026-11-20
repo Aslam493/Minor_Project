@@ -1,0 +1,51 @@
+##### SENDER (sender@10.237.27.170): ip -details -statistics link show can0
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 16 qdisc pfifo_fast state UP mode DEFAULT group default qlen 10
+    link/can  promiscuity 0 allmulti 0 minmtu 16 maxmtu 16 
+    can state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  bitrate 500000 sample-point 0.875
+	  tq 25 prop-seg 34 phase-seg1 35 phase-seg2 10 sjw 5 brp 1
+	  mcp251xfd: tseg1 2..256 tseg2 1..128 sjw 1..128 brp 1..256 brp_inc 1
+	  mcp251xfd: dtseg1 1..32 dtseg2 1..16 dsjw 1..16 dbrp 1..256 dbrp_inc 1
+	  tdco 0..63
+	  clock 40000000 
+	  re-started bus-errors arbit-lost error-warn error-pass bus-off
+	  0          0          0          0          0          0         numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 tso_max_size 65536 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus spi parentdev spi0.0 
+    RX:  bytes packets errors dropped  missed   mcast           
+             4       1      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+             4       1      0       0       0       0 
+
+[   16.132749] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+[   16.132795] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+[   16.192453] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) successfully initialized.
+
+
+##### RECEIVER (root@10.237.27.187): canmode can0 (read-only netlink query)
+canmode (read-only RTM_GETLINK)
+interface requested : can0
+interface reported  : can0
+link kind           : can
+flags               : 0x500c1  (administratively UP)
+mtu                 : 16
+operstate           : UP
+CAN attributes:
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  data bit timing        unavailable
+  can clock              40000000 Hz
+  controller state       ERROR-ACTIVE (0)
+  ctrlmode ACTIVE        0x00000000  <>
+  ctrlmode mask word     0x00000000  (kernel leaves this 0 in a GETLINK reply; not the supported set)
+  loopback               disabled
+  listen-only            disabled
+  FD mode                disabled
+  ctrlmode SUPPORTED     0x000001b3  <LOOPBACK,LISTEN-ONLY,BERR-REPORTING,FD,FD-NON-ISO,CC-LEN8-DLC>
+  restart_ms             0 ms
+  error counters (TEC/REC) tx 0  rx 0
+
+3: can0: <NOARP,UP,LOWER_UP40000> mtu 16 qdisc pfifo_fast qlen 10
+    link/[280] 
+rx_packets=1 tx_packets=0 rx_errors=0 tx_errors=0 rx_dropped=1 
+
+[   10.889446] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+[   10.911688] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+[   10.936238] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) successfully initialized.

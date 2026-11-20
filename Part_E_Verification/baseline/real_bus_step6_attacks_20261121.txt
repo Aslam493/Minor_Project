@@ -1,0 +1,54 @@
+==== BEFORE: monitor
+page 0: version 1 length 128 boot_id 0xc7bf4b68 flags 0x1f mode 2
+  now_ticks 32375934677 core1_poll_age_ticks 5325 poll_count 60817794767
+  skip_count 0 skip_total 186 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 600 hb_seq 1668 hb_state MISSED hb_miss_count 115 idle_uses 0
+  traffic_age_ticks 2412686519 hb_last_ok_age_ticks 2218970380 lease_remaining_ticks 0
+==== SENDER: attack file
+sent 36 CAN-FD frames on can0 (no key, no HMAC in this script)
+==== forwarder summary
+  request 33367: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 33369: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+PULL: frames received from can0 and queued: 36 | requests answered: 497 (ON_TIME 497, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 36 | still queued: 0 | dropped by the queue: 0
+Secure World judged 36 packets in this run; events it raised: AUTH_FAIL 1 REPLAY 2 TIMEOUT 3 MALFORMED 1 COUNTER_GAP 1 TRAFFIC_RECOVERED 3 HEARTBEAT_RECOVERED 2
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 26 LATE 0 other 0
+can0 rx_packets counter (frames received by the CAN controller): 1623 -> 1659 (+36)
+end state: flags 0x0f last_counter 636 hb_state ANSWERED miss_count 0 starved 0
+==== EVENTS from seq 8
+seq 8 HEARTBEAT_RECOVERED  counter 33158 detail 1 ticks 32389502587
+seq 9 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 32488299946
+seq 10 TIMEOUT              counter 0 detail 1 ticks 32529702937
+seq 11 AUTH_FAIL            counter 621 detail 0 ticks 32531620074
+seq 12 REPLAY               counter 615 detail 1 ticks 32538341915
+  returned 5, more=1, ev_lost=0
+seq 13 REPLAY               counter 620 detail 3 ticks 32543219844
+seq 14 MALFORMED            counter 621 detail 3 ticks 32549114688
+seq 15 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 32554963281
+seq 16 COUNTER_GAP          counter 625 detail 4 ticks 32554963281
+seq 17 TIMEOUT              counter 0 detail 1 ticks 32560731445
+  returned 5, more=1, ev_lost=0
+seq 18 TIMEOUT              counter 0 detail 1 ticks 32599207476
+seq 19 TIMEOUT              counter 0 detail 4 ticks 32872352146
+seq 20 TIMEOUT              counter 0 detail 2 ticks 32931369520
+  returned 3, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=261
+==== status page 0 / 1
+page 0: version 1 length 128 boot_id 0xc7bf4b68 flags 0x1f mode 2
+  now_ticks 33053438584 core1_poll_age_ticks 5812 poll_count 62104251011
+  skip_count 0 skip_total 261 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 636 hb_seq 1703 hb_state MISSED hb_miss_count 9 idle_uses 0
+  traffic_age_ticks 459996089 hb_last_ok_age_ticks 188995537 lease_remaining_ticks 0
+  ev_seq 20 ev_ack 0 ev_lost 0 pinned_used 7
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=261
+page 1: version 1 length 128 verdict totals frame 636 heartbeat 102 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              10
+  MALFORMED            1
+  COUNTER_GAP          1
+  COUNTER_RESYNC       1
+  TRAFFIC_RECOVERED    3
+  HEARTBEAT_RECOVERED  4
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=261

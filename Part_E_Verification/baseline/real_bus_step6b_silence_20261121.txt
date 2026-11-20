@@ -1,0 +1,13 @@
+##### Step 6b: 2.5 s silence supplement (events from seq 21)
+sent 16 CAN-FD frames on can0 (no key, no HMAC in this script)
+seq 21 HEARTBEAT_RECOVERED  counter 35129 detail 1 ticks 34294451941
+seq 22 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 34392767071
+seq 23 TIMEOUT              counter 0 detail 1 ticks 34416245880
+seq 24 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 34458529529
+seq 25 TIMEOUT              counter 0 detail 1 ticks 34472989342
+  returned 5, more=1, ev_lost=0
+seq 26 TIMEOUT              counter 0 detail 4 ticks 34642699245
+seq 27 TIMEOUT              counter 0 detail 2 ticks 34698334374
+  returned 2, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=305
+  last_counter 652 hb_seq 1793 hb_state OPEN hb_miss_count 6 idle_uses 0

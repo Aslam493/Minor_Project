@@ -1,0 +1,120 @@
+################ 7a: Linux drops every 10th frame for ~10 s (test forwarder, FWD_TEST_DROP_EVERY=10)
+-- before
+page 1: version 1 length 128 verdict totals frame 652 heartbeat 121 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              14
+  MALFORMED            1
+  COUNTER_GAP          1
+  TRAFFIC_RECOVERED    5
+  HEARTBEAT_RECOVERED  6
+ev_seq=27
+sent 99 CAN-FD frames on can0 (no key, no HMAC in this script)
+-- forwarder log (TEST lines)
+9
+PULL: frames received from can0 and queued: 99 | requests answered: 318 (ON_TIME 318, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 90 | still queued: 0 | dropped by the queue: 0
+end state: flags 0x0f last_counter 751 hb_state ANSWERED miss_count 0 starved 0
+-- events from seq 28
+seq 28 HEARTBEAT_RECOVERED  counter 37759 detail 1 ticks 36835571539
+seq 29 LATE_ANSWER          counter 1900 detail 0 ticks 36835805285
+seq 30 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 36912997562
+seq 31 COUNTER_GAP          counter 663 detail 1 ticks 36932526472
+seq 32 COUNTER_GAP          counter 683 detail 1 ticks 36970060920
+  returned 5, more=1, ev_lost=0
+seq 33 COUNTER_GAP          counter 693 detail 1 ticks 36989604473
+seq 34 COUNTER_GAP          counter 713 detail 1 ticks 37028190355
+seq 35 COUNTER_GAP          counter 723 detail 1 ticks 37047446300
+seq 36 COUNTER_GAP          counter 733 detail 1 ticks 37066904178
+seq 37 COUNTER_GAP          counter 743 detail 1 ticks 37086111852
+  returned 5, more=1, ev_lost=0
+seq 38 TIMEOUT              counter 0 detail 1 ticks 37107338477
+seq 39 TIMEOUT              counter 0 detail 4 ticks 37145555479
+seq 40 TIMEOUT              counter 0 detail 2 ticks 37195125256
+  returned 3, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=343
+-- after
+page 1: version 1 length 128 verdict totals frame 742 heartbeat 138 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              17
+  MALFORMED            1
+  COUNTER_GAP          10
+  TRAFFIC_RECOVERED    6
+  HEARTBEAT_RECOVERED  8
+
+################ 7b: forwarder frozen for 2 s (SIGSTOP/SIGCONT) while the sender keeps sending
+-- before
+page 1: version 1 length 128 verdict totals frame 742 heartbeat 138 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              17
+  MALFORMED            1
+  COUNTER_GAP          10
+  TRAFFIC_RECOVERED    6
+  HEARTBEAT_RECOVERED  8
+ev_seq=40
+forwarder STOPPED
+forwarder RESUMED (2 s later)
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+-- events from seq 41
+seq 41 HEARTBEAT_RECOVERED  counter 38353 detail 1 ticks 37409651711
+seq 42 LATE_ANSWER          counter 1930 detail 0 ticks 37409885485
+seq 43 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 37489164481
+seq 44 TIMEOUT              counter 0 detail 4 ticks 37559158778
+seq 45 HEARTBEAT_RECOVERED  counter 38557 detail 1 ticks 37607246631
+  returned 5, more=1, ev_lost=2
+seq 46 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 37607246631
+seq 47 LATE_ANSWER          counter 1940 detail 0 ticks 37607514516
+seq 48 TIMEOUT              counter 0 detail 1 ticks 37723027751
+seq 49 TIMEOUT              counter 0 detail 4 ticks 37794008689
+  returned 4, more=0, ev_lost=2
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=387
+-- after
+page 1: version 1 length 128 verdict totals frame 862 heartbeat 158 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              22
+  MALFORMED            1
+  COUNTER_GAP          10
+  TRAFFIC_RECOVERED    8
+  HEARTBEAT_RECOVERED  11
+
+################ 7c: heartbeat responder OFF for ~5 s (forwarder --no-heartbeat), then back on
+-- before
+page 1: version 1 length 128 verdict totals frame 862 heartbeat 158 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              22
+  MALFORMED            1
+  COUNTER_GAP          10
+  TRAFFIC_RECOVERED    8
+  HEARTBEAT_RECOVERED  11
+ev_seq=50
+heartbeat responder RESTARTED
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+/tmp/fwd7c1.log:PULL: frames received from can0 and queued: 50 | requests answered: 160 (ON_TIME 160, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 50 | still queued: 0 | dropped by the queue: 0
+/tmp/fwd7c1.log:end state: flags 0x17 last_counter 921 hb_state OPEN miss_count 19 starved 0
+/tmp/fwd7c2.log:PULL: frames received from can0 and queued: 44 | requests answered: 160 (ON_TIME 160, LATE 0, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 44 | still queued: 0 | dropped by the queue: 0
+/tmp/fwd7c2.log:heartbeat answers: ON_TIME 9 LATE 0 other 0
+/tmp/fwd7c2.log:end state: flags 0x0f last_counter 991 hb_state ANSWERED miss_count 0 starved 0
+-- events from seq 51
+seq 51 HEARTBEAT_RECOVERED  counter 38985 detail 1 ticks 38020811738
+seq 52 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 38080526516
+seq 53 TIMEOUT              counter 0 detail 4 ticks 38177654957
+seq 54 HEARTBEAT_RECOVERED  counter 39197 detail 1 ticks 38225949749
+seq 55 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 38226440657
+  returned 5, more=1, ev_lost=11
+seq 56 COUNTER_GAP          counter 948 detail 26 ticks 38226440657
+seq 57 TIMEOUT              counter 0 detail 1 ticks 38315340304
+seq 58 TIMEOUT              counter 0 detail 4 ticks 38382531412
+  returned 3, more=0, ev_lost=11
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=426
+-- after
+page 1: version 1 length 128 verdict totals frame 956 heartbeat 167 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               2
+  TIMEOUT              27
+  MALFORMED            1
+  COUNTER_GAP          11
+  TRAFFIC_RECOVERED    10
+  HEARTBEAT_RECOVERED  14

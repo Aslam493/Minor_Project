@@ -1,0 +1,48 @@
+################ 7b (clean rerun): forwarder frozen for 2 s; ONE status read in the middle of the freeze
+ev_seq=128
+before:  TIMEOUT 40; COUNTER_GAP 12; TRAFFIC_RECOVERED 13; HEARTBEAT_RECOVERED 24; STALE_ANSWER 60; LATE_ANSWER 41;
+forwarder STOPPED
+-- one read in the middle of the freeze:
+ last_counter 1260 hb_seq 2171 hb_state OPEN hb_miss_count 1 idle_uses 0
+ traffic_age_ticks 22220321 hb_last_ok_age_ticks 38919306 lease_remaining_ticks 0
+ TIMEOUT 42
+forwarder RESUMED
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+after:   TIMEOUT 44; COUNTER_GAP 12; TRAFFIC_RECOVERED 15; HEARTBEAT_RECOVERED 27; STALE_ANSWER 61; LATE_ANSWER 42;
+-- events from seq 129
+seq 129 HEARTBEAT_RECOVERED  counter 42968 detail 1 ticks 41869525631
+seq 130 LATE_ANSWER          counter 2162 detail 0 ticks 41869752476
+seq 131 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 41950992141
+seq 132 TIMEOUT              counter 0 detail 4 ticks 42007397743
+seq 133 STALE_ANSWER         counter 43152 detail 1 ticks 42048233498
+  returned 5, more=1, ev_lost=90
+seq 134 HEARTBEAT_RECOVERED  counter 43153 detail 1 ticks 42048703599
+seq 135 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 42048703599
+seq 136 TIMEOUT              counter 0 detail 1 ticks 42184619885
+seq 137 TIMEOUT              counter 0 detail 4 ticks 42259637178
+  returned 4, more=0, ev_lost=90
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=519
+
+################ 7c (clean rerun): heartbeat responder OFF ~6 s, then ON (one-command swap); ONE status read while it is off
+ev_seq=138
+before:  TIMEOUT 45; COUNTER_GAP 12; TRAFFIC_RECOVERED 15; HEARTBEAT_RECOVERED 27; STALE_ANSWER 61; LATE_ANSWER 42;
+-- one read while the heartbeat responder is off (about 6 s after it was stopped):
+ last_counter 1380 hb_seq 2196 hb_state MISSED hb_miss_count 13 idle_uses 0
+ traffic_age_ticks 2142009 hb_last_ok_age_ticks 261325275 lease_remaining_ticks 0
+ TIMEOUT 45
+SWAP: heartbeat responder back ON
+sent 120 CAN-FD frames on can0 (no key, no HMAC in this script)
+after:   TIMEOUT 47; COUNTER_GAP 13; TRAFFIC_RECOVERED 16; HEARTBEAT_RECOVERED 29; STALE_ANSWER 62; LATE_ANSWER 44;
+-- events from seq 139
+seq 139 HEARTBEAT_RECOVERED  counter 43518 detail 1 ticks 42401295908
+seq 140 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 42462184143
+seq 141 STALE_ANSWER         counter 43638 detail 1 ticks 42518659831
+seq 142 LATE_ANSWER          counter 43639 detail 1 ticks 42518734202
+seq 143 LATE_ANSWER          counter 2198 detail 0 ticks 42562228966
+  returned 5, more=1, ev_lost=100
+seq 144 COUNTER_GAP          counter 1404 detail 1 ticks 42562731757
+seq 145 HEARTBEAT_RECOVERED  counter 2199 detail 0 ticks 42563995788
+seq 146 TIMEOUT              counter 0 detail 1 ticks 42696984035
+seq 147 TIMEOUT              counter 0 detail 4 ticks 42772803664
+  returned 4, more=0, ev_lost=100
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=569
