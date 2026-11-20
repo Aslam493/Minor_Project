@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1200" height="760" fill="#ffffff"/>
+  <text x="600" y="38" font-size="24" font-weight="bold" text-anchor="middle" fill="#111">Two-Pi test setup: Sender and Receiver (Secure CAN monitor)</text>
+
+  <!-- Laptop -->
+  <rect x="470" y="70" width="260" height="90" rx="8" fill="#e8eef7" stroke="#2b4a7a" stroke-width="2"/>
+  <text x="600" y="108" font-size="18" font-weight="bold" text-anchor="middle" fill="#111">Laptop</text>
+  <text x="600" y="132" font-size="13" text-anchor="middle" fill="#333">SSH to both Pis, runs scripts</text>
+
+  <!-- Router -->
+  <rect x="470" y="235" width="260" height="70" rx="8" fill="#f3f3f3" stroke="#555" stroke-width="2"/>
+  <text x="600" y="268" font-size="18" font-weight="bold" text-anchor="middle" fill="#111">Router / switch</text>
+  <text x="600" y="290" font-size="13" text-anchor="middle" fill="#333">gives each Pi an IP (DHCP)</text>
+  <line x1="600" y1="160" x2="600" y2="235" stroke="#1a7f37" stroke-width="4"/>
+  <text x="612" y="203" font-size="13" fill="#1a7f37">Ethernet or Wi-Fi</text>
+
+  <!-- Sender -->
+  <rect x="60" y="400" width="400" height="190" rx="10" fill="#fff4e0" stroke="#b36b00" stroke-width="2"/>
+  <text x="260" y="432" font-size="20" font-weight="bold" text-anchor="middle" fill="#111">SENDER Pi 3  (32 GB card)</text>
+  <text x="260" y="456" font-size="13" text-anchor="middle" fill="#333">Raspberry Pi OS Lite, user "sender"</text>
+  <rect x="90" y="480" width="340" height="80" rx="6" fill="#ffe3b3" stroke="#b36b00"/>
+  <text x="260" y="508" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Seeed CAN-FD HAT v2 (MCP2518FD)</text>
+  <text x="260" y="530" font-size="13" text-anchor="middle" fill="#333">sits on all 40 GPIO pins, can0 = 500000 bit/s</text>
+  <text x="260" y="548" font-size="13" text-anchor="middle" fill="#333">sends a frame every 50 ms</text>
+
+  <!-- Receiver -->
+  <rect x="740" y="400" width="400" height="190" rx="10" fill="#e6f5ea" stroke="#1a7f37" stroke-width="2"/>
+  <text x="940" y="432" font-size="20" font-weight="bold" text-anchor="middle" fill="#111">RECEIVER Pi 3  (8 GB card)</text>
+  <text x="940" y="456" font-size="13" text-anchor="middle" fill="#333">OP-TEE image, monitor in Secure World</text>
+  <rect x="770" y="480" width="340" height="80" rx="6" fill="#c9ebd2" stroke="#1a7f37"/>
+  <text x="940" y="508" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Seeed CAN-FD HAT v2 (MCP2518FD)</text>
+  <text x="940" y="530" font-size="13" text-anchor="middle" fill="#333">can0 = 500000 bit/s, same settings</text>
+  <text x="940" y="548" font-size="13" text-anchor="middle" fill="#333">reads frames, checks and logs them</text>
+
+  <!-- Ethernet from router to Pis -->
+  <path d="M520 305 L520 350 L260 350 L260 400" fill="none" stroke="#1a7f37" stroke-width="4"/>
+  <path d="M680 305 L680 350 L940 350 L940 400" fill="none" stroke="#1a7f37" stroke-width="4"/>
+  <text x="270" y="342" font-size="13" fill="#1a7f37">Ethernet cable (for SSH only)</text>
+  <text x="700" y="342" font-size="13" fill="#1a7f37">Ethernet cable (for SSH only)</text>
+
+  <!-- CAN bus between HATs -->
+  <line x1="430" y1="505" x2="770" y2="505" stroke="#c0392b" stroke-width="4"/>
+  <line x1="430" y1="525" x2="770" y2="525" stroke="#1f5fbf" stroke-width="4"/>
+  <line x1="430" y1="545" x2="770" y2="545" stroke="#333" stroke-width="3" stroke-dasharray="8 5"/>
+  <text x="600" y="497" font-size="14" font-weight="bold" text-anchor="middle" fill="#c0392b">CAN_H to CAN_H</text>
+  <text x="600" y="520" font-size="14" font-weight="bold" text-anchor="middle" fill="#1f5fbf" dy="14">CAN_L to CAN_L</text>
+  <text x="600" y="562" font-size="14" font-weight="bold" text-anchor="middle" fill="#333">GND to GND</text>
+  <text x="600" y="584" font-size="12" text-anchor="middle" fill="#333">120 ohm termination ON at both ends (HAT jumper)</text>
+  <text x="600" y="606" font-size="12" text-anchor="middle" fill="#c0392b">This is where the CAN frames travel, not the network</text>
+
+  <!-- HDMI monitors -->
+  <rect x="90" y="660" width="170" height="60" rx="6" fill="#ece6f7" stroke="#5b3d99" stroke-width="2"/>
+  <text x="175" y="688" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Monitor / TV</text>
+  <text x="175" y="706" font-size="12" text-anchor="middle" fill="#333">+ USB keyboard (optional)</text>
+  <line x1="175" y1="660" x2="175" y2="590" stroke="#5b3d99" stroke-width="4"/>
+  <text x="185" y="632" font-size="13" fill="#5b3d99">HDMI</text>
+
+  <rect x="940" y="660" width="170" height="60" rx="6" fill="#ece6f7" stroke="#5b3d99" stroke-width="2"/>
+  <text x="1025" y="688" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Monitor / TV</text>
+  <text x="1025" y="706" font-size="12" text-anchor="middle" fill="#333">(optional, see boot screen)</text>
+  <line x1="1025" y1="660" x2="1025" y2="590" stroke="#5b3d99" stroke-width="4"/>
+  <text x="1035" y="632" font-size="13" fill="#5b3d99">HDMI</text>
+
+  <!-- Power -->
+  <rect x="320" y="660" width="170" height="60" rx="6" fill="#fdecea" stroke="#c0392b" stroke-width="2"/>
+  <text x="405" y="688" font-size="14" font-weight="bold" text-anchor="middle" fill="#111">5 V 2.5 A supply</text>
+  <text x="405" y="706" font-size="12" text-anchor="middle" fill="#333">micro-USB, sender</text>
+  <line x1="405" y1="660" x2="405" y2="590" stroke="#c0392b" stroke-width="4"/>
+
+  <rect x="710" y="660" width="170" height="60" rx="6" fill="#fdecea" stroke="#c0392b" stroke-width="2"/>
+  <text x="795" y="688" font-size="14" font-weight="bold" text-anchor="middle" fill="#111">5 V 2.5 A supply</text>
+  <text x="795" y="706" font-size="12" text-anchor="middle" fill="#333">micro-USB, receiver</text>
+  <line x1="795" y1="660" x2="795" y2="590" stroke="#c0392b" stroke-width="4"/>
+
+  <text x="600" y="745" font-size="12" text-anchor="middle" fill="#555">Optional: a USB-UART cable on pins 8/10/6 of the receiver shows its serial boot log (enable_uart=1 is set).</text>
+</svg>

@@ -5,7 +5,7 @@ Everything below was checked against the real backup files. What could **not** b
 
 ## 1. Golden rules
 
-1. **Never write to the original working card.** All flashing and all experiments go to the spare card.
+1. **Never write to the working RECEIVER card.** All flashing and all experiments go to the 8 GB spare. (Card roles changed 2026-11-20, see section 10: the 32 GB card is now the SENDER, the 4 GB card is the backup and must not be flashed.)
 2. **Never guess the device.** Identify the target with `lsblk` and `file /dev/sdX` before every write (section 5, Incident 2).
 3. **A flash is only trusted after a read-back** (`cmp`) and a boot check (`verify_boot.sh`).
 4. **Restore the card and the source together.** An image restores the SD card only; a later rebuild from a still-modified source tree silently recreates the broken firmware (Incident 5). Section 7 covers the source.
@@ -163,3 +163,14 @@ Then check `git status` and `git diff --stat` match the saved diff before buildi
 | P3 | `verify_boot.sh` stopped with "unexpected EOF while looking for matching `'`" | bisected with `head -n N \| bash -n` | a missing closing quote on one line | added the quote; the script now parses (`bash -n`) | syntax-check a script before relying on its output |
 | P4 | `verify_boot.sh` reported FAIL "no SPI CRC errors" on a healthy Pi | looked at which line matched | the driver's banner contains `+CRC_REG +CRC_RX +CRC_TX` (features, not errors) | match `CRC read error` / `CRC write error` only; tested the pattern on a fake error line and on the banner | a check is only trusted after it has been shown to fail when it should, and to pass when it should |
 | P5 | Would the saved diffs really restore the source? | unpacked pinned HEAD with `git archive` into a scratch directory (live repos untouched), applied, compared | n/a | 23 of 23 files equal | a backup is verified by restoring it somewhere safe |
+
+## 10. Card roles (changed 2026-11-20, user decision)
+
+| Card | Role | May be written? |
+|---|---|---|
+| 8 GB | RECEIVER: OP-TEE monitor image | yes, with `scripts/card_helper.sh` (it refuses every other size) |
+| 32 GB | SENDER: Raspberry Pi OS Lite (2026-10-06, 32-bit) | only with a Raspberry Pi OS image, never with a monitor image |
+| 4 GB | BACKUP | no, never flash |
+
+- The old 32 GB card (referred to above as "the original") was overwritten on 2026-11-20 by the user's decision. Its previous contents were **not backed up**: `SD_Card_Backups/sd32gb_before_sender_2026-11-20.img.gz` is an empty 20-byte gzip. Everywhere above that says "the original card is the only copy" is therefore historical. The rollback points are the images listed in section 2.
+- After any card write, compare it byte for byte (`cmp`) before booting. On 2026-11-20 the first sender write was silently corrupted (`kernel7.img` differed in 1018 bytes) and the Pi stopped after the rainbow screen; the second write passed `cmp`.

@@ -4,7 +4,8 @@
 #                                     verify the image against SHA256SUMS, print the exact dd + cmp commands
 #   card_helper.sh identify           while the card is mounted in the laptop: say which known firmware its armstub8.bin is
 #   card_helper.sh pi <ip>            after the card is in the Pi: drop the stale SSH host key for <ip> (backup first) and show the board identity
-# The 32 GB original card must never be written: its size (anything other than 7730102272) makes 'check' refuse.
+# Card roles (changed 2026-11-20): 8 GB = RECEIVER (OP-TEE image, the only card this script accepts); 32 GB = SENDER (Raspberry Pi OS Lite, never gets a monitor image);
+# 4 GB = backup card, must not be flashed. Any size other than 7730102272 makes 'check' refuse, so the 32 GB sender and the 4 GB backup are both protected.
 set -u
 IMG_DIR="$(cd "$(dirname "$0")/../build_scratch/candidate_image" && pwd)"
 SPARE=7730102272
@@ -14,7 +15,7 @@ check)
   disks=$(lsblk -dnb -o NAME,SIZE,TRAN,RM | awk '$3=="usb" && $4=="1" {print $1" "$2}')
   [ "$(echo "$disks" | grep -c .)" = 1 ] || { echo "REFUSED: expected exactly one removable USB disk, found: ${disks:-none}"; exit 3; }
   dev=/dev/$(echo "$disks" | cut -d' ' -f1); size=$(echo "$disks" | cut -d' ' -f2)
-  [ "$size" = "$SPARE" ] || { echo "REFUSED: $dev is $size bytes, not the 8 GB spare ($SPARE). This may be the 32 GB original; do not write it."; exit 4; }
+  [ "$size" = "$SPARE" ] || { echo "REFUSED: $dev is $size bytes, not the 8 GB spare ($SPARE). This may be the 32 GB SENDER card or the 4 GB BACKUP card; do not write it."; exit 4; }
   for p in $(lsblk -nlo NAME,MOUNTPOINT "$dev" | awk 'NF==2 {print "/dev/"$1}'); do umount "$p" || { echo "could not unmount $p"; exit 5; }; done
   want=$(grep " $(basename "$img")\$" "$IMG_DIR/SHA256SUMS" | tail -1 | cut -d' ' -f1); have=$(sha256sum "$img" | cut -d' ' -f1)
   [ -n "$want" ] && [ "$want" = "$have" ] || { echo "REFUSED: image hash $have does not match SHA256SUMS (${want:-no entry})"; exit 6; }

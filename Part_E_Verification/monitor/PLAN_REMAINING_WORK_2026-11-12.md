@@ -115,4 +115,4 @@ My earlier board log used the label `T10b` for "recovery after silence"; that is
 **Cut rule:** if the flash has not passed its regression by Friday 14:00, the Secure World changes are dropped and the soaks run on the current proven image (which is already verified); `IDLE_EXPIRED` and the UART line then stay "built, not flashed".
 
 ## 5. What I will not do
-No TF-A change, no edit of `rpi3_can_fiq.c`, commands 0-16 and their numbers unchanged, no memcpy/memset/unbounded work inside a lock hold, keys and MAC contexts never readable, no writing of the 32 GB card, no push without your OK, no claim beyond the evidence.
+No TF-A change, no edit of `rpi3_can_fiq.c`, commands 0-16 and their numbers unchanged, no memcpy/memset/unbounded work inside a lock hold, keys and MAC contexts never readable, no writing of the 4 GB backup card or of the 32 GB sender card with a monitor image (card roles changed 2026-11-20), no push without your OK, no claim beyond the evidence.
