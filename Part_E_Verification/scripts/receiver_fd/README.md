@@ -13,3 +13,6 @@ A new image composed from the Sep-20 base would carry the OLD S12can (classic 50
 `usr/sbin/canfdcfg` to the overlay (or to compose_image.sh) before the next flash.
 Rollback on the Pi: `cp /root/S12can.orig-classic /etc/init.d/S12can` (or delete /usr/sbin/canfdcfg; S12can then falls back to classic).
 Sender: `/etc/systemd/system/can0-up.service` (FD 500000/2000000); old unit kept as `can0-up.service.bak-classic`.
+
+## Buildroot overlay (done 2026-11-22, local commit, not built yet)
+`optee_full/build/br-ext/board/rpi3/overlay/etc/init.d/S12can` is now the permanent-FD script (sha256 40c757cd...) and `overlay/usr/sbin/canfdcfg` is the static aarch64 binary (sha256 178546af...ada4f6), both mode 0755, committed in the `optee_full/build` tree as `9ec01a8` (NOT pushed: that tree's remote is the upstream OP-TEE build repository). A full Buildroot build was NOT run (hours); the composed image `rpi3-sdcard-monitor-modeP-p6-n04-nostk.img` already carries the same two files through `compose_image.sh` ROOTFS_ADD, verified by read-back hash, mode and a whole-tree comparison.
