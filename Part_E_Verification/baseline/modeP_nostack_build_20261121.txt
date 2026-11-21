@@ -1,0 +1,21 @@
+# Mode P core with CFG_CORE_DEBUG_CHECK_STACKS=n, build and verification, 2026-11-21T21:17:44+05:30
+optee_os HEAD 80b310010cf382c4a981a3cdeffdbfa4045cd466 (monitor Mode P: command 20 page 2 = request latency (issue to answer, 24 buckets of 2 ms, ); uncommitted changes in optee_os: 0
+Part_E HEAD a67e3de
+BUILD off ( CFG_CORE_DEBUG_CHECK_STACKS=n): make exit=0, compiler warnings=0, disassembly lines=94929, instrumented hook calls in the object code=0, tee-pager_v2.bin sha256=78053f878fc52c51
+BUILD on (CFG_RPI3_CAN_MONITOR=y CFG_CORE_DEBUG_CHECK_STACKS=n): make exit=0, compiler warnings=0, disassembly lines=96781, instrumented hook calls in the object code=0, tee-pager_v2.bin sha256=2fefbe174028395b
+BUILD pull (CFG_RPI3_CAN_MONITOR=y CFG_RPI3_CAN_MONITOR_PULL=y CFG_CORE_DEBUG_CHECK_STACKS=n): make exit=0, compiler warnings=0, disassembly lines=97303, instrumented hook calls in the object code=0, tee-pager_v2.bin sha256=feadbe271f86cbc3
+BUILD debug (CFG_RPI3_CAN_MONITOR=y CFG_RPI3_CAN_MONITOR_DEBUG=y CFG_CORE_DEBUG_CHECK_STACKS=n): make exit=0, compiler warnings=0, disassembly lines=96803, instrumented hook calls in the object code=0, tee-pager_v2.bin sha256=24ee414bf6dfc129
+== for comparison: the shipped Mode P core (CHECK_STACKS=y), instrumented hook calls in its object code: 5060
+== host tests (the monitor source is unchanged; they do not depend on the flag)
+make test: total: 440 checks, 0 failed
+make test_ts: total: 1499 checks, 0 failed
+make test_uart: total: 457 checks, 0 failed
+make test_pull: total: 613 checks, 0 failed
+== static checks (text + object code on ns_on and ns_pull)
+static_checks: final monitor code (stages 1-6)
+static_checks: 72 pass, 0 FAIL
+== armstub
+TF-A armstub build exit=0, warnings=0
+-rw-rw-r-- 1 aslam aslam 1295464 Nov 21 21:23 build_scratch/armstub_ns/rpi3/debug/armstub8.bin
+armstub8.bin sha256: 5166aa08ee3b996c2e0f9125a49745f917837ba85ba88662b1f08b67cafe3d47
+DONE

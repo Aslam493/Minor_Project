@@ -1,0 +1,11 @@
+OK   DTB read back from build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04-nostk.img: sha256 e8ac38faebc78f87... (N-04)
+OK   armstub8.bin read back equals build_scratch/armstub_ns/rpi3/debug/armstub8.bin
+OK   boot-partition files that differ from the base: armstub8.bin 
+OK   first 1048576 bytes (partition table) identical to the base
+OK   base root filesystem is clean (e2fsck)
+OK   root filesystem is clean after the additions (e2fsck)
+OK   /usr/sbin/canfdcfg read back from the image: same sha256 as scripts/receiver_fd/canfdcfg_aarch64, mode 0755
+OK   /etc/init.d/S12can read back from the image: same sha256 as scripts/receiver_fd/S12can, mode 0755
+OK   file-by-file comparison of the whole root filesystem: only the added/replaced files differ: /etc/init.d/S12can /usr/sbin/canfdcfg 
+IMAGE build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04-nostk.img sha256 9700049351af848f6a57035e14d9007a3b07c18c319d4ae9926691623c0f6eec
+compose_image: ALL CHECKS PASS
