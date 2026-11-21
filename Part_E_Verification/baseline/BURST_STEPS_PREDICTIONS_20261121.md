@@ -59,3 +59,9 @@ At 1200 and at 600 MHz: every reply under 3 ms, LATE_ANSWER 0, late heartbeat 0 
 
 ## Prediction for step 3b: CB_QCAP 256 -> 2048 (forwarder only; same image, same settings, written before the build and runs)
 Memory: 2048 x 44 = 90 KB. Expected on the 1004-frame burst (1200 MHz, --rcvbuf 4 MiB, batch 32): judged 1004 (all), queue dropped 0, kernel drops 0, chip loss 0, the four planted classes exact (AUTH_FAIL 1, REPLAY 2, MALFORMED 1, COUNTER_GAP 1 or the counted equivalents), judging window about 1004/640 = 1.6 s (+-0.3 s), reply p99 < 3 ms. LATE_ANSWER and late heartbeat: unknown, they are not caused by the queue; if they persist the preemption hypothesis (step 4) is next. 2000-frame burst (not run yet): 2000 <= 2048 + 640 x burst time, so also expected lossless.
+
+## Prediction for step 4 (runtime only, written before the runs): 5 bursts per sub-step, forwarder = the 3b build, 1200 MHz, --rcvbuf 4 MiB
+Reference (3b, 3 runs, no pinning): LATE_ANSWER 0/1/2, late heartbeat 0/1/1, reply max 8.7/8.8/17.4 ms, judged 1004 each.
+4a only the forwarder pinned to CPUs 2,3 (`--cpus 2,3`; chip interrupt still free on all of 0,2,3 = affinity f): hypothesis "the forwarder is held up by the real-time interrupt/pump threads on its CPU". If true: LATE_ANSWER and late heartbeat fall to 0 in most runs, reply max under 8 ms. If it only helps partly (the interrupt threads still land on 2/3): fewer but not zero. If no change: preemption by those threads is not the cause (then the cause is the delivery of the request itself, e.g. the 1 s scheduling of the Core 1 side).
+4b adds `echo 1 > /proc/irq/186/smp_affinity` (chip interrupt on CPU 0 only). Prediction: LATE 0 in all 5 runs, late heartbeat 0, chip overflow (rx_over_errors) stays 0 (risk: interrupt on one CPU could be slower; judged must stay 1004).
+Honest uncertainty: late events are rare (about 1 per run) so 5 runs distinguish "0 of 5" from "about 1 per run" but not a 20 % rate from 0.
