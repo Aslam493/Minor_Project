@@ -29,7 +29,7 @@ LIMITS = [
 for i, t, e, ev in LIMITS:
     d[i] = {"id": i, "test": t, "expected": "-", "result": "LIMIT", "evidence": e + (" | " + ev if ev != "-" else ""), "file": "-"}
 
-order = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "C1", "C2", "C3", "C4", "C5", "C5b", "C6", "C7", "C8", "C9", "D1a", "D1b", "D2", "D3", "D4", "D5a", "D5b", "D5c", "D5d", "D5e", "D6", "E1", "E2a", "E2b"] + [x[0] for x in LIMITS]
+order = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "C1", "C2", "C3", "C4", "C5", "C5b", "C6", "C7", "C8", "C9", "D1a", "D1b", "D2", "D3", "D4", "D5a", "D5b", "D5c", "D5d", "D5e", "D5f", "D6", "E1", "E2a", "E2b"] + [x[0] for x in LIMITS]
 missing = [o for o in order if o not in d]
 npass = sum(1 for o in order if o in d and d[o]["result"] == "PASS"); nfail = sum(1 for o in order if o in d and d[o]["result"] == "FAIL"); nlim = sum(1 for o in order if o in d and d[o]["result"] == "LIMIT")
 
@@ -77,7 +77,7 @@ L.append("## What is not shown\n")
 L.append("- A3 checks the DTB hash on the image that was flashed (compose read-back, `dd` + `cmp` MATCH) and the live reserved-memory node, not a hash of the live device tree (the bootloader may modify it).")
 L.append("- D6 frames per socket buffer is derived (linear from a measured point), not measured at 8 MiB.")
 L.append("- C9 shows LATE only (8 in 40 freezes); STALE was not triggered (F10).")
-L.append("- The sustained-rate claim up to 640 frames/s rests on a measured 480 frames/s run and the measured judging rate of 640.0 frames/s; a sustained run at 600-640 frames/s was not made.")
+L.append("- The sustained-rate claim up to 640 frames/s rests on lossless runs at 480 and 603 frames/s (D5b, D5f) and the measured judging rate of 640.0 frames/s; a sustained run closer to 640 (for example 630) was not made.")
 L.append("- Generated %s by scripts/final_campaign/make_report.py from baseline/final_campaign/results.json." % time.strftime("%F %T"))
 open(os.path.join(PV, "FINAL_TEST_REPORT.md"), "w").write("\n".join(L) + "\n")
 print("%d PASS / %d FAIL / %d documented limits; missing: %s; fails: %s" % (npass, nfail, nlim, missing, fails))

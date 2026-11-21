@@ -1,0 +1,12 @@
+# EXPECTED for a paced rate test, written BEFORE sending, only if NOTHING is lost
+last_counter_start=13030
+frames_attempted=9000
+frames_judged=9000
+AUTH_FAIL=0
+REPLAY=0
+MALFORMED=0
+COUNTER_GAP=0
+COUNTER_RESYNC=0
+ACCEPTED=9000
+last_counter_end=22030
+plain=1

@@ -277,5 +277,14 @@
   "evidence": "heartbeat: 10 of 10 match (first MISSED <=> first LATE, later answers on time); packet request: 10 of 10 match; first-state MISSED in 2 hb runs",
   "file": "baseline/final_campaign/E1.txt",
   "time": "2026-11-22 00:53:34"
+ },
+ "D5f": {
+  "id": "D5f",
+  "test": "Sustained 603 frames/s x3 (below 640)",
+  "expected": "0 loss at every stage, Secure World gap 0, queue empty",
+  "result": "PASS",
+  "evidence": "series s9_ (9000 frames each, paced 5x1 ms + 7x2 ms): sender rate 603.7 / 601.3 / 602.7 frames/s; 27000 of 27000 judged, lost: sender 0, chip 0, socket 0, forwarder-rejected 0, Mode P queue 0; gap 0 = 0 in 3 of 3; identity PASS 3 of 3; judging window s: min 14.25 median 14.25 max 14.29; reply p99 1.76-1.80 ms. Prediction met (rate 604 predicted); the window is 14.25 s, not the 14.9 s predicted (it is measured between the first and last judged frame, the sender duration includes start and end).",
+  "file": "baseline/final_campaign/D5f_s9_.txt",
+  "time": "2026-11-22"
  }
 }

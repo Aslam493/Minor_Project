@@ -1,6 +1,6 @@
 # FINAL TEST REPORT: Secure CAN Monitor, Raspberry Pi 3 B, Mode P (2026-11-22)
 
-**Summary: 30 PASS / 1 FAIL / 10 documented limits**
+**Summary: 31 PASS / 1 FAIL / 10 documented limits**
 
 FAIL cases: E2b. Each FAIL is explained below; nothing was changed to turn it into a PASS.
 
@@ -47,6 +47,7 @@ Evidence: D1-D5 (273,000+ frames, 18 of 18 runs with the exact Secure World gap 
 | D5c | Sustained 943 frames/s x3 (above 640) | drops counted at one stage, equal to the gap | **PASS** | series s8b_: ALL PASS (0 run(s) with an uncounted frame or a missing run; / {'att': 42000, 'judged': 32797, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 9203, 'rej': 0} / judging window s: min 17.16 median 17.16 max 17.21  | `baseline/final_campaign/D5c_s8b_.txt` |
 | D5d | Lossless limit: 2400 frames x3 and 2600 frames x3 | 2400 lossless; 2600 counted drops | **PASS** | series s7a_: ALL PASS (0 run(s) with an uncounted frame or a missing run; / {'att': 7200, 'judged': 7200, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} / judging window s: min 3.73 median 3.73 max 3.73 (2600: see D5e) | `baseline/final_campaign/D5d_s7a_.txt` |
 | D5e | 2600-frame burst x3 | counted drops = gap | **PASS** | series s7b_: ALL PASS (0 run(s) with an uncounted frame or a missing run; / {'att': 7800, 'judged': 7528, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 272, 'rej': 0} / judging window s: min 3.88 median 3.93 max 3.93  | `baseline/final_campaign/D5e_s7b_.txt` |
+| D5f | Sustained 603 frames/s x3 (below 640) | 0 loss at every stage, Secure World gap 0, queue empty | **PASS** | series s9_ (9000 frames each, paced 5x1 ms + 7x2 ms): sender rate 603.7 / 601.3 / 602.7 frames/s; 27000 of 27000 judged, lost: sender 0, chip 0, socket 0, forwarder-rejected 0, Mode P queue 0; gap 0 = 0 in 3 of 3; identity PASS 3 of 3; judging window s: min 14.25 median 14.25 max 14.29; reply p99 1.76-1.80 ms. Prediction met (rate 604 predicted); the window is 14.25 s, not the 14.9 s predicted (it is measured betw... | `baseline/final_campaign/D5f_s9_.txt` |
 | D6 | Bucket sizes | documented | **PASS** | sender txqueuelen 2000 (during the campaign a runtime setting that was 10 after the reboot; made PERSISTENT on 2026-11-22 in the sender's can0-up.service and verified after a sender reboot: qlen 2000, FD 500k/2M, no manual step); receiver can0 tx qlen 10; chip RX FIFO (ethtool -g) current 20, max 24; chip TX ring 4, max 8; forwarder queue CB_QCAP 2048 frames; SO_RCVBUF requested 4194304, granted 8388608 bytes = ab... | `baseline/final_campaign/D6_buckets.txt` |
 | E1 | Restart the forwarder 10x at random phase | only the first answer may be LATE and only when its first state was MISSED (heartbeat and packet request) | **PASS** | heartbeat: 10 of 10 match (first MISSED <=> first LATE, later answers on time); packet request: 10 of 10 match; first-state MISSED in 2 hb runs | `baseline/final_campaign/E1.txt` |
 | E2a | Reboot receiver: monitor back, boot grace respected | no TIMEOUT before G=60 s although heartbeat misses accumulate; forwarder started inside G -> never a TIMEOUT | **PASS** | uptime 48 s: hb_state MISSED hb_miss_count 48 TIMEOUT counter 0 init_ok 1 starved 0 / uptime 49 s: hb_state MISSED hb_miss_count 49 TIMEOUT counter 0 init_ok 1 starved 0 / uptime 55 s: hb_state ANSWERED hb_miss_count 0 TIMEOUT counter 0 init_ok 1 starved 0 | `baseline/final_campaign/A4_E2_reboot.txt` |
@@ -78,5 +79,5 @@ Evidence: D1-D5 (273,000+ frames, 18 of 18 runs with the exact Secure World gap 
 - A3 checks the DTB hash on the image that was flashed (compose read-back, `dd` + `cmp` MATCH) and the live reserved-memory node, not a hash of the live device tree (the bootloader may modify it).
 - D6 frames per socket buffer is derived (linear from a measured point), not measured at 8 MiB.
 - C9 shows LATE only (8 in 40 freezes); STALE was not triggered (F10).
-- The sustained-rate claim up to 640 frames/s rests on a measured 480 frames/s run and the measured judging rate of 640.0 frames/s; a sustained run at 600-640 frames/s was not made.
-- Generated 2026-11-22 01:05:35 by scripts/final_campaign/make_report.py from baseline/final_campaign/results.json.
+- The sustained-rate claim up to 640 frames/s rests on lossless runs at 480 and 603 frames/s (D5b, D5f) and the measured judging rate of 640.0 frames/s; a sustained run closer to 640 (for example 630) was not made.
+- Generated 2026-11-22 01:09:00 by scripts/final_campaign/make_report.py from baseline/final_campaign/results.json.
