@@ -173,3 +173,16 @@ Method: `series_report.py` classifies each late packet reply by time on the forw
 | n7h | 0 (heartbeat log only) | 7 late replies listed, all at 0.01 s after the start | 0; run 20: counter +1 but no listed event (its after-run snapshot is empty, see below) |
 **11 of 11 runs with a trace match.** The two late replies at 22-23 s coincide with the harness's own status snapshot (SNAP_AT): the trace shows fetch calls of 21 ms and 22 ms and a 57.6 ms gap between fetches at 22.3 s, while the burst (4.5-6.1 s) is clean. That is a second cause, introduced by my measurement (a `status` read during the run), not by the burst or the restart. The packet request is OPEN for 40 ms of every 50 ms, so a restart is MISSED in 20 % of the cases; over all 32 runs the late reply at the start occurred 10 times (31 %; the n7h series alone 8 of 21 = 38 %, one standard deviation of chance above 20 %).
 **Harness finding:** in n7h run 20 (a normal paced run) the after-run snapshot of both Pis is empty (`status_after` all None), so the harness deltas are negative (tx_packets -35436 etc.). Not a frame loss: the forwarder side of that run is complete (100 received = 100 handed = 100 judged by its own status delta). `series_report.py` marks such a run UNVERIFIED and demands a rerun; it is not counted as PASS.
+
+## Final pass, step 3: 30 repeats of N=500 (504 frames each), governor powersave 600 MHz: prediction MET
+Report: `python3 scripts/real_bus/series_report.py s3_ 30` (files `burst_20261121_N500_retry_nocd_s3_*`, traces and heartbeat logs `trace_/hblog_20261121_s3_*`).
+| | prediction | result |
+|---|---|---|
+| runs with the identity PASS | 30 of 30 | **30 of 30** |
+| frames judged / sent | 504 each, 0 lost at every stage | 15120 / 15120; lost: sender 0, chip 0, kernel socket 0, forwarder-rejected 0, Mode P queue 0 |
+| judging window (min / median / max) | 0.79 +-0.1 s | **0.76 / 0.76 / 0.81 s** |
+| reply p99 | about 1.7 ms | 1.68-1.72 ms in every run; slowest single reply 2.0 / 8.8 / 17.5 / 26.2 ms (multiples of about 8.7 ms, the chip-interrupt thread time slice) |
+| late heartbeat answers | restart only | 17 (all 17 at restart; 30 of 30 runs: first poll MISSED <=> first answer LATE) |
+| late packet replies | restart only | 7 (all at restart; 30 of 30 runs: first request MISSED <=> late reply); 0 at the 22 s snapshot |
+| chip FIFO loss | 0 (rule of three: below 10 % per burst with 95 % confidence if 0 of 30) | 0 of 30 (rx_over_errors 0 in every run) |
+Late replies: 24 in 30 runs, every one explained by the restart state. No late answer anywhere else.
