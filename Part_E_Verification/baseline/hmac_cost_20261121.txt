@@ -1,0 +1,66 @@
+##### (1) 1200 MHz (performance), CAN traffic OFF
+governor performance 1200000 kHz
+hmac_cost: 30 requests per cell, cpu 2, Mode P image
+  kind     n   median_us   max_us
+  hmac    0         930      1136
+  hmac    1        2035      2233
+  hmac    2        2952      3339
+  hmac    4        5340      5584
+  hmac    8        9370      9767
+  hmac   16       17989     18376
+  hmac   32       35029     35819
+  nohmac  0         926      1129
+  nohmac  1         949      1160
+  nohmac  2         962      1167
+  nohmac  4        1004      1211
+  nohmac  8        1269      1311
+  nohmac 16        1610      1627
+  nohmac 32        2102      2308
+fit hmac  : time = 932 us + 1065.4 us per packet
+fit nohmac: time = 914 us + 38.4 us per packet
+one HMAC (difference of the slopes) = 1027.0 us
+
+##### (2) 1200 MHz, CAN traffic ON (sender loops 1004-frame bursts)
+hmac_cost: 30 requests per cell, cpu 2, Mode P image
+  kind     n   median_us   max_us
+  hmac    0        3897    107373
+  hmac    1        2035    184638
+  hmac    2        3138     41106
+  hmac    4        5159     74467
+  hmac    8        9555    293326
+  hmac   16       17983    301458
+  hmac   32       35221    319260
+  nohmac  0         930    167826
+  nohmac  1         947     39571
+  nohmac  2         962      1178
+  nohmac  4        1194      1206
+  nohmac  8        1264      1282
+  nohmac 16        1612      1827
+  nohmac 32        2101      2324
+fit hmac  : time = 1668 us + 1036.7 us per packet
+fit nohmac: time = 952 us + 37.2 us per packet
+one HMAC (difference of the slopes) = 999.5 us
+frames received by the chip while measuring: 36144
+
+##### (3) 600 MHz (powersave), CAN traffic OFF
+governor powersave 600000 kHz
+hmac_cost: 30 requests per cell, cpu 2, Mode P image
+  kind     n   median_us   max_us
+  hmac    0        3884      4311
+  hmac    1        8897     10351
+  hmac    2       13903     14747
+  hmac    4       23756     24828
+  hmac    8       43362     44297
+  hmac   16       82301     85128
+  hmac   32      161880    164855
+  nohmac  0        3879      4286
+  nohmac  1        3926      5563
+  nohmac  2        4346      4402
+  nohmac  4        4435      4835
+  nohmac  8        5368      5411
+  nohmac 16        6864      6907
+  nohmac 32        9458      9899
+fit hmac  : time = 3918 us + 4929.5 us per packet
+fit nohmac: time = 3874 us + 177.1 us per packet
+one HMAC (difference of the slopes) = 4752.4 us
+RESTORED: governor performance 1200000 kHz
