@@ -37,3 +37,9 @@ The trace (`baseline/burst_20261121_s3t_trace.csv`) shows reply (Secure World ca
 - **3c' batch cap 6 (forwarder `--batch 6`, workaround):** every reply under 40 ms (n=6: 33.7 ms at 600 MHz, less at 1200 MHz), LATE_ANSWER 0, late heartbeat 0, all 1004 judged, drain about 8.4-9 s at 600 MHz (6 per 50 ms), about 4-5 s at 1200 MHz if 2d helps.
 - **3a xtest hash benchmark (small buffers):** expectation for HMAC/SHA-256 of 16 bytes on a Cortex-A53 without crypto extensions: about 20-60 us per operation at 600 MHz in the crypto library itself; each `xtest` operation also pays one TEE invocation (about 3.9 ms measured for the monitor PTA), so a benchmark that does many operations per invocation shows the library speed and one that does one per invocation shows about 4 ms.
 - **3b PTA call cost, no-HMAC vs HMAC, traffic OFF vs ON:** no-HMAC call about 3.4 ms in both, HMAC call about 8.4 ms in both (the 5 ms extra does not depend on CAN traffic); if traffic ON changes the HMAC cost, something is shared with the CAN/SPI path.
+
+## Root-cause check 3b: `hmac_cost` (written before the runs)
+Tool `tools/monitor_client/hmac_cost.c`: answers open Mode P requests with n = 0..32 packets, kind `hmac` (id 0x123, invalid tag: HMAC computed, AUTH_FAIL) and `nohmac` (id 0x124: MALFORMED before the HMAC), times the call. Conditions: (1) 1200 MHz, CAN traffic OFF; (2) 1200 MHz, traffic ON (the sender streams 1004-frame bursts in a loop, no forwarder and no reader on the receiver, the chip and its interrupt still work); (3) 600 MHz (powersave), traffic OFF.
+- (1) nohmac: base about 0.9 ms (the empty reply seen in the trace), slope about 0.02 ms per packet; hmac slope about 1.07 ms per packet; one HMAC about 1.05 ms.
+- (2) the same within +-10 %. If traffic ON is clearly slower, the CAN/SPI activity shares something with the Secure World path.
+- (3) base about 4.0 ms, hmac slope about 4.95, nohmac slope about 0.05, one HMAC about 4.9 ms.
