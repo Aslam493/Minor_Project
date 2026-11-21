@@ -116,12 +116,15 @@ def fwd_parse(text):
     return d
 
 
-def run_one(kind, date, scratch):
+def run_one(kind, date, scratch, idx=0):
     """kind: 'normal' or 'N:policy'. Returns the result dict."""
     if kind == "normal":
         N, policy, tag = 100, "paced", "normal_%s" % time.strftime("%H%M%S")
     else:
         N, policy = int(kind.split(":")[0]), kind.split(":")[1]; tag = "N%d_%s" % (N, policy)
+    nocd = os.environ.get("NOCD") == "1"                      # measurement option: do NOT run the extra candump (to see whether it adds load)
+    if nocd:
+        tag += "_nocd_r%d" % idx                             # the same burst can be repeated: every run gets its own files
     p0 = page0(ssh("root", RX, MCL + " status 0")); L = p0["last_counter"]
     pre = os.path.join(scratch, "burst"); exp_path = os.path.join(BL, "burst_%s_%s.expected.txt" % (date, tag))
     if kind == "normal":
@@ -143,7 +146,7 @@ def run_one(kind, date, scratch):
     sent_ms, sent_order = sender_file_multiset(pre + ".txt")
     b_rx, b_sn = snap_rx(), snap_sn(); M = page0(b_rx)["ev_seq"]
     ssh("root", RX, MCL + " ack %d" % M)
-    ssh("root", RX, "rm -f /tmp/burst_cd.log /tmp/burst_fwd.log; /tmp/candump_aarch64 -d -ta can0 > /tmp/burst_cd.log 2>&1 < /dev/null & echo $! > /tmp/cd.pid; "
+    ssh("root", RX, "rm -f /tmp/burst_cd.log /tmp/burst_fwd.log; " + ("echo 0 > /tmp/cd.pid; : > /tmp/burst_cd.log; " if nocd else "/tmp/candump_aarch64 -d -ta can0 > /tmp/burst_cd.log 2>&1 < /dev/null & echo $! > /tmp/cd.pid; ") +
         "/tmp/can_forwarder run %d --pull --verbose --stats > /tmp/burst_fwd.log 2>&1 < /dev/null & echo $! > /tmp/fwd.pid" % FWD_SECONDS)
     t_start = time.time(); time.sleep(4)
     cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
@@ -160,7 +163,7 @@ def run_one(kind, date, scratch):
     a_rx, a_sn = snap_rx(), snap_sn()
     ev_txt = ssh("root", RX, MCL + " events --from %d --all" % (M + 1))
     time.sleep(max(1, FWD_SECONDS + 3 - (time.time() - t_start)))
-    fwd_txt = ssh("root", RX, "cat /tmp/burst_fwd.log"); cd_txt = ssh("root", RX, "kill $(cat /tmp/cd.pid) 2>/dev/null; sleep 1; cat /tmp/burst_cd.log")
+    fwd_txt = ssh("root", RX, "cat /tmp/burst_fwd.log"); cd_txt = ssh("root", RX, ("" if nocd else "kill $(cat /tmp/cd.pid) 2>/dev/null; ") + "sleep 1; cat /tmp/burst_cd.log")
     # ---- analysis ----
     sx, rx_b, rx_a = stats(b_sn), stats(b_rx), stats(a_rx); sa = stats(a_sn)
     dS = lambda k: sa.get(k, 0) - sx.get(k, 0); dR = lambda k: rx_a.get(k, 0) - rx_b.get(k, 0)
@@ -222,14 +225,14 @@ def main(argv):
     if "ENABLED" not in cm or "ERROR-ACTIVE" not in cm or "FD" not in sn or "ERROR-ACTIVE" not in sn:
         print("ABORT: both sides must be FD and ERROR-ACTIVE"); return 2
     results = []
-    for k in runs:
-        r = run_one(k, date, scratch); results.append(r)
+    for idx, k in enumerate(runs, 1):
+        r = run_one(k, date, scratch, idx); results.append(r)
         print("run %s done: attempted %s, sender ok %s, ENOBUFS %s, receiver can0 %s, forwarder queued %s, handed %s, judged %s" % (
             r["tag"], r["expected"]["frames_attempted"], r["sender"].get("sent_ok"), r["sender"].get("enobufs"), r["rx_can0"], r["fwd"].get("fwd_received_queued"),
             r["fwd"].get("handed_judged"), r["judged"]), flush=True)
         time.sleep(8)
     hdr = ["run", "attempted", "sender_ok", "ENOBUFS", "sender_tx_pk", "rx_can0", "over/fifo/drop/err", "candump_seen", "fwd_queued", "queue_dropped", "handed_judged", "judged", "expected_judged"]
-    with open(os.path.join(BL, "burst_%s_SUMMARY.txt" % date), "w") as f:
+    with open(os.path.join(BL, "burst_%s_SUMMARY%s.txt" % (date, os.environ.get("SUMMARYTAG", ""))), "w") as f:
         f.write("\t".join(hdr) + "\n")
         for r in results:
             f.write("\t".join(str(x) for x in row(r)) + "\n")
