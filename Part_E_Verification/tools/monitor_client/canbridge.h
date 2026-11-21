@@ -37,7 +37,7 @@ int cb_parse_line(const char *line, uint32_t *delay_ms, struct canfd_frame *f);
 
 /* Mode P forwarder queue: the frames received from can0 wait here until Secure World asks. When full, the OLDEST message is dropped (the newest
  * are the ones a real-time monitor needs) and counted; Secure World then sees the counter gap. */
-#define CB_QCAP 256
+#define CB_QCAP 2048
 struct cb_queue { uint8_t m[CB_QCAP][MON_FRAME_LEN]; unsigned head, n; unsigned long dropped; };
 void cb_q_init(struct cb_queue *q);
 int cb_q_push(struct cb_queue *q, const uint8_t msg[MON_FRAME_LEN]);		/* returns 1 if the oldest message was dropped to make room */

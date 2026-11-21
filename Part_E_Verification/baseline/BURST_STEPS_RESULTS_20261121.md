@@ -125,3 +125,15 @@ Same OP-TEE source (`80b310010`), same monitor code; only `CFG_CORE_DEBUG_CHECK_
 | LATE_ANSWER / late heartbeat | 0 / 0 | 1 / 1 | 1 / 1 | 2 / 1 |
 Secure World answers in under 1 ms; judged + queue-dropped = 1004 exactly; the loss moved to the forwarder queue, as the plan said. The window of judging is 0.6-0.66 s (the burst itself lasts 0.28 s).
 **Finding / prediction miss:** LATE_ANSWER (1-2 per run) and one late heartbeat answer in EVERY run remain although each reply call takes under 1 ms. The lateness is therefore not the HMAC any more; the forwarder (a normal-priority process) is held up while the burst arrives (earlier `hmac_cost` with traffic ON showed stalls of 40-319 ms for processes sharing a CPU with the real-time interrupt thread). This is the original preemption hypothesis, now the only remaining cause; test: step 4 (forwarder on CPUs 2,3, chip interrupt on CPU 0).
+
+## Step 3b: forwarder queue CB_QCAP 256 -> 2048 (forwarder sha256 3df5a227..., host test 38 checks 0 failed, cross build 0 warnings), 3 bursts, 1200 MHz, --rcvbuf 4 MiB, batch 32
+| | predicted | r1 | r2 | r3 |
+|---|---|---|---|---|
+| judged | 1004 | 1004 | 1004 | 1004 |
+| dropped by queue / kernel / chip | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| planted classes exact (AUTH_FAIL 1, REPLAY 2, MALFORMED 1, COUNTER_GAP 1) | yes | yes | yes | yes |
+| judging window | 1.6 +- 0.3 s | 1.56 s | 1.56 s | 1.56 s |
+| reply p99 | < 3 ms | 0.85 ms | 0.83 ms | 0.82 ms |
+| reply max | | 8.7 ms | 8.8 ms | 17.4 ms |
+| LATE_ANSWER / late heartbeat | unknown | 0 / 0 | 1 / 1 | 2 / 1 |
+**Prediction met on every stated number.** The 1004-frame burst is now judged completely, exactly, at the design ceiling of 640 frames/s (1004/640 = 1.57 s). **Open:** LATE_ANSWER (0-2 per run) and one late heartbeat answer in 2 of 3 runs although the Secure World call is under 1 ms and the maximum reply time is only 8-17 ms: the forwarder process is sometimes held up for tens of ms while the burst arrives (not the queue, not the HMAC). Next: step 4, forwarder on CPUs 2,3 and the chip interrupt on CPU 0 (runtime only).

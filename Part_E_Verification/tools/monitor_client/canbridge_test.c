@@ -69,10 +69,10 @@ int main(void)
 		memset(a, 0x77, sizeof a); a[0] = 0xFE; a[1] = 0xFE; j = (unsigned)cb_q_push(&q, a);
 		CHECK(j == 1 && q.n == CB_QCAP && q.dropped == 1, "when full the OLDEST is dropped and counted");
 		CHECK(cb_q_peek(&q, 1, out) == 1 && out[0] == 1 && out[1] == 0, "after one overflow the oldest left is message 1");
-		for (k = 0; k < 600; k++) { memset(a, 0, sizeof a); a[0] = (uint8_t)k; a[1] = (uint8_t)(k >> 8); cb_q_push(&q, a); }
+		for (k = 0; k < 2 * CB_QCAP + 88; k++) { memset(a, 0, sizeof a); a[0] = (uint8_t)k; a[1] = (uint8_t)(k >> 8); cb_q_push(&q, a); }
 		{ uint8_t big[CB_QCAP * MON_FRAME_LEN]; static uint8_t chk[CB_QCAP * MON_FRAME_LEN]; unsigned n2 = cb_q_peek(&q, CB_QCAP, big); (void)chk;
-		  for (k = 0; k < n2; k++) { unsigned want = 600 - CB_QCAP + k; if (big[k * 44] != (uint8_t)want || big[k * 44 + 1] != (uint8_t)(want >> 8)) ok = 0; }
-		  CHECK(n2 == CB_QCAP && ok && q.dropped == 1 + 600, "after wrapping many times the queue holds exactly the newest CB_QCAP messages in order"); }
+		  for (k = 0; k < n2; k++) { unsigned want = 2 * CB_QCAP + 88 - CB_QCAP + k; if (big[k * 44] != (uint8_t)want || big[k * 44 + 1] != (uint8_t)(want >> 8)) ok = 0; }
+		  CHECK(n2 == CB_QCAP && ok && q.dropped == 1 + 2 * CB_QCAP + 88, "after wrapping many times the queue holds exactly the newest CB_QCAP messages in order"); }
 	}
 	printf("canbridge_test: %d checks, %d failed\n", n_pass + n_fail, n_fail);
 	return n_fail != 0;
