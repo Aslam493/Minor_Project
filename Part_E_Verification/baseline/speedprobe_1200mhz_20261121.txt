@@ -1,0 +1,13 @@
+-rw-r--r--    1 root     root        114096 Jan  1 02:01 5a3
+bind-mounted RAM dir over /lib/optee_armtz: 1 file(s) visible
+governor performance 1200000 kHz
+speedprobe (loops run inside the secure world, S-EL0), milliseconds:
+  A register-only loop, 2,000,000 iterations      :      9 ms   (Cortex-A53 with caches at 1.2 GHz: about 8-15)
+  B 200 passes over 16 KiB (L1-resident)          :      2 ms   (about 1-3)
+  C 20 passes over 256 KiB (L2-resident)          :      4 ms   (about 3-8)
+  D 2000 cheap system calls (TEE_GetSystemTime)   :    481 ms   (about 2-6)
+  E 50 HMAC-SHA256 of 12 bytes (TEE API)          :     98 ms   (about 1-3)
+  F 50 SHA-256 of 64 bytes (TEE API)              :     61 ms   (about 1-3)
+  (checksum 1516129008, distinct millisecond steps seen in a short loop: 4811)
+client exit=0
+unmounted; stock TAs visible again: 37
