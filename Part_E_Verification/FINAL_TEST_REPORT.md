@@ -1,6 +1,6 @@
 # FINAL TEST REPORT: Secure CAN Monitor, Raspberry Pi 3 B, Mode P (2026-11-22)
 
-**Summary: 31 PASS / 1 FAIL / 12 documented limits**
+**Summary: campaign 31 PASS / 1 FAIL (E2b) / 12 limits; post-flash (service image): E2b PASS (boot + software reboot), A1, A4, B1, A2 (service stopped) PASS; post-flash FAIL rows (E2ar, A2r, B1r, E2c) kept with their explanations.**
 
 FAIL cases: E2b. Each FAIL is explained below; nothing was changed to turn it into a PASS.
 
@@ -61,13 +61,13 @@ Evidence: D1-D5 (273,000+ frames, 18 of 18 runs with the exact Secure World gap 
 | F7 | CAN chip FIFO and `can1` | - | **LIMIT** | documented: the chip RX FIFO holds 20 frames (max 24); with the old slow core 2 of about 16 heavy bursts overflowed it (counted in `rx_over_errors`); with the current core no overflow in any run of this report (about 270,000 frames, bursts at the full bus rate); `can1` (CE1) is dead on both shields (board level) / D6, baseline/can1_investigation_20261121.md | - |
 | F8 | Pi 3 has no TZASC; detection only | - | **LIMIT** | documented: Linux is kept out of the secure DRAM by the DTB reservation (A3, N-04) and not by hardware protection of Secure World memory; the monitor detects and reports, it prevents nothing / A3; memory-isolation options are stored in the repo | - |
 | F11 | board_full_check.sh must run with the forwarder service STOPPED | - | **LIMIT** | documented: its heartbeat tests (E13-E18) play the heartbeat responder themselves ('responder silent 5 s', 'responder back'); with the boot service answering in parallel they FAIL (A2r: 27 PASS, 5 FAIL); with the service stopped: 32 PASS, 0 FAIL (A2r2) / stop it with `/etc/init.d/S95can_forwarder stop`, start it again afterwards | - |
-| F12 | S95can_forwarder `start`/`restart` over ssh do not return (defect, open) | - | **LIMIT** | documented defect of the script on the card: the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11), so `ssh host '/etc/init.d/S95can_forwarder start'` never returns although the service runs; at boot (init does not wait) and with the output redirected (`start >/dev/null 2>&1 </dev/null`) it is fine; `status` and `stop` return at once / E2c; the fix (close fds 3-12 in the superviso... | - |
+| F12 | S95can_forwarder `start`/`restart` over ssh do not return (known limit with a workaround; fix queued for the next image) | - | **LIMIT** | known limit of the script on the card (workaround: run `start`/`restart` as `/etc/init.d/S95can_forwarder start >/dev/null 2>&1 </dev/null` over ssh): the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11), so `ssh host '/etc/init.d/S95can_forwarder start'` never returns although the service runs; at boot (init does not wait) and with the output redirected (`start >/dev/null 2>&1 <... | - |
 | F9 | Secure audit log | - | **LIMIT** | out of scope for this campaign (later) | - |
 | F10 | STALE verdict not exercised | - | **LIMIT** | documented: C9 produced 8 LATE Mode P answers (exact, forwarder count = Secure World count); a STALE answer needs the request to advance between fetch and answer (microseconds) and was not triggered in 40 freezes (STALE 0) / C9, baseline/final_campaign/C9.txt | - |
 
 ## After the service image (`...-nostk-svc.img`, flashed by the user on 2026-11-22): reruns A1, A2, A4, E2a, E2b, B1 (decision 1)
 
-The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95can_forwarder` (sha256 `d77dd4a5...674c34`; rollback `9700049351af...0f6eec`). **8 PASS / 4 FAIL in this table.** E2b is fixed: the forwarder starts by itself at boot (uptime 20 s) and the heartbeat is answered before the first ssh login (E2br, E2br2). Of the FAIL rows three are conditions of my test that did not fit (E2ar: my runner required a read within 90 s of boot, but the first login was at uptime 212 s because the address had changed; A2r: board_full_check is itself the heartbeat responder; B1r: first packet after a boot is COUNTER_RESYNC by design); each was rerun with the intended condition and PASSES (E2ar2, A2r2, B1r2). **E2c is a real defect of the script (F12) and stays open.**
+The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95can_forwarder` (sha256 `d77dd4a5...674c34`; rollback `9700049351af...0f6eec`). **8 PASS / 4 FAIL in this table.** E2b is fixed: the forwarder starts by itself at boot (uptime 20 s) and the heartbeat is answered before the first ssh login (E2br, E2br2). Of the FAIL rows three are conditions of my test that did not fit (E2ar: my runner required a read within 90 s of boot, but the first login was at uptime 212 s because the address had changed; A2r: board_full_check is itself the heartbeat responder; B1r: first packet after a boot is COUNTER_RESYNC by design); each was rerun with the intended condition and PASSES (E2ar2, A2r2, B1r2). **E2c is a known limit of the script (F12) with a workaround (redirect the output when starting over ssh); the fix is queued for the next image, no flash before the presentation.**
 
 | ID | Test | Expected | Result | Evidence | File |
 |---|---|---|---|---|---|
@@ -87,7 +87,7 @@ The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95
 ## FAIL cases
 
 - **E2b**: no init script starts can_forwarder (init.d: S01seedrng S01syslogd S02klogd S02sysctl S11modules S12can S30optee S30test-arm-ffa-user S40network S41dhcpcd S50crond S); the forwarder is started by hand from /tmp (RAM); reported as a GAP, not fixed
-- **Post-flash table**: FAIL rows E2ar, A2r, B1r are explained above and have passing reruns (E2ar2, A2r2, B1r2); **E2c is open** (F12).
+- **Post-flash table**: FAIL rows E2ar, A2r, B1r are explained above and have passing reruns (E2ar2, A2r2, B1r2); **E2c is a known limit with a workaround** (F12); fix queued for the next image.
 
 ## Mistakes made during the campaign (all in my test runner, none in the system; the rules were not changed)
 1. B1: the report looked for the series under the wrong name (`b1` instead of tag + index), so a run that had judged 600 of 600 showed MISSING; renamed, no new data needed except that I reran group B.
@@ -106,4 +106,4 @@ The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95
 - D6 frames per socket buffer is derived (linear from a measured point), not measured at 8 MiB.
 - C9 shows LATE only (8 in 40 freezes); STALE was not triggered (F10).
 - The sustained-rate claim up to 640 frames/s rests on lossless runs at 480 and 603 frames/s (D5b, D5f) and the measured judging rate of 640.0 frames/s; a sustained run closer to 640 (for example 630) was not made.
-- Generated 2026-11-22 01:41:56 by scripts/final_campaign/make_report.py from baseline/final_campaign/results.json.
+- Generated 2026-11-22 01:46:08 by scripts/final_campaign/make_report.py from baseline/final_campaign/results.json.

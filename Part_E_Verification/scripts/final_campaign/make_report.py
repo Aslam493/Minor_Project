@@ -24,8 +24,8 @@ LIMITS = [
   "A3; memory-isolation options are stored in the repo"),
  ("F11", "board_full_check.sh must run with the forwarder service STOPPED", "documented: its heartbeat tests (E13-E18) play the heartbeat responder themselves ('responder silent 5 s', 'responder back'); with the boot service answering in parallel they FAIL (A2r: 27 PASS, 5 FAIL); with the service stopped: 32 PASS, 0 FAIL (A2r2)",
   "stop it with `/etc/init.d/S95can_forwarder stop`, start it again afterwards"),
- ("F12", "S95can_forwarder `start`/`restart` over ssh do not return (defect, open)", "documented defect of the script on the card: the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11), so `ssh host '/etc/init.d/S95can_forwarder start'` never returns although the service runs; at boot (init does not wait) and with the output redirected (`start >/dev/null 2>&1 </dev/null`) it is fine; `status` and `stop` return at once",
-  "E2c; the fix (close fds 3-12 in the supervisor, `exec` the redirections) needs a new image: the user decides"),
+ ("F12", "S95can_forwarder `start`/`restart` over ssh do not return (known limit with a workaround; fix queued for the next image)", "known limit of the script on the card (workaround: run `start`/`restart` as `/etc/init.d/S95can_forwarder start >/dev/null 2>&1 </dev/null` over ssh): the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11), so `ssh host '/etc/init.d/S95can_forwarder start'` never returns although the service runs; at boot (init does not wait) and with the output redirected (`start >/dev/null 2>&1 </dev/null`) it is fine; `status` and `stop` return at once",
+  "E2c; fix queued for the NEXT image together with the ev_lost/ack fix and the suppressed count (monitor/NEXT_STEPS.md); no flash before the presentation (user decision 2026-11-22)"),
  ("F9", "Secure audit log", "out of scope for this campaign (later)", "-"),
  ("F10", "STALE verdict not exercised", "documented: C9 produced 8 LATE Mode P answers (exact, forwarder count = Secure World count); a STALE answer needs the request to advance between fetch and answer (microseconds) and was not triggered in 40 freezes (STALE 0)",
   "C9, baseline/final_campaign/C9.txt"),
@@ -45,7 +45,7 @@ def cell(s, n=330):
 
 L = []
 L.append("# FINAL TEST REPORT: Secure CAN Monitor, Raspberry Pi 3 B, Mode P (2026-11-22)\n")
-L.append("**Summary: %d PASS / %d FAIL / %d documented limits**%s\n" % (npass, nfail, nlim, ("  (missing cases: %s)" % ", ".join(missing)) if missing else ""))
+L.append("**Summary: campaign %d PASS / %d FAIL (%s) / %d limits; post-flash (service image): E2b PASS (boot + software reboot), A1, A4, B1, A2 (service stopped) PASS; post-flash FAIL rows (E2ar, A2r, B1r, E2c) kept with their explanations.**\n" % (npass, nfail, ", ".join(o for o in order if o in d and d[o]["result"] == "FAIL"), nlim))
 fails = [o for o in order if o in d and d[o]["result"] == "FAIL"]
 L.append("FAIL cases: %s. %s\n" % (", ".join(fails) or "none", "Each FAIL is explained below; nothing was changed to turn it into a PASS." if fails else ""))
 L.append("""## PACKET_LOSS_VERDICT
@@ -69,7 +69,7 @@ L.append("")
 post = ["E2br", "E2br2", "E2ar", "E2ar2", "A4r", "A1r", "A2r", "A2r2", "B1r", "B1r2", "B1rh", "E2c"]
 ppass = sum(1 for o in post if o in d and d[o]["result"] == "PASS"); pfail = sum(1 for o in post if o in d and d[o]["result"] == "FAIL")
 L.append("## After the service image (`...-nostk-svc.img`, flashed by the user on 2026-11-22): reruns A1, A2, A4, E2a, E2b, B1 (decision 1)\n")
-L.append("The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95can_forwarder` (sha256 `d77dd4a5...674c34`; rollback `9700049351af...0f6eec`). **%d PASS / %d FAIL in this table.** E2b is fixed: the forwarder starts by itself at boot (uptime 20 s) and the heartbeat is answered before the first ssh login (E2br, E2br2). Of the FAIL rows three are conditions of my test that did not fit (E2ar: my runner required a read within 90 s of boot, but the first login was at uptime 212 s because the address had changed; A2r: board_full_check is itself the heartbeat responder; B1r: first packet after a boot is COUNTER_RESYNC by design); each was rerun with the intended condition and PASSES (E2ar2, A2r2, B1r2). **E2c is a real defect of the script (F12) and stays open.**\n" % (ppass, pfail))
+L.append("The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95can_forwarder` (sha256 `d77dd4a5...674c34`; rollback `9700049351af...0f6eec`). **%d PASS / %d FAIL in this table.** E2b is fixed: the forwarder starts by itself at boot (uptime 20 s) and the heartbeat is answered before the first ssh login (E2br, E2br2). Of the FAIL rows three are conditions of my test that did not fit (E2ar: my runner required a read within 90 s of boot, but the first login was at uptime 212 s because the address had changed; A2r: board_full_check is itself the heartbeat responder; B1r: first packet after a boot is COUNTER_RESYNC by design); each was rerun with the intended condition and PASSES (E2ar2, A2r2, B1r2). **E2c is a known limit of the script (F12) with a workaround (redirect the output when starting over ssh); the fix is queued for the next image, no flash before the presentation.**\n" % (ppass, pfail))
 L.append("| ID | Test | Expected | Result | Evidence | File |")
 L.append("|---|---|---|---|---|---|")
 for o in post:
@@ -80,7 +80,7 @@ L.append("")
 L.append("## FAIL cases\n")
 for o in fails:
     L.append("- **%s**: %s" % (o, cell(d[o]["evidence"], 600)))
-L.append("- **Post-flash table**: FAIL rows E2ar, A2r, B1r are explained above and have passing reruns (E2ar2, A2r2, B1r2); **E2c is open** (F12).")
+L.append("- **Post-flash table**: FAIL rows E2ar, A2r, B1r are explained above and have passing reruns (E2ar2, A2r2, B1r2); **E2c is a known limit with a workaround** (F12); fix queued for the next image.")
 L.append("""
 ## Mistakes made during the campaign (all in my test runner, none in the system; the rules were not changed)
 1. B1: the report looked for the series under the wrong name (`b1` instead of tag + index), so a run that had judged 600 of 600 showed MISSING; renamed, no new data needed except that I reran group B.

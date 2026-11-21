@@ -1,7 +1,7 @@
 # NEXT_STEPS.md (rewritten 2026-11-12; the 2026-11-09 handoff it replaces is in git history and `source_snapshots/20261112_u0_pre/`)
 
 ## State right now (checked on the Pis 2026-11-21; the 2026-11-12 lines it replaces are in git history)
-- **Receiver:** Pi 3 B at **10.237.27.77** (DHCP: it was .187 until the reflash of 2026-11-21; it can change on every reboot), 8 GB card, **Mode P image with the N-04 DTB** (`rpi3-sdcard-monitor-modeP-p6-n04.img`, sha256 `cf954724...`). `verify_boot` 16 pass / 0 FAIL / 2 skipped; `board_full_check.sh --mode-p` **32 PASS / 0 FAIL / 4 SKIP** (C3 PASS). CAN-FD (500000/2000000) comes up by itself at boot (`/usr/sbin/canfdcfg` + `/etc/init.d/S12can`, see `scripts/receiver_fd/`). `teeclnt` has a member `test` (F24 mitigation not in place).
+- **Receiver:** Pi 3 B at **10.237.27.212** since the flash of 2026-11-22 (same board, MAC `b8:27:eb:5c:ba:a9`; DHCP: it was .187, then .77; it changes when the card is re-flashed), 8 GB card, **Mode P image with the N-04 DTB** (`rpi3-sdcard-monitor-modeP-p6-n04.img`, sha256 `cf954724...`). `verify_boot` 16 pass / 0 FAIL / 2 skipped; `board_full_check.sh --mode-p` **32 PASS / 0 FAIL / 4 SKIP** (C3 PASS). CAN-FD (500000/2000000) comes up by itself at boot (`/usr/sbin/canfdcfg` + `/etc/init.d/S12can`, see `scripts/receiver_fd/`). `teeclnt` has a member `test` (F24 mitigation not in place).
 - **Sender:** Pi 3 B at **10.237.27.144** (DHCP), 32 GB card, Raspberry Pi OS Lite, user `sender`, SSH key login from the laptop; `can0-up.service` brings up CAN-FD 500000/2000000 at boot.
 - Real-bus results: `REAL_BUS_RESULTS.md` (steps 1-7 PASS; C3 found and fixed).
 - Components: C1 done (hardware items open), C2 closed, C3 done with accepted deviations, C4 closed with limits, **C5 done with limits (accepted)**, **C6 partial**, C7 not started (a sender Pi now exists and is verified, see below; still no second CAN board for chip B), C8 not started.
@@ -28,3 +28,9 @@ D-A F27 coalescing (the limiter already exists); D-B contention hint signal; D-C
 3. `can1`: physical checks in `baseline/CAN1_INVESTIGATION_20261121.md` (board-level cause; software configuration is correct).
 4. Wording fix: "the forwarder holds no key, but a root attacker could extract the prototype key" in documents and PDFs.
 5. Prototype keys, no TZASC, detection only (unchanged). The sender Pi never holds a key: packets are made on the laptop by `packet_gen.py` and replayed by `laptop_can_send.py`.
+
+
+## Queue for the NEXT image (decided 2026-11-22, no flash before the presentation)
+1. **S95can_forwarder start/restart over ssh never return (E2c, F12).** Known limit; workaround: `ssh root@<receiver> '/etc/init.d/S95can_forwarder start >/dev/null 2>&1 </dev/null'` (same for `restart`). Fix: in `supervise`/`start` close fds 3-12 in the supervisor (`for fd in 3 4 5 6 7 8 9 10 11 12; do eval "exec $fd>&-"; done`) and use `( exec >/dev/null 2>&1 </dev/null; supervise ) &` so that ash keeps no saved copy of the ssh pipes. Test before building: `ssh host 'S95 start'` must return in under 2 s, `status`, `stop`, `restart`, `kill -9` of the daemon, the boot start. Script: `scripts/receiver_service/S95can_forwarder`; overlay copy in `optee_full/build` (local commit).
+2. **Secure World image (separate, with host tests + mutation + 4 builds first):** the `ev_lost`/`ack` fix (C2: `ev_lost` counts only unread overwrites; `ack` must free slots) and the suppressed count (C1: the number of events suppressed by the 1-per-second limit, in the upper 15 bits of the 16-bit event `flags`).
+3. Related notes: `board_full_check.sh` must run with the service stopped (F11); governor stays `powersave`; sender `txqueuelen` is already persistent (no flash).

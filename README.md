@@ -4,6 +4,10 @@ This Minor Project demonstrates a secure CAN-message processing design using
 ARM TrustZone, OP-TEE, Trusted Firmware-A, U-Boot, Linux, and Buildroot on a
 Raspberry Pi 3 Model B or Model B+.
 
+## Test setup note (2026-11-22)
+
+The CAN monitor test setup uses two Raspberry Pi 3 B boards on the same network. The **receiver** (OP-TEE, 8 GB card, Mode P image `rpi3-sdcard-monitor-modeP-p6-n04-nostk-svc.img`) is now at **10.237.27.212** (DHCP; the same board as before, MAC `b8:27:eb:5c:ba:a9`, the address changed when the card was re-flashed); the **sender** (Raspberry Pi OS Lite, 32 GB card) is at 10.237.27.144 (DHCP). Addresses can change after a re-flash, so confirm the MAC first. The receiver starts the Mode P forwarder by itself at boot. Final results: `Part_E_Verification/FINAL_TEST_REPORT.md`; queue for the next image: `Part_E_Verification/monitor/NEXT_STEPS.md`.
+
 ## Current status
 
 Steps 1 through 7 and Steps 9 through 10 are complete. Physical HDMI boot is confirmed;

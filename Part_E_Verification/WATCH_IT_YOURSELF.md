@@ -4,7 +4,10 @@ You send CAN-FD packets from the **sender Pi** over the real bus, see the raw fr
 Everything below is a command you type; under each one is what you should see, with a **real line from the runs of 2026-11-20/21** (`baseline/real_bus_*`).
 
 Current addresses (DHCP, they can change after any reboot; check your router for MAC `b8:27:eb:1e:98:02` = receiver):
-**receiver `10.237.27.77`** (Mode P image with N-04), **sender `10.237.27.144`**.
+**receiver `10.237.27.212`** (Mode P image with N-04), **sender `10.237.27.144`**.
+
+> **Important since the image of 2026-11-22:** the receiver starts `can_forwarder` by itself at boot (service `S95can_forwarder`). If this guide tells you to start your own forwarder, first stop the service, otherwise two forwarders answer the Secure World: `ssh root@10.237.27.212 '/etc/init.d/S95can_forwarder stop'`. When you are done: `ssh root@10.237.27.212 '/etc/init.d/S95can_forwarder start >/dev/null 2>&1 </dev/null'` (the redirection matters: without it the ssh command never returns, known limit E2c). You can also skip your own forwarder and just watch the service work: `/tmp/mon_client status 0` shows `hb_state ANSWERED`. The address changed with the flash (same board, MAC `b8:27:eb:5c:ba:a9`).
+
 `bash scripts/watch_live.sh` prints just the commands of this file and copies the tools; `RX=... SN=... bash scripts/watch_live.sh` uses other addresses.
 
 ## Four rules so you do not disturb what you are watching
@@ -22,8 +25,8 @@ What was and was not run: every command comes from tonight's runs **except**: th
 
 ```sh
 cd ~/Minor_Project/Part_E_Verification
-scp tools/monitor_client/mon_client tools/monitor_client/can_forwarder tools/canmode/canmode tools/canutils/candump_aarch64 root@10.237.27.77:/tmp/
-ssh root@10.237.27.77 'chmod +x /tmp/mon_client /tmp/can_forwarder /tmp/canmode /tmp/candump_aarch64'
+scp tools/monitor_client/mon_client tools/monitor_client/can_forwarder tools/canmode/canmode tools/canutils/candump_aarch64 root@10.237.27.212:/tmp/
+ssh root@10.237.27.212 'chmod +x /tmp/mon_client /tmp/can_forwarder /tmp/canmode /tmp/candump_aarch64'
 ```
 
 You see: one progress line per file, each ending in `100%`; the second command prints nothing. `candump_aarch64` is the static `candump` used for tonight's captures (`tools/canutils/README.md`); `mon_client` reads the monitor, `can_forwarder` is the Mode P forwarder with the heartbeat responder, `canmode` reads the CAN settings.
@@ -53,7 +56,7 @@ bash scripts/watch_live.sh attacks
 Check the CAN settings first (optional), then watch the wires. `-td` shows the time since the previous frame, `-x` shows the flags (`B` = bit-rate switch of CAN-FD).
 
 ```sh
-ssh root@10.237.27.77
+ssh root@10.237.27.212
 /tmp/canmode can0 | grep -E "mtu|nominal|data bit|FD mode|controller state"
 /tmp/candump_aarch64 -td -x can0
 ```
@@ -74,7 +77,7 @@ A real gap shows in the first column, e.g. ` (001.028629)  can0  RX B -  123  [4
 It keeps the frames it receives in a queue and hands them to Secure World only when Secure World asks; it also answers the heartbeat. 900 s = 15 minutes; it runs in the background, its report goes to `/tmp/fwd.log`.
 
 ```sh
-ssh root@10.237.27.77
+ssh root@10.237.27.212
 /tmp/can_forwarder run 900 --pull --verbose > /tmp/fwd.log 2>&1 & echo $! > /tmp/fwd.pid
 ```
 

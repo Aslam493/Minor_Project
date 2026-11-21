@@ -5,10 +5,10 @@
 #             laptop_can_send.py to the sender's /tmp/watch/, (5) print the commands of WATCH_IT_YOURSELF.md.
 #   attacks : same, but only files 2..5, counted from the monitor's CURRENT last_counter (use it after a stopped or repeated step).
 #   print   : only print the commands of WATCH_IT_YOURSELF.md. Touches nothing, needs no network.
-# Addresses (DHCP, they change): RX = receiver, default 10.237.27.77; SN = sender, default 10.237.27.144.  Example: RX=10.0.0.5 SN=10.0.0.6 bash scripts/watch_live.sh prepare
+# Addresses (DHCP, they change): RX = receiver, default 10.237.27.212; SN = sender, default 10.237.27.144.  Example: RX=10.0.0.5 SN=10.0.0.6 bash scripts/watch_live.sh prepare
 # Needs ssh key login as root@RX and sender@SN. Changes only RAM files in /tmp on the Pis; no card is written, nothing is rebooted.
 set -u
-RX=${RX:-10.237.27.77}; SN=${SN:-10.237.27.144}
+RX=${RX:-10.237.27.212}; SN=${SN:-10.237.27.144}
 HERE="$(cd "$(dirname "$0")" && pwd)"; PV="$(cd "$HERE/.." && pwd)"; DOC="$PV/WATCH_IT_YOURSELF.md"; MC="$PV/tools/monitor_client"
 SSH="ssh -o BatchMode=yes -o ConnectTimeout=8"; SCP="scp -q -o BatchMode=yes -o ConnectTimeout=8"
 
