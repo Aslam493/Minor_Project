@@ -46,3 +46,17 @@ judged 300 of 300, all MALFORMED, `last_counter` unchanged, kernel drops 0. Repl
 3. The late replies (N5) are caused by batch size times the HMAC cost (batches of 8 to 11 take 44-58 ms), **not** by Linux scheduling. That is why `chrt` did not help.
 4. Hence the targets "1000 frames within 2 s" cannot be met by Normal World changes alone.
 5. New facts: the receiver CPU governor is `powersave` and the clock is 600 MHz (maximum 1.2 GHz); the A53 has no crypto extensions; an HMAC-SHA256 over 12 bytes should take tens of microseconds, so 4.9 ms is far too slow for the work, and the cause is not yet known (candidates: CPU at half speed, software crypto path, memory attributes of the secure world, per-call overhead in the crypto layer).
+
+## Step 2d, receiver CPU governor `powersave` -> `performance` (runtime; only change), 3 runs: the Secure World cost is mostly a CPU-frequency effect
+Before: governor powersave, 600 MHz (min 600, max 1200 MHz, all online CPUs share policy0). After: performance, 1,200,000 kHz on cpu0/2/3 (read back). Reverts at reboot.
+| | 600 MHz | 1200 MHz |
+|---|---|---|
+| plain request fetch | 3.36 ms | **0.86 ms** (3.9x) |
+| empty reply | 3.9 ms | **0.9 ms** |
+| reply cost | 4.0 ms + 4.95 ms/packet | **0.8 ms + 1.07 ms/packet** (4.6x per packet) |
+| heartbeat poll p99 | 8.8 ms | 2.0 ms |
+| 1004-frame drain | 9.9 s (101 fps) | **2.02-2.04 s (492-496 fps)** |
+| reply p99 / max | 58 / 59 ms | 35.0-35.3 / 35.5-47.1 ms |
+Runs: judged 1004 x3, planted exact, kernel drops 0, chip loss 0, batches up to 32 (42-43 replies carry packets), LATE_ANSWER 2 / 0 / 1, STALE 0 / 1 / 1, late heartbeat 1 / 0 / 0, lock timeouts 0, starved 0.
+**Prediction check:** predicted "about 2x faster if CPU-bound" (drain about 5 s); measured 4-5x faster (drain 2 s): the dependence on the clock is stronger than linear, so halving the clock costs more than half the speed (cause not yet known: candidates are memory/bus clocks tied to the ARM clock at 600 MHz, or timer-based waits). The batch of 32 now takes 35 ms, inside the 40 ms deadline but close to it: occasional late replies remain.
+**Side effects to validate before adopting 1200 MHz permanently:** the Core 1 loop cadence is counted in passes (C4 measured pass 26.6 ns, attempt 12.6 us, interval 448 us at 600 MHz); at 1200 MHz it runs about twice as often. `verify_boot` and `board_full_check --mode-p` must be repeated at 1200 MHz.
