@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# S95can_forwarder - starts the Mode P forwarder at boot (E2b fix, 2026-11-22).
+#
+# The Secure World monitor (Mode P) asks for packets every 50 ms and for a heartbeat answer every 1 s; if nobody answers it raises TIMEOUT events
+# (after the boot grace of 60 s). can_forwarder is that answerer: it reads can0, queues the frames (2048 entries, oldest dropped and counted)
+# and hands them to the Secure World. It must therefore run from boot on. S95 = after S12can (can0 up) and S30optee (OP-TEE driver, supplicant).
+#
+# usage: S95can_forwarder start | stop | restart | status
+# Log: /var/log/can_forwarder.log (start, exit status, restarts; the forwarder itself prints its summary only when it ends).
+# No --hblog / --trace / --stats by default (they only add memory use). Settings can be overridden from the environment for tests:
+#   DAEMON, ARGS, PIDFILE, LOGFILE.
+# The forwarder is supervised: if it exits (for example because the TEE is not ready yet) it is started again after 2 s.
+
+DAEMON="${DAEMON:-/usr/bin/can_forwarder}"
+ARGS="${ARGS:---iface can0 run 4000000000 --pull --rcvbuf 4194304}"
+PIDFILE="${PIDFILE:-/var/run/can_forwarder.pid}"
+LOGFILE="${LOGFILE:-/var/log/can_forwarder.log}"
+
+stamp() { date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "-"; }
+
+supervise() {
+	CHILD=""
+	trap 'kill "$CHILD" 2>/dev/null; exit 0' TERM INT
+	while :; do
+		echo "$(stamp) starting: $DAEMON $ARGS" >> "$LOGFILE"
+		$DAEMON $ARGS >> "$LOGFILE" 2>&1 &
+		CHILD=$!
+		wait "$CHILD"
+		echo "$(stamp) can_forwarder exited with status $?; restart in 2 s" >> "$LOGFILE"
+		sleep 2 &
+		CHILD=$!
+		wait "$CHILD"
+	done
+}
+
+running() {
+	[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null
+}
+
+start() {
+	printf 'Starting can_forwarder: '
+	if running; then echo "already running"; return 0; fi
+	if [ ! -x "$DAEMON" ]; then echo "FAIL ($DAEMON is missing)"; return 1; fi
+	mkdir -p "$(dirname "$LOGFILE")" "$(dirname "$PIDFILE")" 2>/dev/null
+	supervise > /dev/null 2>&1 < /dev/null &
+	echo $! > "$PIDFILE"
+	echo "OK"
+}
+
+stop() {
+	printf 'Stopping can_forwarder: '
+	if ! running; then rm -f "$PIDFILE"; echo "not running"; return 0; fi
+	pid="$(cat "$PIDFILE")"
+	kill -TERM "$pid" 2>/dev/null
+	n=0
+	while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 30 ]; do sleep 0.1; n=$((n + 1)); done
+	kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null
+	rm -f "$PIDFILE"
+	echo "OK"
+}
+
+case "$1" in
+	start) start ;;
+	stop) stop ;;
+	restart|reload) stop; start ;;
+	status) if running; then echo "can_forwarder supervisor running (pid $(cat "$PIDFILE"))"; else echo "can_forwarder not running"; exit 1; fi ;;
+	*) echo "Usage: $0 {start|stop|restart|status}"; exit 1 ;;
+esac
+exit $?
