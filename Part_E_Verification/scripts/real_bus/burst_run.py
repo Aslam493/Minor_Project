@@ -130,7 +130,7 @@ def run_one(kind, date, scratch, idx=0):
     elif kind.startswith("wrongid:"):                           # experiment W: N frames with CAN id 0x124, rejected as MALFORMED before the HMAC
         N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "wrongid%d_%s" % (N, policy)
     elif kind.startswith("rate:"):                              # N valid frames PACED by the sender at DELAY_MS between frames (sustained rate test)
-        N, dly = int(kind.split(":")[1]), int(kind.split(":")[2]); policy = "paced"; tag = "rate%d_d%d" % (N, dly)
+        N = int(kind.split(":")[1]); dspec = kind.split(":")[2]; dl = [int(x) for x in dspec.split("-")]; dly = dspec; policy = "paced"; tag = "rate%d_d%s" % (N, dspec)   # DELAY_MS or a repeating pattern such as 1-2-2-1
     elif kind.startswith("plain:"):                             # N valid frames, consecutive counters, NOTHING planted (for the exact gap accounting of overload tests)
         N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "plain%d_%s" % (N, policy)
     else:
@@ -156,9 +156,9 @@ def run_one(kind, date, scratch, idx=0):
         open(exp_path, "w").write("# EXPECTED counts for 10 s of normal traffic, written BEFORE it is sent\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
     elif kind.startswith("rate:"):
         sys.path.insert(0, MC); import packet_gen as g
-        key = g.key_from_source(); lines = ["# rate test: %d valid packets, counters %d..%d, %d ms between frames\n" % (N, L + 1, L + N, dly)]
+        key = g.key_from_source(); lines = ["# rate test: %d valid packets, counters %d..%d, %s ms between frames (repeating)\n" % (N, L + 1, L + N, dly)]
         for i in range(1, N + 1):
-            c = L + i; lines.append(g.line(dly, 0x123, g.packet(key, 0x123, c, 0xC0DE0000 | (c & 0xFFFF)), "valid counter %d" % c))
+            c = L + i; lines.append(g.line(dl[(i - 1) % len(dl)], 0x123, g.packet(key, 0x123, c, 0xC0DE0000 | (c & 0xFFFF)), "valid counter %d" % c))
         open(pre + ".txt", "w").write("".join(lines))
         resync = 1 if L == 0 else 0
         exd = {"last_counter_start": L, "frames_attempted": N, "frames_judged": N, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0, "COUNTER_RESYNC": resync,
