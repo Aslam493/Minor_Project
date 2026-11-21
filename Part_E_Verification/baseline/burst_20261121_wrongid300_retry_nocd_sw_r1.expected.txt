@@ -1,0 +1,11 @@
+# EXPECTED for experiment W, written BEFORE sending: every frame MALFORMED, last_counter unchanged
+last_counter_start=14928
+frames_attempted=300
+frames_judged=300
+AUTH_FAIL=0
+REPLAY=0
+MALFORMED=300
+COUNTER_GAP=0
+COUNTER_RESYNC=0
+ACCEPTED=0
+last_counter_end=14928

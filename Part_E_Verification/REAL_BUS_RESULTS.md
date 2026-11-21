@@ -184,3 +184,19 @@ Two extra experiments, both without any change to the system under test; full te
 - **State after a cold boot (checked at the start of Phase 2, both Pis had rebooted):** FD 500000/2000000 up with nothing set by hand, `10000000-10ffffff : reserved`, monitor `init_ok=1 starved=0`: the fixes of the night survive a second reboot.
 
 Proposals and the decisions needed (D1 to D6) are in the Phase 2 document; **nothing has been changed**, Phase 3 waits for the user's OK.
+
+### 10.8 Fix plan, steps 1 to 3a, the trace and experiment W (2026-11-21)
+
+One change at a time, predictions committed before each step (`baseline/BURST_STEPS_PREDICTIONS_20261121.md`), results in `baseline/BURST_STEPS_RESULTS_20261121.md`. N=1004 frames, sender `retry` unless noted.
+
+| step | change | predicted | measured (3 repeats) | verdict |
+|---|---|---|---|---|
+| 1 | none (baseline) | judged 239 +-2 | **239 / 239 / 239**, socket loss 765, window 2.4 s | met |
+| 2a | receiver `rmem_default = rmem_max = 4 MiB` | 1004 judged, socket loss 0, about 9.7 s | 1004 / 1004 / **980** (24 lost in the chip FIFO in r3), socket loss 0, window 9.9 s | met, chip loss investigated |
+| 2b | sender `txqueuelen 2000`, naive sender | refused sends 0 | **0 / 0 / 0** (was 689 of 1004), 1004 judged x3 | met |
+| 2c | forwarder `chrt -f 50` | p99 under 40 ms or no change | p99 about 59 ms, reply max up to **108 ms**, more STALE answers | no change, tail worse; **not kept** |
+| 3a | forwarder sets its own 4 MiB buffer, exact kernel drop count (validated 765 = 765) | 1004 judged, 0 drops | **1004 x3, kernel drops 0 x3** | met |
+| 3-trace | instrumentation | slow replies not tied to batches | reply = 4.0 ms + 4.95 ms per packet; the 58 ms replies are the batches of 11 | **refuted**, plan-changing |
+| W | 300 wrong-id frames (no HMAC) | fixed per-packet overhead | 0.05 ms per packet: the cost is the HMAC, 4.9 ms each | **refuted** |
+
+Findings: the socket loss is fixed inside the forwarder (steps 2a/3a); the sender loss is fixed by a deeper queue (2b); **the throughput limit is the Secure World time per authenticated packet (about 4.9 ms)**, which also causes the late replies and caps the speed at about 120-140 frames/s inside the 40 ms deadline. **Corrections to sections 10.2 and 10.5:** Secure World is the throughput limit (it lost nothing); the 640/s design ceiling is not reachable; the late replies are not a Linux scheduling effect. The receiver CPU runs at 600 MHz (`powersave`); an HMAC of 12 bytes should be tens of microseconds, so the 4.9 ms is unexplained. Chip FIFO overflow: 2 of 16 heavy bursts so far (17 and 24 frames), unexplained, intermittent. Next steps proposed to the user: see the final report of this session.

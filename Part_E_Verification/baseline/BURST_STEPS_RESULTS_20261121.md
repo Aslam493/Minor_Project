@@ -31,3 +31,18 @@ Judged 239; the forwarder's own new line `socket drops (SO_MEMINFO): 765 frames 
 ## Step 3a, forwarder `--rcvbuf 4194304` (system buffer back at the default 212992), 3 repeats: prediction MET
 judged 1004 / 1004 / 1004, kernel drops reported by the forwarder 0 / 0 / 0, effective buffer 8,388,608 in all (forced 4 MiB, doubled by the kernel), planted counts exact, `last_counter` = expected end, window 9.97 / 9.92 / 9.89 s, no chip loss in these 3. Reply p99 58.8 / 58.8 / 58.1 ms, reply max 215.0 (one outlier) / 64.3 / 59.7 ms, LATE_ANSWER 1 / 1 / 2, STALE 1 / 1 / 1, late heartbeat 0 / 1 / 1, lock timeouts 0, starved 0.
 The socket loss is fixed inside the forwarder itself and every loss at its socket is now counted exactly (kernel counter validated: 765 = 765 in 3a-V). Still slow (9.9 s for 1004 frames): step 3b.
+
+## Step 3-trace (instrumentation only, `--trace`, 1 run with the 3a settings): the reply time is 4.0 ms + 4.95 ms PER PACKET
+`baseline/burst_20261121_s3t_trace.csv` (4,904 events). Same outcome as 3a (judged 1004). Reply (Secure World call) time by batch size, p50: n=0 3.9 ms, n=1 8.9, n=2 13.9, n=3 18.6, n=4 24.0, n=5 28.7, n=6 33.7, n=7 38.3, n=8 43.7, n=9 48.5, n=10 53.4, n=11 58.4 ms (least-squares fit 4.0 ms + 4.95 ms per packet). A plain request fetch costs 3.36 ms (idle and in the drain alike). During the drain: 1004 frames read in 10.18 s (99 request fetches/s, one frame per fetch), 114 of 712 replies over 20 ms, replies about every 100 ms because a reply of 54-58 ms outlasts the 50 ms request period. Heartbeat polls: 38 of 567 took 8.0-8.8 ms (3.4 ms + about 5 ms), about one per second: issuing a fresh challenge computes an HMAC too.
+**Prediction check:** "slow replies are not tied to large batches": REFUTED. The 58 ms replies ARE the batches of 11. **The step 3b prediction (about 1.6 s at 640 frames/s) is refuted by the data before the code was written.**
+
+## Experiment W (300 wrong-id frames, rejected as MALFORMED before the HMAC), forwarder `--rcvbuf 4194304 --trace`
+judged 300 of 300, all MALFORMED, `last_counter` unchanged, kernel drops 0. Reply time at batch 11-12: **5.9 ms** (fit 5.3 ms + 0.05 ms per packet) against 58 ms for valid frames: **the whole per-packet cost is the authentication path, one HMAC about 4.9 ms.** Drain of 300 frames in 1.41 s (about 210 frames/s: with the HMAC out of the way the forwarder's own loop, one frame per 3.4 ms fetch iteration, is the next limit).
+**Prediction check:** my prediction (fixed per-packet overhead, about 4.9 ms per packet also for wrong-id frames) was WRONG.
+
+## What this changes (corrections to earlier statements)
+1. "Secure World was not the bottleneck" (10.2 point 5) is wrong in effect: it lost and refused nothing, but the time it needs per packet is the throughput limit.
+2. "Mode P design ceiling 640 frames/s" is not reachable here: inside the 40 ms reply deadline 4.0 + 4.95 n <= 40 gives n <= 7, so about 120-140 frames/s at best (today 99-103). A reply of 32 packets would take about 160 ms and would be LATE, and 3 missed requests raise TIMEOUT detail 4.
+3. The late replies (N5) are caused by batch size times the HMAC cost (batches of 8 to 11 take 44-58 ms), **not** by Linux scheduling. That is why `chrt` did not help.
+4. Hence the targets "1000 frames within 2 s" cannot be met by Normal World changes alone.
+5. New facts: the receiver CPU governor is `powersave` and the clock is 600 MHz (maximum 1.2 GHz); the A53 has no crypto extensions; an HMAC-SHA256 over 12 bytes should take tens of microseconds, so 4.9 ms is far too slow for the work, and the cause is not yet known (candidates: CPU at half speed, software crypto path, memory attributes of the secure world, per-call overhead in the crypto layer).

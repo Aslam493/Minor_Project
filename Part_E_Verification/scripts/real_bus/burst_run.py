@@ -127,6 +127,8 @@ def run_one(kind, date, scratch, idx=0):
     """kind: 'normal' or 'N:policy'. Returns the result dict."""
     if kind == "normal":
         N, policy, tag = 100, "paced", "normal_%s" % time.strftime("%H%M%S")
+    elif kind.startswith("wrongid:"):                           # experiment W: N frames with CAN id 0x124, rejected as MALFORMED before the HMAC
+        N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "wrongid%d_%s" % (N, policy)
     else:
         N, policy = int(kind.split(":")[0]), kind.split(":")[1]; tag = "N%d_%s" % (N, policy)
     nocd = os.environ.get("NOCD") == "1"                      # measurement option: do NOT run the extra candump (to see whether it adds load)
@@ -148,6 +150,14 @@ def run_one(kind, date, scratch, idx=0):
         exd = {"last_counter_start": L, "frames_attempted": 100, "frames_judged": 100, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0,
                "COUNTER_RESYNC": resync, "ACCEPTED": 100 - resync, "last_counter_end": L + 100}
         open(exp_path, "w").write("# EXPECTED counts for 10 s of normal traffic, written BEFORE it is sent\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
+    elif kind.startswith("wrongid:"):
+        sys.path.insert(0, MC); import packet_gen as g
+        key = g.key_from_source(); lines = ["# experiment W: %d frames with can id 0x124 (MALFORMED before the HMAC)\n" % N]
+        for i in range(1, N + 1):
+            lines.append(g.line(0, 0x124, g.packet(key, 0x124, L + i, 0xC0DE0000 | ((L + i) & 0xFFFF)), "id 0x124 counter %d" % (L + i)))
+        open(pre + ".txt", "w").write("".join(lines))
+        exd = {"last_counter_start": L, "frames_attempted": N, "frames_judged": N, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": N, "COUNTER_GAP": 0, "COUNTER_RESYNC": 0, "ACCEPTED": 0, "last_counter_end": L}
+        open(exp_path, "w").write("# EXPECTED for experiment W, written BEFORE sending: every frame MALFORMED, last_counter unchanged\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
     else:
         out = subprocess.run([sys.executable, os.path.join(MC, "burst_packets.py"), pre, "--last", str(L), "--n", str(N)], capture_output=True, text=True, check=True).stdout
         exd = json.loads(out.splitlines()[0]); os.replace(pre + ".expected", exp_path)

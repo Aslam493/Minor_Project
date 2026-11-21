@@ -1,3 +1,5 @@
+> **SUPERSEDED IN PART, 2026-11-21 (after step 3-trace and experiment W; see `BURST_STEPS_RESULTS_20261121.md`).** The trace shows a Secure World reply costs 4.0 ms + 4.95 ms **per packet** (one HMAC about 4.9 ms; wrong-id packets, rejected before the HMAC, cost 0.05 ms). Therefore: N4's cause is not only the forwarder loop but mainly the Secure World time per packet; N5 (late replies) is caused by batch size x HMAC cost, not by Linux scheduling (so A3 `chrt` was useless and made the tail worse); the "640 frames/s" ceiling and the predictions for B2/B3 (about 1.6 s for 1004 frames) are wrong, the realistic ceiling inside the 40 ms deadline is about 120-140 frames/s (batch 6-7); "Secure World was not the bottleneck" in section 1 is wrong in effect. The measured facts of sections 2 (N1-N3, N6, N7) stand.
+
 # Burst behaviour, Phase 2: causes and proposed fixes (2026-11-21). Nothing has been changed on the Pis or in the code. Waiting for the user's OK.
 
 Data: Phase 1 (`baseline/burst_20261121_*`, `REAL_BUS_RESULTS.md` section 10) plus two experiments done for this phase:
