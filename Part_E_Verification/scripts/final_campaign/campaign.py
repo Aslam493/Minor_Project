@@ -339,6 +339,75 @@ def stage_E1():
             sum(1 for r in rows if r[5] == "hb OK"), sum(1 for r in rows if r[6] == "pk OK"), sum(1 for r in rows if r[1] and r[1][0] == 3)), f)
 
 
+
+# ------------------------------------------------------------------ stage R2: after the service image was flashed (E2b fix). The receiver is NOT rebooted here: the user powered it on with the new card.
+SVC = "/etc/init.d/S95can_forwarder"
+
+
+def stage_R2():
+    log = []
+    t_rx, up_rx = wait_ssh("root", RX, 60)
+    if t_rx is None:
+        print("receiver does not answer at %s" % RX); return
+    # E2b-r: FIRST thing, before any tool is copied: is the forwarder running by itself?
+    first = rx("echo uptime $(cut -d' ' -f1 /proc/uptime); ps | grep -E 'can_forwarder|S95' | grep -v grep; %s status; echo ---log; cat /var/log/can_forwarder.log 2>&1 | head -5; ls -l /usr/bin/can_forwarder %s" % (SVC, SVC))
+    log.append("== E2b-r: receiver at first ssh login (nothing copied yet), reading the process list and the service status\n" + first)
+    up0 = float(re.search(r"uptime ([0-9.]+)", first).group(1)) if re.search(r"uptime ([0-9.]+)", first) else -1
+    running = "can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304" in first and "supervisor running" in first and "starting:" in first
+    B.scp([os.path.join(PV, "tools/monitor_client/mon_client"), os.path.join(PV, "tools/canmode/canmode")], "root", RX, "/tmp/"); rx("chmod +x /tmp/mon_client /tmp/canmode")
+    p0, p1, tt = status(); up1 = float(rx("cut -d' ' -f1 /proc/uptime").strip())
+    log.append("== heartbeat read with a mon_client copied afterwards, uptime %.0f s: hb_state %s hb_miss_count %s TIMEOUT counter %s init_ok %s starved %s" % (up1, p0.get("hb_state"), p0.get("hb_miss_count"), p1.get("ev_TIMEOUT", 0), p0.get("init_ok"), p0.get("starved")))
+    ans = p0.get("hb_state") in ("ANSWERED", "OPEN") and p0.get("hb_miss_count", 99) <= 1
+    f = save("R2_E2b_first_login", "\n".join(log))
+    rec("E2br", "Reboot/boot with the service image: forwarder back by itself (rerun of E2b)", "forwarder running from boot without a manual step, heartbeat answered, no TIMEOUT",
+        "PASS" if (running and ans and p1.get("ev_TIMEOUT", 0) == 0) else "FAIL", "first login at uptime %.0f s: service running=%s; later read at uptime %.0f s: hb_state %s miss %s TIMEOUT %s" % (up0, running, up1, p0.get("hb_state"), p0.get("hb_miss_count"), p1.get("ev_TIMEOUT", 0)), f)
+    rec("E2ar", "Boot with the service image: monitor back, boot grace respected (rerun of E2a)", "init_ok 1, starved 0, TIMEOUT counter 0 at uptime under 60 s", "PASS" if (p0.get("init_ok") == 1 and p0.get("starved") == 0 and p1.get("ev_TIMEOUT", 0) == 0 and up1 < 90) else "FAIL",
+        "uptime %.0f s: init_ok %s starved %s TIMEOUT counter %s hb_state %s" % (up1, p0.get("init_ok"), p0.get("starved"), p1.get("ev_TIMEOUT", 0), p0.get("hb_state")), f)
+    # A4-r: receiver as booted; sender rebooted again
+    rxc = rx("/tmp/canmode can0 | grep -E 'nominal bit timing|data bit timing|controller state|ctrlmode ACTIVE'")
+    sn("sync; (sleep 1; sudo reboot) > /dev/null 2>&1 < /dev/null &", 20); time.sleep(10); t_sn, up_sn = wait_ssh("sender", SN)
+    snc = sn("ip -details link show can0 | grep -E 'qlen|state|bitrate|dbitrate' | head -6; cat /sys/class/net/can0/tx_queue_len")
+    a4 = ("500000" in rxc and "2000000" in rxc and "ERROR-ACTIVE" in rxc and "<FD>" in rxc) and ("bitrate 500000" in snc and "dbitrate 2000000" in snc and "ERROR-ACTIVE" in snc and snc.strip().splitlines()[-1].strip() == "2000")
+    f = save("R2_A4", "== receiver (as booted from the new card, nothing configured by hand)\n" + rxc + "\n== sender after a second reboot (answered ssh after %.0f s)\n" % (t_sn or -1) + snc)
+    rec("A4r", "Both Pis: can0 in CAN-FD 500k/2M with no manual step (receiver first boot of the service image, sender rebooted again)", "receiver and sender FD 500000/2000000 ERROR-ACTIVE, sender qlen 2000", "PASS" if a4 else "FAIL",
+        "receiver: %s | sender: qlen %s, FD %s" % (" ".join(rxc.split())[:120], snc.strip().splitlines()[-1].strip(), "bitrate 500000" in snc and "dbitrate 2000000" in snc), f)
+    # tools for the rest (RAM)
+    restore_tools()
+    # E2c: the service control commands from the image
+    c = []
+    c.append("stop:    " + rx("%s stop; sleep 1; ps | grep -c '[c]an_forwarder'" % SVC).replace("\n", " "))
+    c.append("start:   " + rx("%s start; sleep 4; ps | grep -c '[c]an_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'" % SVC).replace("\n", " "))
+    c.append("restart: " + rx("%s restart; sleep 4; ps | grep -c '[c]an_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'" % SVC).replace("\n", " "))
+    c.append("kill -9 of the daemon: " + rx("kill -9 $(ps | grep '[u]sr/bin/can_forwarder' | awk '{print $1}' | head -1); sleep 5; ps | grep -c '[u]sr/bin/can_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'; tail -3 /var/log/can_forwarder.log").replace("\n", " | "))
+    f = save("R2_E2c", "\n".join(c))
+    okc = "Stopping can_forwarder: OK 0" in c[0] and "ANSWERED" in c[1] and "ANSWERED" in c[2] and "ANSWERED" in c[3] and "exited with status 137" in c[3]
+    rec("E2c", "Service control from the image: stop, start, restart, kill -9 of the daemon", "stop -> no process; start/restart -> heartbeat ANSWERED within 4 s; kill -9 -> restarted by the supervisor", "PASS" if okc else "FAIL", " || ".join(x[:110] for x in c), f)
+    # A1-r, A2-r (service running, realistic configuration)
+    r = subprocess.run(["bash", "./verify_boot.sh", RX, "--expect-core1-pinned"], cwd=os.path.join(PV, "tools/verify_boot"), capture_output=True, text=True, timeout=300)
+    last = [l for l in r.stdout.splitlines() if l.startswith("verify_boot:")]; f = save("R2_A1", r.stdout + r.stderr)
+    rec("A1r", "verify_boot with the service image", "0 FAIL", "PASS" if last and " 0 FAIL" in last[-1] else "FAIL", last[-1] if last else "no summary", f)
+    src = open(os.path.join(PV, "..", "optee_full/optee_os/core/arch/arm/plat-rpi3/rpi3_can_monitor_keys.h")).read(); blk = src[src.index("KEY_FRAME_INIT"):]; blk = blk[:blk.index("}")]
+    open(os.path.join(SCR, "kf"), "w").write("".join(re.findall(r"0x([0-9a-fA-F]{2})", blk))); B.scp([os.path.join(SCR, "kf")], "root", RX, "/tmp/kf"); os.remove(os.path.join(SCR, "kf"))
+    out = rx("cd /tmp && sh /tmp/board_full_check.sh --mode-p 2>&1", 900); rx("rm -f /tmp/kf"); f = save("R2_A2", out)
+    summ = re.findall(r"(\d+) PASS, (\d+) FAIL, (\d+) KNOWN, (\d+) SKIP", out)
+    rec("A2r", "board_full_check.sh --mode-p with the service image (service running)", "0 FAIL", "PASS" if summ and summ[-1][1] == "0" else "FAIL", ("%s PASS, %s FAIL, %s KNOWN, %s SKIP" % summ[-1]) if summ else out[-200:], f)
+    # B1-r: the SERVICE is the forwarder (no harness forwarder); counters before/after
+    time.sleep(3); p0, p1, _ = status(); L = p0["last_counter"]; k = g.key_from_source()
+    open(os.path.join(SCR, "b1r.txt"), "w").write("".join(g.line(20, 0x123, g.packet(k, 0x123, c_, P(c_)), "valid %d" % c_) for c_ in range(L + 1, L + 601)))
+    B.scp([os.path.join(SCR, "b1r.txt")], "sender", SN, "/tmp/burst/"); sendo = sn("python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/b1r.txt", 120); time.sleep(4)
+    q0, q1, _ = status(); d = delta(p1, q1, ATTACK + ("TIMEOUT",)); judged = q1.get("frame_total", 0) - p1.get("frame_total", 0)
+    f = save("R2_B1", "before: last_counter %s frame_total %s | after: last_counter %s frame_total %s\nsender: %s\nclass deltas %s" % (L, p1.get("frame_total"), q0.get("last_counter"), q1.get("frame_total"), sendo.strip()[-200:], d))
+    rec("B1r", "600 valid frames at 50 frames/s with the boot SERVICE as the forwarder (no harness forwarder)", "frame total +600, all attack classes +0, last_counter +600", "PASS" if (judged == 600 and not any(d[x] for x in ATTACK) and q0["last_counter"] == L + 600) else "FAIL",
+        "judged +%d, class deltas %s, last_counter %s -> %s" % (judged, {a: v for a, v in d.items() if v}, L, q0["last_counter"]), f)
+    # B1-rh: the original harness way (service stopped for the run, started again afterwards)
+    rx("%s stop" % SVC); time.sleep(1)
+    env = dict(os.environ, QUIET="1", STEP="b1h1", NOCD="1", SUMMARYTAG="_b1h", FWD_BIN=FWD, FWD_ARGS="--rcvbuf 4194304", SNAP_AT="30")
+    subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "burst_run.py"), "--runs", "rate:600:20", "--date", "20261122"], env=env, capture_output=True, text=True, timeout=400)
+    rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b1h", "1", "--date", "20261122"], capture_output=True, text=True).stdout
+    rx("%s start" % SVC); f = save("R2_B1h", rep)
+    rec("B1rh", "600 valid frames at 50 frames/s, original harness way (service stopped for the run)", "600 judged, identity PASS, 0 loss", "PASS" if ("ALL PASS" in rep and "sent 600 = judged 600" in rep) else "FAIL", " ".join(l.strip() for l in rep.splitlines() if l.startswith(" run"))[:240], f)
+
+
 def main(argv):
     st = argv or ["all"]
     for s_ in st:
@@ -348,6 +417,7 @@ def main(argv):
         if s_ in ("C",): stage_C()
         if s_ in ("D",): stage_D()
         if s_ in ("E1",): stage_E1()
+        if s_ in ("R2",): stage_R2()
 
 
 if __name__ == "__main__":

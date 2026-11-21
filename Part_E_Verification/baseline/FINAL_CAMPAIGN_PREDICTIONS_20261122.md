@@ -30,3 +30,17 @@ Rules: no flash, no Secure World change, no test or threshold changed; read-only
 | E1 | 10 of 10: first-answer LATE <=> first state MISSED for the heartbeat and for the packet request, later heartbeat answers all on time | a mismatch |
 | F | documented limits (not tests): `ev_lost`/ack, key held by Linux in this prototype, event list rate limit, sender txqueuelen not persistent, forwarder not a service, first answer LATE after a restart, late reply at the harness snapshot | |
 Risks I cannot exclude: a reboot can change DHCP addresses (then I stop and ask for the address); the receiver may take longer than 4 minutes to answer; A2's frame tests need the prototype key file copied to /tmp (RAM) and removed afterwards.
+
+## After the service image (`...-nostk-svc.img`): reruns A1, A2, A4, E2a, E2b, B1 (written before the flash, 2026-11-22; decision 1)
+Runner: `scripts/final_campaign/campaign.py R2` (no reboot of the receiver: the user powers it on with the new card; the sender is rebooted again so that A4 covers both Pis). New row ids carry an `r` (rerun after the service image); the first campaign rows stay in the report.
+| ID | Prediction | What would be a surprise |
+|---|---|---|
+| E2b-r | **PASS**: at the first ssh login, BEFORE any tool is copied, `S95can_forwarder status` says running, `can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304` is in the process list under the supervisor, and `/var/log/can_forwarder.log` has a `starting:` line. The heartbeat is `ANSWERED` (a `mon_client` copied afterwards reads it), TIMEOUT counter 0, hb_miss_count 0 once answered (the miss counter is reset by an on-time answer; before S95 starts, about 10-15 s after power on, the unanswered requests count up to roughly 5-12 misses, never TIMEOUT: G = 60 s) | no forwarder process; heartbeat not ANSWERED at uptime 40 s; any TIMEOUT |
+| E2a-r | **PASS**: monitor back (init_ok 1, starved 0), TIMEOUT counter 0 at uptime under 60 s, heartbeat answered by the service from boot | TIMEOUT before 60 s |
+| E2c (new) | **PASS**: `S95can_forwarder stop` -> no forwarder process, `start` -> process and heartbeat ANSWERED within 4 s, `restart` -> same, `kill -9` of the daemon -> restarted by the supervisor (the same test passed from /tmp on 2026-11-22) | any difference between /tmp and the image |
+| A4-r | **PASS** both Pis: receiver `can0` UP FD 500000/2000000 with no manual step (S12can + canfdcfg); sender after a second reboot: qlen 2000, FD, no manual step | |
+| A1-r | verify_boot 17 pass, 0 FAIL, 1 skipped | |
+| A2-r | 32 PASS, 0 FAIL, 4 SKIP (service left RUNNING during the run, the realistic configuration); if a FAIL appears that is caused by the service I report it and change nothing | a FAIL |
+| B1-r | **PASS** with the SERVICE as the forwarder (no harness forwarder started): 600 frames at 50 frames/s, Secure World frame total +600, all attack classes +0, last_counter +600 | any class delta |
+| B1-rh | **PASS** in the original harness way (service stopped for the run and started again): 600 of 600, identity PASS | |
+Risks: the receiver's DHCP address can change after the flash (then I stop and ask for it); the Pi's clock shows 1970 (no RTC) so log timestamps are relative only.
