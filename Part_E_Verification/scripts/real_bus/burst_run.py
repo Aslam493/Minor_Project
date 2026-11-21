@@ -172,7 +172,7 @@ def run_one(kind, date, scratch, idx=0):
     t_start = time.time(); time.sleep(4)
     # what was really in force for this run (a setting that silently did not take effect is the main risk of the plan)
     settings = ssh("root", RX, "echo \"sysctl: $(sysctl -n net.core.rmem_default) $(sysctl -n net.core.rmem_max)  (rmem_default rmem_max)\"; echo \"forwarder: $(sha256sum %s | cut -c1-16)  cmd: %s %s run %d --pull --verbose --stats %s\"; "
-                   "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS)) \
+                   "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"; echo \"cpu governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) at $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq) kHz\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS)) \
         + ssh("sender", SN, "echo \"sender can0 qlen $(cat /sys/class/net/can0/tx_queue_len)\"")
     cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
     send_out = ssh("sender", SN, cmd, timeout=120); t_sent = time.time() - t_start
