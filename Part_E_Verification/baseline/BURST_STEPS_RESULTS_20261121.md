@@ -24,3 +24,6 @@ The sender no longer refuses: it **waits** (longest single send 30.7 ms in all t
 Confirmed in force: forwarder `SCHED_FIFO 50`. judged 1004 x3, planted exact, no socket loss, no chip overflow. Reply p99 59.0 / 59.5 / 58.2 ms (2a: 58.1 / 58.0 / 58.2), reply max **108.5 / 89.6 / 107.9** ms (2a: 58.8 / 59.7 / 59.3), STALE_ANSWER 4 / 9 / 5 (2a: 1 / 1 / 1), LATE_ANSWER 4 / 2 / 1, late heartbeat 1 / 0 / 0, window 10.38 / 10.44 / 10.30 s (2a: 9.9).
 - The simple preemption hypothesis (the chip's real-time interrupt thread preempts the normal-priority forwarder) is **not supported**: equal priority does not reduce late replies, and it worsens the tail. Real-time priority is **not kept**.
 - Open: why p99 sits at 58-59 ms, almost equal to the max, in 2a and 2c (a cluster of replies at about 58 ms, a fixed delay). Next: per-reply timing in the forwarder (batch size, time of the Secure World call), then the CPU placement test (step 4).
+
+## Step 3a-V, counter validation (new forwarder `can_forwarder_3a`, default buffer, 1 run): prediction MET
+Judged 239; the forwarder's own new line `socket drops (SO_MEMINFO): 765 frames dropped by the kernel for this socket; SO_RCVBUF 212992` equals the 765 derived from the chip counter minus frames read. The counter is trustworthy.

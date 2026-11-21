@@ -107,6 +107,9 @@ def fwd_parse(text):
     if m:
         for k, v in zip(("fwd_received_queued", "requests", "on_time", "late", "stale", "unissued", "dup", "handed_judged", "still_queued", "queue_dropped"), map(int, m.groups())):
             d[k] = v
+    m = re.search(r"socket drops \(SO_MEMINFO\): (\d+) frames dropped by the kernel for this socket; SO_RCVBUF (\d+) bytes", text)
+    if m:
+        d["kernel_sock_drops"], d["rcvbuf_at_exit"] = int(m.group(1)), int(m.group(2))
     m = re.search(r"dropped by the forwarder: error frame (\d+), remote frame (\d+), wrong length (\d+)", text)
     if m:
         d["fwd_dropped_err_rtr_len"] = list(map(int, m.groups()))
@@ -208,7 +211,7 @@ def run_one(kind, date, scratch, idx=0):
            "fwd": fw, "judged": judged, "class_delta": cdelta, "events_recorded": dict(recorded), "events_suppressed": suppressed, "events_total_recorded": len(evs),
            "ev_lost_delta": q1.get("ev_lost", 0) - q0.get("ev_lost", 0), "judged_window_s": window_s, "sender_elapsed_s": round(t_sent, 2),
            "reply_p99_ms": rep_p99_ms, "reply_max_ms": rep_max_ms, "settings": settings.strip(), "step": STEP, "hb_late": (fw.get("hb_answers_on_time_late_other") or [0, 0, 0])[1], "late_answers": cdelta.get("LATE_ANSWER", 0),
-           "stale_answers": cdelta.get("STALE_ANSWER", 0), "socket_loss_derived": r_sock,
+           "stale_answers": cdelta.get("STALE_ANSWER", 0), "socket_loss_derived": r_sock, "kernel_sock_drops": fw.get("kernel_sock_drops"), "rcvbuf_at_exit": fw.get("rcvbuf_at_exit"),
            "status_before": q0, "status_after": q1, "last_counter_after": q1.get("last_counter"),
            "lock_timeouts_delta": q1.get("pta_lock_timeouts", 0) - q0.get("pta_lock_timeouts", 0), "skip_total_delta": q1.get("skip_total", 0) - q0.get("skip_total", 0),
            "starved": q1.get("starved"), "init_ok": q1.get("init_ok"), "core1_poll_age_ticks": q1.get("core1_poll_age_ticks"), "hb_state": q1.get("hb_state"), "hb_miss_count": q1.get("hb_miss_count")}
@@ -226,7 +229,7 @@ def row(r):
     e, fw, s = r["expected"], r["fwd"], r["sender"]
     return [r["tag"], e["frames_attempted"], s.get("sent_ok"), s.get("enobufs"), r["sender_tx_packets"], r["rx_can0"], "%d/%d/%d/%d" % (r["rx_over_errors"], r["rx_fifo_errors"], r["rx_dropped"], r["rx_errors"]),
             "%d (-%d, drops %d)" % (r["candump_seen"], r["sent_ok_not_seen_by_candump"], r["candump_drops"]), fw.get("fwd_received_queued"), fw.get("queue_dropped"), fw.get("handed_judged"),
-            r["judged"], e["frames_judged"], r["hb_late"], r["late_answers"], r["reply_p99_ms"], r["reply_max_ms"], "%.2f" % r["judged_window_s"] if r["judged_window_s"] else None, r["socket_loss_derived"]]
+            r["judged"], e["frames_judged"], r["hb_late"], r["late_answers"], r["reply_p99_ms"], r["reply_max_ms"], "%.2f" % r["judged_window_s"] if r["judged_window_s"] else None, r["socket_loss_derived"], r["kernel_sock_drops"]]
 
 
 def main(argv):
@@ -248,7 +251,7 @@ def main(argv):
             r["tag"], r["expected"]["frames_attempted"], r["sender"].get("sent_ok"), r["sender"].get("enobufs"), r["rx_can0"], r["fwd"].get("fwd_received_queued"),
             r["fwd"].get("handed_judged"), r["judged"]), flush=True)
         time.sleep(8)
-    hdr = ["run", "attempted", "sender_ok", "ENOBUFS", "sender_tx_pk", "rx_can0", "over/fifo/drop/err", "candump_seen", "fwd_queued", "queue_dropped", "handed_judged", "judged", "expected_judged", "hb_late", "LATE_ANS", "reply_p99_ms", "reply_max_ms", "window_s", "socket_loss"]
+    hdr = ["run", "attempted", "sender_ok", "ENOBUFS", "sender_tx_pk", "rx_can0", "over/fifo/drop/err", "candump_seen", "fwd_queued", "queue_dropped", "handed_judged", "judged", "expected_judged", "hb_late", "LATE_ANS", "reply_p99_ms", "reply_max_ms", "window_s", "socket_loss", "kernel_drops"]
     with open(os.path.join(BL, "burst_%s_SUMMARY%s.txt" % (date, os.environ.get("SUMMARYTAG", ""))), "w") as f:
         f.write("\t".join(hdr) + "\n")
         for r in results:

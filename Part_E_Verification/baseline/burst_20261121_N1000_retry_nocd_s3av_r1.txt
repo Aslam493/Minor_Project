@@ -1,0 +1,531 @@
+# burst run N1000_retry_nocd_s3av_r1 on 2026-11-21T20:08:12
+## EXPECTED
+# EXPECTED counts for this burst, written BEFORE it is sent (lossless, in order)
+last_counter_start=10682
+n_valid=1000
+frames_attempted=1004
+frames_judged=1004
+AUTH_FAIL=1
+REPLAY=2
+MALFORMED=1
+COUNTER_GAP=1
+COUNTER_RESYNC=0
+ACCEPTED=999
+last_counter_end=11684
+planted_positions(a,b,d,j,w)=[200, 400, 550, 700, 850]
+# MODEL PREDICTION from the design limits (50 ms request, 32 per reply, queue 256, ~290 us per frame); not a measurement
+model_burst_on_bus_ms=291
+model_ceiling_fps_secure_world=640
+model_drained_while_arriving=192
+model_lost_at_forwarder_queue(256, drop oldest)=556
+model_judged=448
+model_total_drain_ms=700
+
+## SENDER (json)
+{"policy": "retry", "attempted": 1004, "sent_ok": 1004, "enobufs": 0, "lost_at_sender": 0, "retries": 0, "other_errors": 0, "duration_s": 0.2323, "rate_fps": 4322.0, "longest_stall_ms": 30.643, "lost_indices": []}
+## SENDER can0 before
+stat collisions 0
+stat multicast 0
+stat rx_bytes 819552
+stat rx_compressed 0
+stat rx_crc_errors 0
+stat rx_dropped 0
+stat rx_errors 0
+stat rx_fifo_errors 0
+stat rx_frame_errors 0
+stat rx_length_errors 0
+stat rx_missed_errors 0
+stat rx_nohandler 0
+stat rx_over_errors 0
+stat rx_packets 17074
+stat tx_aborted_errors 0
+stat tx_bytes 819552
+stat tx_carrier_errors 0
+stat tx_compressed 0
+stat tx_dropped 0
+stat tx_errors 0
+stat tx_fifo_errors 0
+stat tx_heartbeat_errors 0
+stat tx_packets 17074
+stat tx_window_errors 0
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 72 qdisc pfifo_fast state UP mode DEFAULT group default qlen 2000
+    link/can  promiscuity 0 allmulti 0 minmtu 72 maxmtu 72 
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  bitrate 500000 sample-point 0.875
+	  re-started bus-errors arbit-lost error-warn error-pass bus-off
+	  0          0          0          0          0          0         numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 tso_max_size 65536 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus spi parentdev spi0.0 
+
+## SENDER can0 after
+stat collisions 0
+stat multicast 0
+stat rx_bytes 867744
+stat rx_compressed 0
+stat rx_crc_errors 0
+stat rx_dropped 0
+stat rx_errors 0
+stat rx_fifo_errors 0
+stat rx_frame_errors 0
+stat rx_length_errors 0
+stat rx_missed_errors 0
+stat rx_nohandler 0
+stat rx_over_errors 0
+stat rx_packets 18078
+stat tx_aborted_errors 0
+stat tx_bytes 867744
+stat tx_carrier_errors 0
+stat tx_compressed 0
+stat tx_dropped 0
+stat tx_errors 0
+stat tx_fifo_errors 0
+stat tx_heartbeat_errors 0
+stat tx_packets 18078
+stat tx_window_errors 0
+3: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 72 qdisc pfifo_fast state UP mode DEFAULT group default qlen 2000
+    link/can  promiscuity 0 allmulti 0 minmtu 72 maxmtu 72 
+    can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 
+	  bitrate 500000 sample-point 0.875
+	  re-started bus-errors arbit-lost error-warn error-pass bus-off
+	  0          0          0          0          0          0         numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 tso_max_size 65536 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus spi parentdev spi0.0 
+
+## RECEIVER before
+stat collisions 0
+stat multicast 0
+stat rx_bytes 818400
+stat rx_compressed 0
+stat rx_crc_errors 0
+stat rx_dropped 0
+stat rx_errors 6
+stat rx_fifo_errors 0
+stat rx_frame_errors 0
+stat rx_length_errors 0
+stat rx_missed_errors 0
+stat rx_nohandler 0
+stat rx_over_errors 6
+stat rx_packets 17050
+stat tx_aborted_errors 0
+stat tx_bytes 0
+stat tx_carrier_errors 0
+stat tx_compressed 0
+stat tx_dropped 0
+stat tx_errors 0
+stat tx_fifo_errors 0
+stat tx_heartbeat_errors 0
+stat tx_packets 0
+stat tx_window_errors 0
+page 0: version 1 length 128 boot_id 0x0e51aae5 flags 0x1f mode 2
+  now_ticks 62238635289 core1_poll_age_ticks 3853 poll_count 117519834001
+  skip_count 0 skip_total 1688 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 10682 hb_seq 3223 hb_state OPEN hb_miss_count 139 idle_uses 0
+  traffic_age_ticks 3089997496 hb_last_ok_age_ticks 2694238359 lease_remaining_ticks 0
+  ev_seq 236 ev_ack 216 ev_lost 184 pinned_used 12
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1688
+page 1: version 1 length 128 verdict totals frame 10685 heartbeat 592 crosscheck 0
+  AUTH_FAIL            16
+  REPLAY               20
+  TIMEOUT              67
+  MALFORMED            9
+  COUNTER_GAP          15
+  COUNTER_RESYNC       1
+  TRAFFIC_RECOVERED    15
+  HEARTBEAT_RECOVERED  49
+  STALE_ANSWER         37
+  LATE_ANSWER          39
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1688
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+
+## RECEIVER after
+stat collisions 0
+stat multicast 0
+stat rx_bytes 866592
+stat rx_compressed 0
+stat rx_crc_errors 0
+stat rx_dropped 0
+stat rx_errors 6
+stat rx_fifo_errors 0
+stat rx_frame_errors 0
+stat rx_length_errors 0
+stat rx_missed_errors 0
+stat rx_nohandler 0
+stat rx_over_errors 6
+stat rx_packets 18054
+stat tx_aborted_errors 0
+stat tx_bytes 0
+stat tx_carrier_errors 0
+stat tx_compressed 0
+stat tx_dropped 0
+stat tx_errors 0
+stat tx_fifo_errors 0
+stat tx_heartbeat_errors 0
+stat tx_packets 0
+stat tx_window_errors 0
+page 0: version 1 length 128 boot_id 0x0e51aae5 flags 0x0f mode 2
+  now_ticks 62678352808 core1_poll_age_ticks 2940 poll_count 118354777239
+  skip_count 0 skip_total 1751 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 10920 hb_seq 3246 hb_state ANSWERED hb_miss_count 0 idle_uses 0
+  traffic_age_ticks 290697538 hb_last_ok_age_ticks 3567641 lease_remaining_ticks 0
+  ev_seq 243 ev_ack 236 ev_lost 191 pinned_used 12
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1751
+page 1: version 1 length 128 verdict totals frame 10924 heartbeat 616 crosscheck 0
+  AUTH_FAIL            17
+  REPLAY               20
+  TIMEOUT              69
+  MALFORMED            9
+  COUNTER_GAP          15
+  COUNTER_RESYNC       1
+  TRAFFIC_RECOVERED    16
+  HEARTBEAT_RECOVERED  52
+  STALE_ANSWER         37
+  LATE_ANSWER          41
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1751
+  controller state       ERROR-ACTIVE (0)
+  error counters (TEC/REC) tx 0  rx 0
+
+## SETTINGS IN FORCE
+sysctl: 212992 212992  (rmem_default rmem_max)
+forwarder: 291bbbbd429cbd2e  cmd:  /tmp/can_forwarder_3a run 36 --pull --verbose --stats 
+forwarder pid 2479: pid 2479's current scheduling policy: SCHED_OTHER pid 2479's current scheduling priority: 0 
+Cpus_allowed_list:	0-3
+can0 qlen 10; irq186 smp_affinity f
+sender can0 qlen 2000
+
+## EVENTS from seq 237
+seq 237 HEARTBEAT_RECOVERED  counter 64056 detail 1 ticks 62250344999
+seq 238 LATE_ANSWER          counter 3223 detail 0 ticks 62250572072
+seq 239 TIMEOUT              counter 0 detail 4 ticks 62339441924
+seq 240 HEARTBEAT_RECOVERED  counter 64151 detail 1 ticks 62341758942
+seq 241 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 62341758942
+  returned 5, more=1, ev_lost=192
+seq 242 AUTH_FAIL            counter 10883 detail 0 ticks 62379859849
+seq 243 TIMEOUT              counter 0 detail 1 ticks 62393415606
+seq 244 LATE_ANSWER          counter 64500 detail 1 ticks 62679805485
+  returned 3, more=0, ev_lost=192
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=1751
+
+## FORWARDER log (tail)
+  request 64500: sent 0 packet(s) -> LATE, Secure World judged 0 (queue left 0)
+  request 64501: sent 0 packet(s) -> LATE, Secure World judged 0 (queue left 0)
+PULL: frames received from can0 and queued: 239 | requests answered: 711 (ON_TIME 709, LATE 2, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 239 | still queued: 0 | dropped by the queue: 0
+SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n 711 (ON_TIME 709, LATE 2); p50 in bucket 10-12 ms, p99 in bucket 26-28 ms, slowest in bucket 46-48 ms (2 ms buckets, upper edge is the bound); max since boot 50.206 ms
+LINUX-SIDE reply time, request fetched -> reply returned: n 711 (lost 0) p50 3884 us, p99 53366 us, max 58988 us
+LINUX-SIDE gap between two request fetches (worst wait before Linux looks): n 2331 (lost 0) p50 13828 us, p99 44640 us, max 296459 us
+CPU COST of this process: 14993 ms CPU in 36057 ms wall = 41.6 % of one core; 10 ms poll() polling; 2332 request fetches; pinned to cores: (not pinned)
+Secure World judged 239 packets in this run; events it raised: AUTH_FAIL 1 TIMEOUT 2 TRAFFIC_RECOVERED 1 HEARTBEAT_RECOVERED 3 LATE_ANSWER 3
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 36 LATE 1 other 0
+can0 rx_packets counter (frames received by the CAN controller): 17050 -> 18054 (+1004)
+socket drops (SO_MEMINFO): 765 frames dropped by the kernel for this socket; SO_RCVBUF 212992 bytes; receive memory in use at exit 0 bytes
+end state: flags 0x0f last_counter 10920 hb_state ANSWERED miss_count 0 starved 0
+## CANDUMP (first 3 / last 3 lines, 0 lines, drops 0)
+...
+## ANALYSIS (json)
+{
+ "tag": "N1000_retry_nocd_s3av_r1",
+ "N": 1000,
+ "policy": "retry",
+ "L": 10682,
+ "expected": {
+  "last_counter_start": 10682,
+  "n_valid": 1000,
+  "frames_attempted": 1004,
+  "frames_judged": 1004,
+  "AUTH_FAIL": 1,
+  "REPLAY": 2,
+  "MALFORMED": 1,
+  "COUNTER_GAP": 1,
+  "COUNTER_RESYNC": 0,
+  "ACCEPTED": 999,
+  "last_counter_end": 11684,
+  "planted_positions(a,b,d,j,w)": [
+   200,
+   400,
+   550,
+   700,
+   850
+  ]
+ },
+ "sender": {
+  "policy": "retry",
+  "attempted": 1004,
+  "sent_ok": 1004,
+  "enobufs": 0,
+  "lost_at_sender": 0,
+  "retries": 0,
+  "other_errors": 0,
+  "duration_s": 0.2323,
+  "rate_fps": 4322.0,
+  "longest_stall_ms": 30.643,
+  "lost_indices": []
+ },
+ "sender_tx_packets": 1004,
+ "sender_tx_errors": 0,
+ "sender_tx_dropped": 0,
+ "sender_all_stat_deltas": {
+  "rx_bytes": 48192,
+  "rx_packets": 1004,
+  "tx_bytes": 48192,
+  "tx_packets": 1004
+ },
+ "rx_can0": 1004,
+ "rx_dropped": 0,
+ "rx_over_errors": 0,
+ "rx_fifo_errors": 0,
+ "rx_errors": 0,
+ "rx_missed_errors": 0,
+ "rx_all_stat_deltas": {
+  "rx_bytes": 48192,
+  "rx_packets": 1004
+ },
+ "candump_seen": 0,
+ "candump_drops": 0,
+ "sent_ok_not_seen_by_candump": 1004,
+ "candump_extra_unexplained": 0,
+ "candump_window_s": null,
+ "candump_rate_fps": null,
+ "candump_max_gap_ms": 0,
+ "fwd": {
+  "replies_with_packets": 50,
+  "batches": [
+   1,
+   11,
+   1,
+   7,
+   3,
+   7,
+   1,
+   10,
+   1,
+   8,
+   1,
+   11,
+   1,
+   8,
+   1,
+   11,
+   1,
+   8,
+   1,
+   11,
+   1,
+   7,
+   3,
+   8,
+   1,
+   11,
+   1,
+   5,
+   4,
+   7,
+   3,
+   7,
+   2,
+   10,
+   1,
+   9,
+   1,
+   10,
+   1,
+   9,
+   1,
+   8,
+   1,
+   11,
+   1,
+   6,
+   2,
+   4,
+   0,
+   0
+  ],
+  "max_queue_left": 0,
+  "reply_verdicts": {
+   "ON_TIME": 48,
+   "LATE": 2
+  },
+  "fwd_received_queued": 239,
+  "requests": 711,
+  "on_time": 709,
+  "late": 2,
+  "stale": 0,
+  "unissued": 0,
+  "dup": 0,
+  "handed_judged": 239,
+  "still_queued": 0,
+  "queue_dropped": 0,
+  "kernel_sock_drops": 765,
+  "rcvbuf_at_exit": 212992,
+  "fwd_dropped_err_rtr_len": [
+   0,
+   0,
+   0
+  ],
+  "hb_answers_on_time_late_other": [
+   36,
+   1,
+   0
+  ],
+  "sw_side": "SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n 711 (ON_TIME 709, LATE 2); p50 in bucket 10-12 ms, p99 in bucket 26-28 ms, slowest in bucket 46-48 ms (2 ms buckets, upper edge is the bound); max since boot 50.206 ms",
+  "linux_reply": "LINUX-SIDE reply time, request fetched -> reply returned: n 711 (lost 0) p50 3884 us, p99 53366 us, max 58988 us",
+  "linux_gap": "LINUX-SIDE gap between two request fetches (worst wait before Linux looks): n 2331 (lost 0) p50 13828 us, p99 44640 us, max 296459 us",
+  "cpu": "CPU COST of this process: 14993 ms CPU in 36057 ms wall = 41.6 % of one core; 10 ms poll() polling; 2332 request fetches; pinned to cores: (not pinned)",
+  "raised": "Secure World judged 239 packets in this run; events it raised: AUTH_FAIL 1 TIMEOUT 2 TRAFFIC_RECOVERED 1 HEARTBEAT_RECOVERED 3 LATE_ANSWER 3",
+  "rx_counter": "can0 rx_packets counter (frames received by the CAN controller): 17050 -> 18054 (+1004)",
+  "end_state": "end state: flags 0x0f last_counter 10920 hb_state ANSWERED miss_count 0 starved 0"
+ },
+ "judged": 239,
+ "class_delta": {
+  "AUTH_FAIL": 1,
+  "REPLAY": 0,
+  "MALFORMED": 0,
+  "COUNTER_GAP": 0,
+  "COUNTER_RESYNC": 0,
+  "TRAFFIC_RECOVERED": 1,
+  "TIMEOUT": 2,
+  "HEARTBEAT_RECOVERED": 3,
+  "LATE_ANSWER": 2,
+  "STALE_ANSWER": 0
+ },
+ "events_recorded": {
+  "HEARTBEAT_RECOVERED": 2,
+  "LATE_ANSWER": 2,
+  "TIMEOUT": 2,
+  "TRAFFIC_RECOVERED": 1,
+  "AUTH_FAIL": 1
+ },
+ "events_suppressed": {
+  "AUTH_FAIL": 0,
+  "TRAFFIC_RECOVERED": 0,
+  "TIMEOUT": 0,
+  "HEARTBEAT_RECOVERED": 1,
+  "LATE_ANSWER": 0
+ },
+ "events_total_recorded": 8,
+ "ev_lost_delta": 7,
+ "judged_window_s": 2.39045125,
+ "sender_elapsed_s": 4.81,
+ "reply_p99_ms": 53.366,
+ "reply_max_ms": 58.988,
+ "settings": "sysctl: 212992 212992  (rmem_default rmem_max)\nforwarder: 291bbbbd429cbd2e  cmd:  /tmp/can_forwarder_3a run 36 --pull --verbose --stats \nforwarder pid 2479: pid 2479's current scheduling policy: SCHED_OTHER pid 2479's current scheduling priority: 0 \nCpus_allowed_list:\t0-3\ncan0 qlen 10; irq186 smp_affinity f\nsender can0 qlen 2000",
+ "step": "s3av",
+ "hb_late": 1,
+ "late_answers": 2,
+ "stale_answers": 0,
+ "socket_loss_derived": 765,
+ "kernel_sock_drops": 765,
+ "rcvbuf_at_exit": 212992,
+ "status_before": {
+  "last_counter": 10682,
+  "hb_seq": 3223,
+  "hb_state": "OPEN",
+  "hb_miss_count": 139,
+  "skip_count": 0,
+  "skip_total": 1688,
+  "pta_lock_timeouts": 0,
+  "pta_timeouts_seen": 0,
+  "core1_poll_age_ticks": 3853,
+  "poll_count": 117519834001,
+  "ev_seq": 236,
+  "ev_ack": 216,
+  "ev_lost": 184,
+  "pinned_used": 12,
+  "traffic_age_ticks": 3089997496,
+  "now_ticks": 62238635289,
+  "init_ok": 1,
+  "starved": 0
+ },
+ "status_after": {
+  "last_counter": 10920,
+  "hb_seq": 3246,
+  "hb_state": "ANSWERED",
+  "hb_miss_count": 0,
+  "skip_count": 0,
+  "skip_total": 1751,
+  "pta_lock_timeouts": 0,
+  "pta_timeouts_seen": 0,
+  "core1_poll_age_ticks": 2940,
+  "poll_count": 118354777239,
+  "ev_seq": 243,
+  "ev_ack": 236,
+  "ev_lost": 191,
+  "pinned_used": 12,
+  "traffic_age_ticks": 290697538,
+  "now_ticks": 62678352808,
+  "init_ok": 1,
+  "starved": 0
+ },
+ "last_counter_after": 10920,
+ "lock_timeouts_delta": 0,
+ "skip_total_delta": 63,
+ "starved": 0,
+ "init_ok": 1,
+ "core1_poll_age_ticks": 2940,
+ "hb_state": "ANSWERED",
+ "hb_miss_count": 0
+}
+## FORWARDER full log
+can_forwarder: can0, 36 s, heartbeat answered, PULL mode (frames are held until Secure World asks); monitor last_counter 10682
+socket receive buffer: 212992 bytes (system default)
+  request 64151: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64152: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64153: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64154: sent 7 packet(s) -> ON_TIME, Secure World judged 7 (queue left 0)
+  request 64155: sent 3 packet(s) -> ON_TIME, Secure World judged 3 (queue left 0)
+  request 64156: sent 7 packet(s) -> ON_TIME, Secure World judged 7 (queue left 0)
+  request 64157: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64158: sent 10 packet(s) -> ON_TIME, Secure World judged 10 (queue left 0)
+  request 64159: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64160: sent 8 packet(s) -> ON_TIME, Secure World judged 8 (queue left 0)
+  request 64161: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64162: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64163: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64164: sent 8 packet(s) -> ON_TIME, Secure World judged 8 (queue left 0)
+  request 64165: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64166: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64167: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64168: sent 8 packet(s) -> ON_TIME, Secure World judged 8 (queue left 0)
+  request 64169: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64170: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64171: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64172: sent 7 packet(s) -> ON_TIME, Secure World judged 7 (queue left 0)
+  request 64173: sent 3 packet(s) -> ON_TIME, Secure World judged 3 (queue left 0)
+  request 64174: sent 8 packet(s) -> ON_TIME, Secure World judged 8 (queue left 0)
+  request 64175: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64176: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64177: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64178: sent 5 packet(s) -> ON_TIME, Secure World judged 5 (queue left 0)
+  request 64179: sent 4 packet(s) -> ON_TIME, Secure World judged 4 (queue left 0)
+  request 64180: sent 7 packet(s) -> ON_TIME, Secure World judged 7 (queue left 0)
+  request 64181: sent 3 packet(s) -> ON_TIME, Secure World judged 3 (queue left 0)
+  request 64182: sent 7 packet(s) -> ON_TIME, Secure World judged 7 (queue left 0)
+  request 64183: sent 2 packet(s) -> ON_TIME, Secure World judged 2 (queue left 0)
+  request 64184: sent 10 packet(s) -> ON_TIME, Secure World judged 10 (queue left 0)
+  request 64185: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64186: sent 9 packet(s) -> ON_TIME, Secure World judged 9 (queue left 0)
+  request 64187: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64188: sent 10 packet(s) -> ON_TIME, Secure World judged 10 (queue left 0)
+  request 64189: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64190: sent 9 packet(s) -> ON_TIME, Secure World judged 9 (queue left 0)
+  request 64191: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64192: sent 8 packet(s) -> ON_TIME, Secure World judged 8 (queue left 0)
+  request 64193: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64194: sent 11 packet(s) -> ON_TIME, Secure World judged 11 (queue left 0)
+  request 64195: sent 1 packet(s) -> ON_TIME, Secure World judged 1 (queue left 0)
+  request 64196: sent 6 packet(s) -> ON_TIME, Secure World judged 6 (queue left 0)
+  request 64197: sent 2 packet(s) -> ON_TIME, Secure World judged 2 (queue left 0)
+  request 64198: sent 4 packet(s) -> ON_TIME, Secure World judged 4 (queue left 0)
+  request 64500: sent 0 packet(s) -> LATE, Secure World judged 0 (queue left 0)
+  request 64501: sent 0 packet(s) -> LATE, Secure World judged 0 (queue left 0)
+PULL: frames received from can0 and queued: 239 | requests answered: 711 (ON_TIME 709, LATE 2, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 239 | still queued: 0 | dropped by the queue: 0
+SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n 711 (ON_TIME 709, LATE 2); p50 in bucket 10-12 ms, p99 in bucket 26-28 ms, slowest in bucket 46-48 ms (2 ms buckets, upper edge is the bound); max since boot 50.206 ms
+LINUX-SIDE reply time, request fetched -> reply returned: n 711 (lost 0) p50 3884 us, p99 53366 us, max 58988 us
+LINUX-SIDE gap between two request fetches (worst wait before Linux looks): n 2331 (lost 0) p50 13828 us, p99 44640 us, max 296459 us
+CPU COST of this process: 14993 ms CPU in 36057 ms wall = 41.6 % of one core; 10 ms poll() polling; 2332 request fetches; pinned to cores: (not pinned)
+Secure World judged 239 packets in this run; events it raised: AUTH_FAIL 1 TIMEOUT 2 TRAFFIC_RECOVERED 1 HEARTBEAT_RECOVERED 3 LATE_ANSWER 3
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 36 LATE 1 other 0
+can0 rx_packets counter (frames received by the CAN controller): 17050 -> 18054 (+1004)
+socket drops (SO_MEMINFO): 765 frames dropped by the kernel for this socket; SO_RCVBUF 212992 bytes; receive memory in use at exit 0 bytes
+end state: flags 0x0f last_counter 10920 hb_state ANSWERED miss_count 0 starved 0
+

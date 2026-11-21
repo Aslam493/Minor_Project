@@ -5,7 +5,13 @@
  * 44-byte monitor message (canbridge) and submits it to the monitor (PTA command 17). It also answers the monitor's heartbeat, like the
  * soak responder. It holds no key and builds no packet: the tag is judged only in Secure World.
  *
- *   can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin]
+ *   can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--trace FILE]
+ *
+ * --rcvbuf BYTES (burst study, step 3a) sets THIS socket's receive buffer with SO_RCVBUFFORCE (root; the kernel doubles the value) and fails if the kernel refuses;
+ * without it the system default is used (212,992 bytes = about 238 FD frames). At exit the report prints the kernel's own drop count for this socket (SO_MEMINFO).
+ * --trace FILE records, in memory, the time of every frame read, request fetch, reply (with its batch size) and heartbeat call and writes it as CSV (t_us,kind,a,b) at
+ * exit: kind 1 frame read (a = queue depth after), 2 request fetch (a = call us, b = request state), 3 reply (a = batch size, b = call us), 4 heartbeat poll (a = call us).
+ * Instrumentation only: it does not change what the forwarder does.
  *
  * --pull is for the Mode P image (CFG_RPI3_CAN_MONITOR_PULL=y; command 17 is refused there): the forwarder only HOLDS the frames it receives from
  * can0 in a queue. Secure World posts a packet request; the forwarder fetches it (command 30) and replies with the oldest queued packets (command 31,
@@ -36,6 +42,17 @@
 #include "canbridge.h"
 #include "latstat.h"
 
+#ifndef SO_MEMINFO
+#define SO_MEMINFO 55				/* getsockopt: uint32_t[SK_MEMINFO_VARS]; index 0 = RMEM_ALLOC, 8 = DROPS */
+#endif
+#define TR_MAX 60000
+static struct { uint64_t t; uint32_t kind, a, b; } g_tr[TR_MAX];
+static unsigned g_trn;
+static void tr_add(uint64_t t, uint32_t kind, uint32_t a, uint32_t b)
+{
+	if (g_trn < TR_MAX) { g_tr[g_trn].t = t; g_tr[g_trn].kind = kind; g_tr[g_trn].a = a; g_tr[g_trn].b = b; g_trn++; }
+}
+
 static int g_retries = 20;
 #define RETRY(call, r) do { int t_; for (t_ = 0; ; t_++) { (r) = (call); if ((r) != TEEC_ERROR_BUSY || t_ >= g_retries) break; \
 			     { struct timespec ts_ = {0, 2000000}; nanosleep(&ts_, NULL); } } } while (0)
@@ -53,7 +70,7 @@ static unsigned long rx_packets(const char *ifn)
 
 int main(int argc, char **argv)
 {
-	const char *ifn = "can0", *cpus = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0; unsigned secs;
+	const char *ifn = "can0", *cpus = NULL, *trace_path = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0, rcvbuf = 0; unsigned secs;
 	struct latstat l_reply, l_gap; uint64_t t_fetch = 0, t_prev_fetch = 0, t_start_us, cpu0_us; unsigned long fetches = 0; struct timespec cpu_ts;
 	static struct cb_queue q; static uint8_t batch[MON_PQ_MAX_BATCH * MON_FRAME_LEN]; uint32_t last_pseq = 0xFFFFFFFFu, pseq, pst, pmax, pdue, rv, proc;
 	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b; struct mon_status2 s2a, s2b; int have2 = 0;
@@ -68,9 +85,9 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[a], "--cpus") && a + 1 < argc) { cpus = argv[a + 1]; a += 2; }
 		else break;
 	}
-	if (a + 1 >= argc || strcmp(argv[a], "run")) { fprintf(stderr, "usage: can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin]\n"); return 2; }
+	if (a + 1 >= argc || strcmp(argv[a], "run")) { fprintf(stderr, "usage: can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--trace FILE]\n"); return 2; }
 	secs = (unsigned)strtoul(argv[a + 1], NULL, 0);
-	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; }
+	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; else if (!strcmp(argv[i], "--rcvbuf") && i + 1 < argc) rcvbuf = atoi(argv[++i]); else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i]; }
 	cb_q_init(&q);
 	if (cpus) {	/* pin to the listed cores; only 0, 2, 3 (core 1 is Secure World's) */
 		cpu_set_t set; char *e, *tok, *dup = strdup(cpus); int any = 0;
@@ -89,6 +106,7 @@ int main(int argc, char **argv)
 	s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
 	if (s < 0) { perror("socket(PF_CAN)"); return 1; }
 	if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &on, sizeof on)) { perror("CAN_RAW_FD_FRAMES (is the interface in FD mode?)"); return 1; }
+	if (rcvbuf > 0 && setsockopt(s, SOL_SOCKET, SO_RCVBUFFORCE, &rcvbuf, sizeof rcvbuf)) { perror("--rcvbuf: SO_RCVBUFFORCE (needs root)"); return 1; }
 	memset(&ifr, 0, sizeof ifr); snprintf(ifr.ifr_name, sizeof ifr.ifr_name, "%s", ifn);
 	if (ioctl(s, SIOCGIFINDEX, &ifr)) { perror("SIOCGIFINDEX"); return 1; }
 	memset(&ad, 0, sizeof ad); ad.can_family = AF_CAN; ad.can_ifindex = ifr.ifr_ifindex;
@@ -100,6 +118,8 @@ int main(int argc, char **argv)
 	memset(&s2a, 0, sizeof s2a); memset(&s2b, 0, sizeof s2b); if (pull && stats) have2 = !mon_get_status2(&c, &s2a, &h);
 	rx0 = rx_packets(ifn);
 	printf("can_forwarder: %s, %u s%s%s; monitor last_counter %u\n", ifn, secs, hb ? ", heartbeat answered" : ", no heartbeat", pull ? ", PULL mode (frames are held until Secure World asks)" : "", s0.last_counter);
+	{ int rb = 0; socklen_t rl = sizeof rb; getsockopt(s, SOL_SOCKET, SO_RCVBUF, &rb, &rl);
+	  printf("socket receive buffer: %d bytes (%s)\n", rb, rcvbuf > 0 ? "forced by --rcvbuf, doubled by the kernel" : "system default"); }
 	end = now_ms() + (uint64_t)secs * 1000u;
 	while (now_ms() < end) {
 		struct pollfd pf = { s, POLLIN, 0 };
@@ -115,6 +135,7 @@ int main(int argc, char **argv)
 			else if (pull) {
 				if (cb_q_push(&q, msg) && verbose) printf("  queue full: the oldest packet was dropped\n");
 				received++;
+				if (trace_path) tr_add(now_us(), 1, q.n, 0);
 			} else {
 				RETRY(mon_submit_frame(&c, msg, &v, &d, &h), r);
 				if (r == TEEC_ERROR_BUSY) busy++;
@@ -124,11 +145,15 @@ int main(int argc, char **argv)
 			}
 		}
 		if (pull) {
+			uint64_t tf0 = trace_path ? now_us() : 0;
 			r = mon_get_packet_request(&c, &pseq, &pst, &pmax, &pdue, &h);
+			if (trace_path) tr_add(tf0, 2, (uint32_t)(now_us() - tf0), r ? 0xFFu : pst);
 			if (stats && !r) { t_fetch = now_us(); fetches++; if (t_prev_fetch) latstat_add(&l_gap, (uint32_t)(t_fetch - t_prev_fetch)); t_prev_fetch = t_fetch; }
 			if (!r && (pst == 1 || pst == 3) && pseq != last_pseq) {		/* OPEN or MISSED: answer once per request number */
 				unsigned n = cb_q_peek(&q, pmax < MON_PQ_MAX_BATCH ? pmax : MON_PQ_MAX_BATCH, batch);
+				uint64_t ts0 = trace_path ? now_us() : 0;
 				RETRY(mon_submit_packets(&c, pseq, n, batch, &rv, &proc, &h), r);
+				if (trace_path) tr_add(ts0, 3, n, (uint32_t)(now_us() - ts0));
 				if (r == TEEC_ERROR_BUSY) busy++;
 				else if (r) errs++;
 				else {
@@ -142,7 +167,9 @@ int main(int argc, char **argv)
 		}
 		if (hb && now_ms() - last_hb_poll >= 50) {		/* a request lives 500 ms and a new one comes every 1000 ms: looking every 50 ms is plenty, and it keeps command 22 from hammering the monitor lock when --spin is used */
 			last_hb_poll = now_ms();
+			uint64_t th0 = trace_path ? now_us() : 0;
 			r = mon_get_nonce(&c, &nonce, &seq, &st, &h);
+			if (trace_path) tr_add(th0, 4, (uint32_t)(now_us() - th0), 0);
 			if (!r && (st == 1 || st == 3) && nonce != 0 && seq != last_answered) {
 				RETRY(mon_submit_answer(&c, seq, nonce, &v, &d, &h), r);
 				if (!r) { last_answered = seq; if (v == 0) ans_on++; else if (v == 1) ans_late++; else ans_other++; }
@@ -178,6 +205,14 @@ int main(int argc, char **argv)
 	printf("dropped by the forwarder: error frame %lu, remote frame %lu, wrong length %lu\n", drop[CB_ERR_FRAME], drop[CB_RTR], drop[CB_BAD_LEN]);
 	if (hb) printf("heartbeat answers: ON_TIME %lu LATE %lu other %lu\n", ans_on, ans_late, ans_other);
 	printf("can0 rx_packets counter (frames received by the CAN controller): %lu -> %lu (+%lu)\n", rx0, rx1, rx1 - rx0);
+	{ uint32_t mi[16]; socklen_t ml = sizeof mi; int rb = 0; socklen_t rl = sizeof rb; memset(mi, 0, sizeof mi); getsockopt(s, SOL_SOCKET, SO_RCVBUF, &rb, &rl);
+	  if (!getsockopt(s, SOL_SOCKET, SO_MEMINFO, mi, &ml)) printf("socket drops (SO_MEMINFO): %u frames dropped by the kernel for this socket; SO_RCVBUF %d bytes; receive memory in use at exit %u bytes\n", mi[8], rb, mi[0]);
+	  else printf("socket drops (SO_MEMINFO): not available (%s)\n", strerror(errno)); }
+	if (trace_path) {
+		FILE *tf = fopen(trace_path, "w"); unsigned k;
+		if (tf) { fprintf(tf, "t_us,kind,a,b\n"); for (k = 0; k < g_trn; k++) fprintf(tf, "%" PRIu64 ",%u,%u,%u\n", g_tr[k].t, g_tr[k].kind, g_tr[k].a, g_tr[k].b); fclose(tf); }
+		printf("trace: %u events written to %s%s\n", g_trn, trace_path, g_trn >= TR_MAX ? " (buffer full, later events not recorded)" : "");
+	}
 	if (!r) printf("end state: flags 0x%02x last_counter %u hb_state %s miss_count %u starved %u\n", s0.flags, s0.last_counter, mon_hbstate_name(s0.hb_state), s0.hb_miss_count, !!(h.p2b & MON_HP_STARVED));
 	mon_close(&c);
 	return 0;
