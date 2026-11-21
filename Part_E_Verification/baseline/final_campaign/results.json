@@ -1,0 +1,56 @@
+{
+ "A4": {
+  "id": "A4",
+  "test": "Reboot both Pis: can0 up in CAN-FD 500k/2M with no manual step",
+  "expected": "receiver and sender can0 UP, FD on, 500000/2000000",
+  "result": "PASS",
+  "evidence": "receiver ssh 1 s, sender 56 s after reboot command; rx fd=True, sender fd=True (S12can+canfdcfg in the image; sender systemd unit)",
+  "file": "baseline/final_campaign/A4_E2_reboot.txt",
+  "time": "2026-11-22 00:27:26"
+ },
+ "E2a": {
+  "id": "E2a",
+  "test": "Reboot receiver: monitor back, boot grace respected",
+  "expected": "no TIMEOUT before G=60 s although heartbeat misses accumulate; forwarder started inside G -> never a TIMEOUT",
+  "result": "PASS",
+  "evidence": "uptime 48 s: hb_state MISSED hb_miss_count 48 TIMEOUT counter 0 init_ok 1 starved 0 | uptime 49 s: hb_state MISSED hb_miss_count 49 TIMEOUT counter 0 init_ok 1 starved 0 | uptime 55 s: hb_state ANSWERED hb_miss_count 0 TIMEOUT counter 0 init_ok 1 starved 0",
+  "file": "baseline/final_campaign/A4_E2_reboot.txt",
+  "time": "2026-11-22 00:27:26"
+ },
+ "E2b": {
+  "id": "E2b",
+  "test": "Reboot receiver: forwarder back by itself",
+  "expected": "forwarder starts at boot without a manual step",
+  "result": "FAIL",
+  "evidence": "no init script starts can_forwarder (init.d: S01seedrng S01syslogd S02klogd S02sysctl S11modules S12can S30optee S30test-arm-ffa-user S40network S41dhcpcd S50crond S); the forwarder is started by hand from /tmp (RAM); reported as a GAP, not fixed",
+  "file": "baseline/final_campaign/A4_E2_reboot.txt",
+  "time": "2026-11-22 00:27:26"
+ },
+ "A1": {
+  "id": "A1",
+  "test": "verify_boot on the receiver",
+  "expected": "0 FAIL",
+  "result": "PASS",
+  "evidence": "verify_boot: 17 pass, 0 FAIL, 1 skipped",
+  "file": "baseline/final_campaign/A1_verify_boot.txt",
+  "time": "2026-11-22 00:28:35"
+ },
+ "A2": {
+  "id": "A2",
+  "test": "board_full_check.sh --mode-p (fresh boot, empty ring)",
+  "expected": "0 FAIL (C3 N-04 reservation PASS)",
+  "result": "PASS",
+  "evidence": "32 PASS, 0 FAIL, 0 KNOWN, 4 SKIP; C3 (N-04: secure DRAM 0x10000000-0x10ffffff reserved in /proc/iomem) PASS, C4 PASS; the 4 SKIPs (E1-E12, F1, F3, G) are by design in Mode P because command 17 is refused there; packet detection is tested on the real bus in group C. Key file /tmp/kf removed after the run.",
+  "file": "baseline/final_campaign/A2_board_full_check_modeP.txt",
+  "time": "2026-11-22 00:28:54"
+ },
+ "A3": {
+  "id": "A3",
+  "test": "DTB = N-04 (e8ac38fa) and the secure-memory reservation is present",
+  "expected": "image DTB sha256 e8ac38fa...; reserved-memory node optee_secure@10000000 live",
+  "result": "PASS",
+  "evidence": "image DTB e8ac38faebc78f87; live node: #address-cells #size-cells linux,cma name optee_secure@10000000 phandle ranges /sys/firmware/devicetree/base/reserved-memory/optee_secure@10",
+  "file": "baseline/final_campaign/A3_dtb_n04.txt",
+  "time": "2026-11-22 00:28:54"
+ }
+}

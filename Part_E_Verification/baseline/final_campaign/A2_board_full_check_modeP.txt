@@ -1,0 +1,64 @@
+board_full_check  1970-01-01 00:02:07 UTC  host buildroot  kernel 6.7.0-rc6-v8  uptime 127 s
+tools: /tmp   log: /tmp/board_check_19700101T000207Z.txt
+  note   --mode-p: frame tests E1-E12, F1, F2 and G need command 17 and are skipped (not failed); E18 expects only the heartbeat events
+
+== B  Boot and hardware
+  PASS   B1 kernel is 6.7.0-rc6-v8 (6.7.0-rc6-v8)
+  PASS   B2 OP-TEE reports its revision: optee: revision 4.10 (80b310010cf382c4)
+  PASS   B3 OP-TEE driver initialised
+  PASS   B4 no OP-TEE error in the kernel log
+  PASS   B5 /dev/tee0 and /dev/teepriv0 exist
+  PASS   B6 tee-supplicant is running
+  PASS   B7 legacy Core 1 heartbeat rising: 4771760720 -> 4847848119
+  PASS   B8 PTA answers (FIQ count read)
+  PASS   B9 FIQ not armed (FIQ_CONTROL 0x00000000)
+  PASS   B10 can0 exists and is up
+  PASS   B11 mcp251xfd initialised the MCP2518FD on can0
+  PASS   B12 no SPI CRC errors from the CAN driver
+
+== C  Isolation settings (Linux side)
+  PASS   C1 Linux CPUs online = 0,2-3, Core 1 never runs Linux ('0,2-3')
+  PASS   C2 kernel log: CPU1 failed to come online (held by the TF-A divert)
+  PASS   C3 secure DRAM 0x10000000-0x10ffffff (TF-A + OP-TEE, N-04) is reserved in /proc/iomem
+  PASS   C4 shared-memory pool 0x08000000-0x09ffffff is reserved in /proc/iomem
+  PASS   C5 /dev/tee0 has no world access (crw-rw---- root teeclnt)
+  note   C6 teeclnt members: test (F24 mitigation not in place)
+
+== D  Monitor health
+  PASS   D1 monitor initialised: init_ok=1
+  PASS   D2 Core 1 not starved: starved=0
+  PASS   D3 no PTA lock timeouts: 0
+  PASS   D4 Core 1 last poll 0 ms ago (limit 10 ms)
+  PASS   D5 Core 1 polls on its own: poll_count 4854973347 -> 4897025901 in 1 s, no Linux help
+  PASS   D6 past the 60 s boot grace (uptime 129 s), timeouts are live
+  note   event log before section E: ev_seq 3, ev_lost 0
+
+== E  Detection, step by step (software-injected frames, ID 0x123)
+  SKIP   E1-E12 frame tests (Mode P image: needs command 17, which is refused there (packets are tested by modeP_board_test.sh through command 31))
+  PASS   E13 Secure World issues fresh challenges: hb_seq 132 -> 134, nonce 0x0000000000000000 -> 0x480b4654d0b4ddca
+  PASS   E14 Normal World answers a fresh challenge -> ON_TIME: hb_seq 135 answered: ON_TIME (detail 0)
+  PASS   E15 answer again without a new challenge -> nothing to answer: no open challenge (state ANSWERED, hb_seq 135): nothing to answer
+  PASS   E16 responder silent 5 s -> hb_state OPEN, misses 4 (>=3), heartbeat TIMEOUT (detail 2) from Core 1
+  PASS   E17 responder back -> hb_seq 141 answered: ON_TIME (detail 0), HEARTBEAT_RECOVERED, miss count 0
+  PASS   E18 every detection is in the Secure World event log (TIMEOUT HEARTBEAT_RECOVERED)
+         seq 4 HEARTBEAT_RECOVERED  counter 132 detail 0 ticks 2757868132
+         seq 5 TIMEOUT              counter 0 detail 2 ticks 2881804722
+         seq 6 HEARTBEAT_RECOVERED  counter 141 detail 0 ticks 2930477555
+
+== F  Full regression and negative tests
+  SKIP   F1 c5_board_tests (Mode P image: needs command 17, which is refused there (packets are tested by modeP_board_test.sh through command 31))
+  PASS   F2 legacy/debug commands refused, bad parameters rejected (T25, Mode P expectations): SUMMARY: 12 PASS, 0 FAIL, 0 note
+  SKIP   F3 idle-lease caps (C6 negative): one step injects a frame with command 17, refused in Mode P; the lease commands themselves are covered by F1 on the Mode F image
+
+== G  Soak (sender 10 frames/s + heartbeat responder)
+  SKIP   G soak (--quick, --soak 0 or Mode P image: needs command 17, which is refused there (packets are tested by modeP_board_test.sh through command 31))
+
+== H  After the run
+  PASS   H1 monitor still healthy: init_ok=1 starved=0 lock timeouts 0 ev_lost 0
+  PASS   H2 Core 1 still running: heartbeat 5307818046 -> 5346431259, FIQ still unarmed
+
+== SUMMARY
+32 PASS, 0 FAIL, 0 KNOWN, 4 SKIP
+Scope: software-injected frames through the PTA (not CAN-bus traffic); prototype keys; detection only; Pi 3 has no TZASC.
+Test events are now in the monitor's RAM log: reboot for a clean state. Remove the key when done: rm /tmp/kf
+Log: /tmp/board_check_19700101T000207Z.txt

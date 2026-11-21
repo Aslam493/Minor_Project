@@ -1,0 +1,21 @@
+== image compose record (DTB read back from the composed image):
+OK   DTB read back from build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04-nostk.img: sha256 e8ac38faebc78f87... (N-04)
+IMAGE build_scratch/candidate_image/rpi3-sdcard-monitor-modeP-p6-n04-nostk.img sha256 9700049351af848f6a57035e14d9007a3b07c18c319d4ae9926691623c0f6eec
+== flashed with dd + cmp = MATCH (card_helper check, sha256 9700049351af848f...)
+== live reserved-memory on the running receiver:
+#address-cells
+#size-cells
+linux,cma
+name
+optee_secure@10000000
+phandle
+ranges
+/sys/firmware/devicetree/base/reserved-memory/optee_secure@10000000
+ 10 00 00 00 01 00 00 00
+name
+no-map
+reg
+
+== board_full_check lines:
+  PASS   C3 secure DRAM 0x10000000-0x10ffffff (TF-A + OP-TEE, N-04) is reserved in /proc/iomem
+  PASS   C4 shared-memory pool 0x08000000-0x09ffffff is reserved in /proc/iomem
