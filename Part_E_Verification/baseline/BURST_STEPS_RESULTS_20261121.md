@@ -113,3 +113,15 @@ Same OP-TEE source (`80b310010`), same monitor code; only `CFG_CORE_DEBUG_CHECK_
 600 MHz with the new core: empty call 128 us, one HMAC 46.2 us, reply with 32 packets 1.66 ms (shipped core: 3.9 ms, 4.75 ms, 162 ms): 600 -> 1200 MHz is now 2.0-2.1x (HMAC 46.2 -> 21.9 us), no longer 4.2-4.7x: the super-linear clock effect was the instrumentation. User-mode loops unchanged (register loop 11 ms at 600, 5 ms at 1200).
 **Prediction check:** every threshold written before the build was met (empty call < 0.1 ms: 65 us; one HMAC < 0.15 ms: 22 us; no-HMAC packet < 5 us: 0.7 us; D < 20 ms: 5 ms; E < 10 ms: 1 ms; 600 MHz about 2x slower: 2.0-2.1x).
 **Consequence:** one HMAC is 22-46 us, a reply with 32 packets is under 2 ms even at 600 MHz: the Mode P design ceiling (32 packets per 50 ms = 640 frames/s) is reachable; the 40 ms reply deadline is no longer a problem; the governor change may not be needed. The forwarder's own loop and its 256-entry queue become the limits (next).
+
+## Burst on the CHECK_STACKS=n image (1200 MHz, forwarder `--rcvbuf 4194304`, batch 32, queue 256), 3 runs: prediction MET in structure, numbers 8 % outside, one new finding
+| | predicted | r1 | r2 | r3 |
+|---|---|---|---|---|
+| reply p99 / max | < 3 ms | 0.83 / 0.93 ms | 0.82 / **8.76** ms | 0.82 / 0.93 ms |
+| judged | about 450-520 | 417 | 416 | 438 |
+| dropped by the forwarder queue (256, drop-oldest) | about 500-550 | 587 | 588 | 566 |
+| kernel drops / chip loss | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| replies with packets (all full batches of 32) | | 14 | 13 | 15 |
+| LATE_ANSWER / late heartbeat | 0 / 0 | 1 / 1 | 1 / 1 | 2 / 1 |
+Secure World answers in under 1 ms; judged + queue-dropped = 1004 exactly; the loss moved to the forwarder queue, as the plan said. The window of judging is 0.6-0.66 s (the burst itself lasts 0.28 s).
+**Finding / prediction miss:** LATE_ANSWER (1-2 per run) and one late heartbeat answer in EVERY run remain although each reply call takes under 1 ms. The lateness is therefore not the HMAC any more; the forwarder (a normal-priority process) is held up while the burst arrives (earlier `hmac_cost` with traffic ON showed stalls of 40-319 ms for processes sharing a CPU with the real-time interrupt thread). This is the original preemption hypothesis, now the only remaining cause; test: step 4 (forwarder on CPUs 2,3, chip interrupt on CPU 0).
