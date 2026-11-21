@@ -5,7 +5,7 @@
  * 44-byte monitor message (canbridge) and submits it to the monitor (PTA command 17). It also answers the monitor's heartbeat, like the
  * soak responder. It holds no key and builds no packet: the tag is judged only in Secure World.
  *
- *   can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--trace FILE]
+ *   can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--trace FILE] [--hblog FILE]
  *
  * --rcvbuf BYTES (burst study, step 3a) sets THIS socket's receive buffer with SO_RCVBUFFORCE (root; the kernel doubles the value) and fails if the kernel refuses;
  * without it the system default is used (212,992 bytes = about 238 FD frames). At exit the report prints the kernel's own drop count for this socket (SO_MEMINFO).
@@ -55,6 +55,20 @@ static void tr_add(uint64_t t, uint32_t kind, uint32_t a, uint32_t b)
 	if (g_trn < TR_MAX) { g_tr[g_trn].t = t; g_tr[g_trn].kind = kind; g_tr[g_trn].a = a; g_tr[g_trn].b = b; g_trn++; }
 }
 
+/* --hblog FILE: every heartbeat poll (command 22) and every heartbeat answer (command 23): time on CLOCK_MONOTONIC and on the generic counter (CNTVCT, 19.2 MHz,
+ * the same counter family the Secure World timestamps use), the TEEC result, the request number, its state, whether the nonce was non-zero, the verdict. Adds no call. */
+#define HB_MAX 6000
+static struct { uint64_t t0, c0, t1, c1; uint32_t kind, r, seq, st, nz, v, d; } g_hb[HB_MAX];
+static unsigned g_hbn;
+static uint64_t cntvct(void)
+{
+#if defined(__aarch64__)
+	uint64_t v; __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(v)); return v;
+#else
+	return 0;
+#endif
+}
+
 static int g_retries = 20;
 #define RETRY(call, r) do { int t_; for (t_ = 0; ; t_++) { (r) = (call); if ((r) != TEEC_ERROR_BUSY || t_ >= g_retries) break; \
 			     { struct timespec ts_ = {0, 2000000}; nanosleep(&ts_, NULL); } } } while (0)
@@ -72,7 +86,7 @@ static unsigned long rx_packets(const char *ifn)
 
 int main(int argc, char **argv)
 {
-	const char *ifn = "can0", *cpus = NULL, *trace_path = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0, rcvbuf = 0, batch_cap = MON_PQ_MAX_BATCH; unsigned secs;
+	const char *ifn = "can0", *cpus = NULL, *trace_path = NULL, *hblog_path = NULL; uint64_t ck_c0 = 0, ck_c1 = 0, ck_mono = 0; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0, rcvbuf = 0, batch_cap = MON_PQ_MAX_BATCH; unsigned secs;
 	struct latstat l_reply, l_gap; uint64_t t_fetch = 0, t_prev_fetch = 0, t_start_us, cpu0_us; unsigned long fetches = 0; struct timespec cpu_ts;
 	static struct cb_queue q; static uint8_t batch[MON_PQ_MAX_BATCH * MON_FRAME_LEN]; uint32_t last_pseq = 0xFFFFFFFFu, pseq, pst, pmax, pdue, rv, proc;
 	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b; struct mon_status2 s2a, s2b; int have2 = 0;
@@ -89,7 +103,7 @@ int main(int argc, char **argv)
 	}
 	if (a + 1 >= argc || strcmp(argv[a], "run")) { fprintf(stderr, "usage: can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--batch N] [--trace FILE]\n"); return 2; }
 	secs = (unsigned)strtoul(argv[a + 1], NULL, 0);
-	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; else if (!strcmp(argv[i], "--rcvbuf") && i + 1 < argc) rcvbuf = atoi(argv[++i]); else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i]; else if (!strcmp(argv[i], "--batch") && i + 1 < argc) { batch_cap = atoi(argv[++i]); if (batch_cap < 1 || batch_cap > MON_PQ_MAX_BATCH) { fprintf(stderr, "--batch: 1..%d\n", MON_PQ_MAX_BATCH); return 2; } } }
+	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; else if (!strcmp(argv[i], "--rcvbuf") && i + 1 < argc) rcvbuf = atoi(argv[++i]); else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i]; else if (!strcmp(argv[i], "--hblog") && i + 1 < argc) hblog_path = argv[++i]; else if (!strcmp(argv[i], "--batch") && i + 1 < argc) { batch_cap = atoi(argv[++i]); if (batch_cap < 1 || batch_cap > MON_PQ_MAX_BATCH) { fprintf(stderr, "--batch: 1..%d\n", MON_PQ_MAX_BATCH); return 2; } } }
 	cb_q_init(&q);
 	if (cpus) {	/* pin to the listed cores; only 0, 2, 3 (core 1 is Secure World's) */
 		cpu_set_t set; char *e, *tok, *dup = strdup(cpus); int any = 0;
@@ -115,7 +129,8 @@ int main(int argc, char **argv)
 	if (bind(s, (struct sockaddr *)&ad, sizeof ad)) { perror("bind"); return 1; }
 	r = mon_open(&c);
 	if (r) { fprintf(stderr, "cannot open the monitor session (0x%08x)\n", (unsigned)r); return 1; }
-	memset(&s0, 0, sizeof s0); RETRY(mon_get_status0(&c, &s0, &h), r);
+	memset(&s0, 0, sizeof s0); ck_c0 = cntvct(); RETRY(mon_get_status0(&c, &s0, &h), r); ck_c1 = cntvct(); ck_mono = now_us();
+	if (hblog_path) printf("clockcheck at start: CNTVCT before the status call %" PRIu64 ", Secure World now_ticks in it %" PRIu64 ", CNTVCT after %" PRIu64 " (CLOCK_MONOTONIC us %" PRIu64 ")\n", ck_c0, (uint64_t)s0.now_ticks, ck_c1, ck_mono);
 	memset(&s1a, 0, sizeof s1a); memset(&s1b, 0, sizeof s1b); (void)mon_get_status1(&c, &s1a, &h);
 	memset(&s2a, 0, sizeof s2a); memset(&s2b, 0, sizeof s2b); if (pull && stats) have2 = !mon_get_status2(&c, &s2a, &h);
 	rx0 = rx_packets(ifn);
@@ -169,11 +184,16 @@ int main(int argc, char **argv)
 		}
 		if (hb && now_ms() - last_hb_poll >= 50) {		/* a request lives 500 ms and a new one comes every 1000 ms: looking every 50 ms is plenty, and it keeps command 22 from hammering the monitor lock when --spin is used */
 			last_hb_poll = now_ms();
-			uint64_t th0 = trace_path ? now_us() : 0;
+			uint64_t th0 = trace_path ? now_us() : 0, hbt0 = hblog_path ? now_us() : 0, hbc0 = hblog_path ? cntvct() : 0;
 			r = mon_get_nonce(&c, &nonce, &seq, &st, &h);
 			if (trace_path) tr_add(th0, 4, (uint32_t)(now_us() - th0), 0);
+			if (hblog_path && g_hbn < HB_MAX) { g_hb[g_hbn].t0 = hbt0; g_hb[g_hbn].c0 = hbc0; g_hb[g_hbn].t1 = now_us(); g_hb[g_hbn].c1 = cntvct(); g_hb[g_hbn].kind = 22; g_hb[g_hbn].r = (uint32_t)r;
+				g_hb[g_hbn].seq = r ? 0 : seq; g_hb[g_hbn].st = r ? 0xFFu : st; g_hb[g_hbn].nz = !r && nonce != 0; g_hb[g_hbn].v = 0; g_hb[g_hbn].d = 0; g_hbn++; }
 			if (!r && (st == 1 || st == 3) && nonce != 0 && seq != last_answered) {
+				uint64_t hat0 = hblog_path ? now_us() : 0, hac0 = hblog_path ? cntvct() : 0;
 				RETRY(mon_submit_answer(&c, seq, nonce, &v, &d, &h), r);
+				if (hblog_path && g_hbn < HB_MAX) { g_hb[g_hbn].t0 = hat0; g_hb[g_hbn].c0 = hac0; g_hb[g_hbn].t1 = now_us(); g_hb[g_hbn].c1 = cntvct(); g_hb[g_hbn].kind = 23; g_hb[g_hbn].r = (uint32_t)r;
+					g_hb[g_hbn].seq = seq; g_hb[g_hbn].st = st; g_hb[g_hbn].nz = 1; g_hb[g_hbn].v = r ? 0xFFu : v; g_hb[g_hbn].d = r ? 0 : d; g_hbn++; }
 				if (!r) { last_answered = seq; if (v == 0) ans_on++; else if (v == 1) ans_late++; else ans_other++; }
 			}
 		}
@@ -210,6 +230,16 @@ int main(int argc, char **argv)
 	{ uint32_t mi[16]; socklen_t ml = sizeof mi; int rb = 0; socklen_t rl = sizeof rb; memset(mi, 0, sizeof mi); getsockopt(s, SOL_SOCKET, SO_RCVBUF, &rb, &rl);
 	  if (!getsockopt(s, SOL_SOCKET, SO_MEMINFO, mi, &ml)) printf("socket drops (SO_MEMINFO): %u frames dropped by the kernel for this socket; SO_RCVBUF %d bytes; receive memory in use at exit %u bytes\n", mi[8], rb, mi[0]);
 	  else printf("socket drops (SO_MEMINFO): not available (%s)\n", strerror(errno)); }
+	if (hblog_path) {
+		FILE *hf = fopen(hblog_path, "w"); unsigned k;
+		if (hf) {
+			fprintf(hf, "# start_clockcheck cntvct_before=%" PRIu64 " secure_now_ticks=%" PRIu64 " cntvct_after=%" PRIu64 " mono_us=%" PRIu64 "\n", ck_c0, (uint64_t)s0.now_ticks, ck_c1, ck_mono);
+			fprintf(hf, "kind,t_start_us,t_end_us,cntvct_start,cntvct_end,teec_result,hb_seq,hb_state,nonce_nonzero,verdict,detail\n");
+			for (k = 0; k < g_hbn; k++) fprintf(hf, "%u,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",0x%x,%u,%u,%u,%u,%u\n", g_hb[k].kind, g_hb[k].t0, g_hb[k].t1, g_hb[k].c0, g_hb[k].c1, g_hb[k].r, g_hb[k].seq, g_hb[k].st, g_hb[k].nz, g_hb[k].v, g_hb[k].d);
+			fclose(hf);
+		}
+		printf("hblog: %u heartbeat records written to %s%s\n", g_hbn, hblog_path, g_hbn >= HB_MAX ? " (buffer full)" : "");
+	}
 	if (trace_path) {
 		FILE *tf = fopen(trace_path, "w"); unsigned k;
 		if (tf) { fprintf(tf, "t_us,kind,a,b\n"); for (k = 0; k < g_trn; k++) fprintf(tf, "%" PRIu64 ",%u,%u,%u\n", g_tr[k].t, g_tr[k].kind, g_tr[k].a, g_tr[k].b); fclose(tf); }
