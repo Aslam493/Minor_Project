@@ -265,7 +265,7 @@
   "test": "Bucket sizes",
   "expected": "documented",
   "result": "PASS",
-  "evidence": "sender txqueuelen 2000 (runtime setting, NOT persistent: after the reboot it was 10 until set again); receiver can0 tx qlen 10; chip RX FIFO (ethtool -g) current 20, max 24; chip TX ring 4, max 8; forwarder queue CB_QCAP 2048 frames; SO_RCVBUF requested 4194304, granted 8388608 bytes = about 9380 frames (derived: linear scaling of the measured 238 frames at 212992 bytes, 894 B/frame); sysctl rmem_default/rmem_max 212992 (unchanged); batch 32 packets per reply, request every 50 ms; event ring: 24 pinned slots (RPI3_MON_PINNED_PER_CLASS 4 x 6 evidence classes) + 40 ordinary slots = 64 slots, events limited to 1 per second per type after the first 4 of a class (counters stay exact)",
+  "evidence": "sender txqueuelen 2000 (during the campaign a runtime setting that was 10 after the reboot; made PERSISTENT on 2026-11-22 in the sender's can0-up.service and verified after a sender reboot: qlen 2000, FD 500k/2M, no manual step); receiver can0 tx qlen 10; chip RX FIFO (ethtool -g) current 20, max 24; chip TX ring 4, max 8; forwarder queue CB_QCAP 2048 frames; SO_RCVBUF requested 4194304, granted 8388608 bytes = about 9380 frames (derived: linear scaling of the measured 238 frames at 212992 bytes, 894 B/frame); sysctl rmem_default/rmem_max 212992 (unchanged); batch 32 packets per reply, request every 50 ms; event ring: 24 pinned slots (RPI3_MON_PINNED_PER_CLASS 4 x 6 evidence classes) + 40 ordinary slots = 64 slots, events limited to 1 per second per type after the first 4 of a class (counters stay exact)",
   "file": "baseline/final_campaign/D6_buckets.txt",
   "time": "2026-11-22 00:52:27"
  },

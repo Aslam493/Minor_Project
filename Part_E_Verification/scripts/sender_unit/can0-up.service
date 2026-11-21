@@ -1,0 +1,14 @@
+[Unit]
+Description=Bring up can0 CAN-FD at 500000/2000000 bit/s (CAN sender)
+After=sys-subsystem-net-devices-can0.device
+Wants=sys-subsystem-net-devices-can0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/ip link set can0 up type can bitrate 500000 dbitrate 2000000 fd on
+ExecStartPost=/usr/sbin/ip link set can0 txqueuelen 2000
+ExecStop=/usr/sbin/ip link set can0 down
+
+[Install]
+WantedBy=multi-user.target

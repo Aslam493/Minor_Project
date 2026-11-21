@@ -14,7 +14,7 @@ LIMITS = [
   "e.g. a late heartbeat answer and a late packet reply at the same restart appear as one event; the exact counters (page 1) are used for every PASS/FAIL here"),
  ("F4", "First answer after a forwarder (re)start can be LATE", "documented, explained and tested (E1): the request is already MISSED when the forwarder starts in the second half of the heartbeat period (about 50 %) or in the last 10 ms of the 50 ms packet period (about 20 %)",
   "E1 10 of 10, series s3_ 30 of 30, n7h 21 of 21: first state MISSED <=> first answer LATE"),
- ("F5", "Settings that are not persistent", "documented: governor (powersave after every reboot; performance only by hand), sender `txqueuelen` 2000 (10 after a reboot until set again), the forwarder is not a service (E2b), all test tools live in /tmp (RAM)",
+ ("F5", "Settings that are not persistent", "documented: governor (powersave after every reboot; performance only by hand), sender `txqueuelen` 2000 (was 10 after a reboot during the campaign; PERSISTENT since 2026-11-22, verified after a sender reboot), the forwarder is not a service (E2b; fix in progress), all test tools live in /tmp (RAM)",
   "A4/E2 reboot: governor powersave, sender qlen reset; D6"),
  ("F6", "Reading the monitor during a run costs time", "documented: a status read while the forwarder runs delays the next packet fetch by 20-30 ms (a late packet reply at the harness snapshot), heavy PTA polling disturbs the heartbeat (cf. F24)",
   "baseline/BURST_STEPS_RESULTS_20261121.md (traces n5t, p1 run 5); the campaign reads status only between traffic phases"),
