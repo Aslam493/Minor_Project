@@ -43,3 +43,9 @@ Tool `tools/monitor_client/hmac_cost.c`: answers open Mode P requests with n = 0
 - (1) nohmac: base about 0.9 ms (the empty reply seen in the trace), slope about 0.02 ms per packet; hmac slope about 1.07 ms per packet; one HMAC about 1.05 ms.
 - (2) the same within +-10 %. If traffic ON is clearly slower, the CAN/SPI activity shares something with the Secure World path.
 - (3) base about 4.0 ms, hmac slope about 4.95, nohmac slope about 0.05, one HMAC about 4.9 ms.
+
+## Root-cause check 3d: `speedprobe` test TA (RAM only, no flash), written before the run
+A user-mode Trusted Application (S-EL0) that times, with `TEE_GetSystemTime` over loops long enough for 1 % accuracy: (A) a register-only loop (no memory access), (B) a streaming sum over 16 KiB (fits the L1 data cache), (C) the same over 256 KiB (L2), (D) 2000 calls of `TEE_GetSystemTime` (a cheap system call into the core: call overhead), (E) 50 HMAC-SHA256 of 12 bytes through the TEE API (`TEE_MACInit` + `TEE_MACComputeFinal`), (F) 50 SHA-256 of 64 bytes.
+Expected on a Cortex-A53 at 1.2 GHz with caches on: (A) 2,000,000 iterations in about 8-15 ms; (B) 200 passes of 2048 words in about 1-3 ms; (C) 20 passes of 32768 words in about 3-8 ms; (D) about 2000 x (1-3 us); (E) 50 HMACs in about 1-3 ms.
+Hypotheses: H1 secure memory uncached or caches off: (A) and (B) 30-100x slower than expected; H2 only data accesses uncached: (A) normal, (B) and (C) slow; H3 the secure world is throttled by clock only: all about 2x slower than expected, not 30-100x; H4 the cost is in the core crypto/syscall path only: (A)-(C) normal, (D)-(F) slow.
+Method to run without a flash: build the TA with the dev kit and the default signing key, put it in a tmpfs directory and bind-mount that over /lib/optee_armtz for the duration of the test, then unmount (the card is not written).
