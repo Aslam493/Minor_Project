@@ -90,7 +90,7 @@ L.append("""
 5. (post-flash) E2ar: my runner required a read within 90 s of boot (a clause that was not in the written prediction); the first login was at uptime 212 s. Recorded as FAIL, not reclassified; redone after a reboot (E2ar2 PASS).
 6. (post-flash) A2r: I ran board_full_check with the forwarder service running, although the script is the heartbeat responder itself (E13-E18); my prediction had said that a service-caused FAIL would be reported and nothing changed, and that is what was done; rerun with the service stopped passes (A2r2).
 7. (post-flash) B1r: my prediction 'all attack classes +0' ignored the documented COUNTER_RESYNC of the first packet after a boot (last_counter 0); rerun at a later point (B1r2).
-8. (post-flash) E2c: the defect in `S95can_forwarder` (start/restart over ssh never return) is MINE, found only because I tested the service control over ssh; the boot path was tested earlier from /tmp with plain ssh calls that happened to return, because my first test redirected nothing but ran the commands in a way that did not keep the pipes (it passed), and I did not test the exact ssh form that the campaign runner uses. It is open (F12).
+8. (post-flash) E2c: the defect in `S95can_forwarder` (start/restart over ssh never return) is MINE. My earlier test of the script on the receiver did not show it because that test ended with `stop` inside the same ssh command, so the supervisor was already gone when ssh waited for its pipes to close; I never ran `start` alone over ssh before building the image. It is open (F12).
 9. The heartbeat log holds 6,000 records (about 300 s), so for the 320 s run it shows 311 answers while the forwarder's own counter shows 321; both are on time.
 """)
 L.append("## What is not shown\n")
