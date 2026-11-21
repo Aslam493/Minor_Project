@@ -1,0 +1,12 @@
+# EXPECTED for a plain burst, written BEFORE sending, only if NOTHING is lost: every frame ACCEPTED, last_counter_end = start + N; a loss shows as COUNTER_GAP
+last_counter_start=7247
+frames_attempted=320
+frames_judged=320
+AUTH_FAIL=0
+REPLAY=0
+MALFORMED=0
+COUNTER_GAP=0
+COUNTER_RESYNC=0
+ACCEPTED=320
+last_counter_end=7567
+plain=1

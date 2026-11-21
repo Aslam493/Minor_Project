@@ -67,7 +67,7 @@
   "test": "Heartbeat for 5 minutes",
   "expected": "0 late and 0 missed (the first answer after the forwarder start may be LATE only if its first state was MISSED)",
   "result": "PASS",
-  "evidence": "311 heartbeat answers (forwarder: ON_TIME 321, LATE 0), later than the first: 0 late; first answer verdict 0 (first request state 1); end of run hb_state ANSWERED hb_miss_count 0; late_answers 0. CORRECTION: the first evaluation by the runner read the pre-run snapshot (hb_miss_count 14, taken while no forwarder was running) and reported FAIL; the rule (0 misses at the end) is unchanged, the runner now reads the end-of-run record.",
+  "evidence": "311 heartbeat answers in the heartbeat log (its 6000-record buffer filled at about 300 s; the forwarder's own counters cover the whole 320 s:  ON_TIME 321, LATE 0), later than the first: 0 late; first answer verdict 0 (first request state 1); end of run hb_state ANSWERED hb_miss_count 0; late_answers 0. CORRECTION: the first evaluation by the runner read the pre-run snapshot (hb_miss_count 14, taken while no forwarder was running) and reported FAIL; the rule (0 misses at the end) is unchanged, the runner now reads the end-of-run record.",
   "file": "baseline/final_campaign/B2_B3_300s.txt",
   "time": "2026-11-22 00:42:07"
  },
@@ -79,5 +79,95 @@
   "evidence": "requests 6361: ON_TIME 6361 LATE 0 STALE 0 UNISSUED 0 DUPLICATE 0; run  1 PASS | powersave 600 MHz | sent 3000 = judged 3000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | EN",
   "file": "baseline/final_campaign/B2_B3_300s.txt",
   "time": "2026-11-22 00:42:07"
+ },
+ "C1": {
+  "id": "C1",
+  "test": "Replay (old counter b-2, valid tag)",
+  "expected": "REPLAY +1 detail 1 (exact counter), other attack classes 0, judged 8, last_counter 7207",
+  "result": "PASS",
+  "evidence": "class deltas {'REPLAY': 1}; judged 8 of 8; event [('REPLAY', 1)]; last_counter 7207 (want 7207)",
+  "file": "baseline/final_campaign/C1.txt",
+  "time": "2026-11-22 00:42:58"
+ },
+ "C2": {
+  "id": "C2",
+  "test": "Duplicate (the last frame again, byte for byte)",
+  "expected": "REPLAY +1 detail 2 (exact counter), other attack classes 0, judged 8, last_counter 7214",
+  "result": "PASS",
+  "evidence": "class deltas {'REPLAY': 1}; judged 8 of 8; event [('REPLAY', 2)]; last_counter 7214 (want 7214)",
+  "file": "baseline/final_campaign/C2.txt",
+  "time": "2026-11-22 00:43:15"
+ },
+ "C3": {
+  "id": "C3",
+  "test": "Same counter, different payload, valid tag",
+  "expected": "REPLAY +1 detail 3 (exact counter), other attack classes 0, judged 8, last_counter 7221",
+  "result": "PASS",
+  "evidence": "class deltas {'REPLAY': 1}; judged 8 of 8; event [('REPLAY', 3)]; last_counter 7221 (want 7221)",
+  "file": "baseline/final_campaign/C3.txt",
+  "time": "2026-11-22 00:43:31"
+ },
+ "C4": {
+  "id": "C4",
+  "test": "Tampered payload (tag of the original payload)",
+  "expected": "AUTH_FAIL +1 detail 0 (exact counter), other attack classes 0, judged 8, last_counter 7228",
+  "result": "PASS",
+  "evidence": "class deltas {'AUTH_FAIL': 1}; judged 8 of 8; event [('AUTH_FAIL', 0)]; last_counter 7228 (want 7228)",
+  "file": "baseline/final_campaign/C4.txt",
+  "time": "2026-11-22 00:43:48"
+ },
+ "C5": {
+  "id": "C5",
+  "test": "Wrong CAN id 0x124 (valid tag for that id)",
+  "expected": "MALFORMED +1 detail 3 (exact counter), other attack classes 0, judged 8, last_counter 7235",
+  "result": "PASS",
+  "evidence": "class deltas {'MALFORMED': 1}; judged 8 of 8; event [('MALFORMED', 3)]; last_counter 7235 (want 7235)",
+  "file": "baseline/final_campaign/C5.txt",
+  "time": "2026-11-22 00:44:04"
+ },
+ "C6": {
+  "id": "C6",
+  "test": "Counter jump +5 (b -> b+5)",
+  "expected": "COUNTER_GAP +1 detail 4 (exact counter), other attack classes 0, judged 8, last_counter 7247",
+  "result": "PASS",
+  "evidence": "class deltas {'COUNTER_GAP': 1}; judged 8 of 8; event [('COUNTER_GAP', 4)]; last_counter 7247 (want 7247)",
+  "file": "baseline/final_campaign/C6.txt",
+  "time": "2026-11-22 00:44:21"
+ },
+ "C5b": {
+  "id": "C5b",
+  "test": "Wrong-id frames: reply cost per packet",
+  "expected": "cheaper than a valid frame (rejected before the HMAC)",
+  "result": "PASS",
+  "evidence": "wrong id 6.7 us/packet, valid 54.6 us/packet (reply call time / packets, 600 MHz, trace)",
+  "file": "baseline/final_campaign/C5_cost.txt",
+  "time": "2026-11-22 00:46:01"
+ },
+ "C7": {
+  "id": "C7",
+  "test": "Stop the sender (silence 1.5 s)",
+  "expected": "traffic TIMEOUT detail 1 (exact counter +1 during the silence), TRAFFIC_RECOVERED +1 when frames resume",
+  "result": "PASS",
+  "evidence": "TIMEOUT counter +1 during the silence, traffic age 1768 ms (limit 300), event TIMEOUT detail 1: True, TRAFFIC_RECOVERED +1 on resume",
+  "file": "baseline/final_campaign/C7.txt",
+  "time": "2026-11-22 00:46:21"
+ },
+ "C8": {
+  "id": "C8",
+  "test": "Stop the forwarder (kill -9) with a healthy heartbeat",
+  "expected": "after k=3 missed challenges: TIMEOUT detail 2 (exact counter), hb_miss_count reaches 3; on restart HEARTBEAT_RECOVERED",
+  "result": "PASS",
+  "evidence": "hb_miss_count sequence [0, 1, 2, 3, 4, 5]; TIMEOUT detail 2 event: True; HEARTBEAT_RECOVERED 24 -> 26 after restart | exact sequence (file C8): TIMEOUT counter 38 -> 39 in the same ~0.4 s sample in which hb_miss_count became 3 (TIMEOUT detail 2, k=3); the earlier +1 was detail 4 (packet requests unanswered)",
+  "file": "baseline/final_campaign/C8.txt",
+  "time": "2026-11-22 00:46:40"
+ },
+ "C9": {
+  "id": "C9",
+  "test": "Late Mode P answer (forwarder frozen 30-90 ms, 40 times, 20 frames/s)",
+  "expected": "answers to missed requests judged LATE (or STALE), counted exactly; forwarder count = Secure World count",
+  "result": "PASS",
+  "evidence": "forwarder saw LATE 8 STALE 0; Secure World request counters (page 2): LATE 8; LATE_ANSWER counter +8 (includes a heartbeat one at most), STALE_ANSWER +0",
+  "file": "baseline/final_campaign/C9.txt",
+  "time": "2026-11-22 00:47:37"
  }
 }

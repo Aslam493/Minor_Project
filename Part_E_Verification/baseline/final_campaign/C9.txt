@@ -1,0 +1,19 @@
+frozen 40 times
+
+== forwarder log
+can_forwarder: can0, 30 s, heartbeat answered, PULL mode (frames are held until Secure World asks); monitor last_counter 7580
+socket receive buffer: 212992 bytes (system default); batch cap 32 packets per reply
+PULL: frames received from can0 and queued: 440 | requests answered: 578 (ON_TIME 570, LATE 8, STALE 0, UNISSUED 0, DUPLICATE 0) | packets sent in replies and judged: 440 | still queued: 0 | dropped by the queue: 0
+SECURE-WORLD-SIDE request issued -> answer received (Secure World clock), this run: n 578 (ON_TIME 570, LATE 8); p50 in bucket 4-6 ms, p99 in bucket 42-44 ms, slowest in bucket 46-48 ms (2 ms buckets, upper edge is the bound); max since boot 49.531 ms
+LINUX-SIDE reply time, request fetched -> reply returned: n 578 (lost 0) p50 198 us, p99 439 us, max 8928 us
+LINUX-SIDE gap between two request fetches (worst wait before Linux looks): n 2763 (lost 0) p50 10133 us, p99 58418 us, max 106116 us
+CPU COST of this process: 458 ms CPU in 30011 ms wall = 1.5 % of one core; 10 ms poll() polling; 2764 request fetches; pinned to cores: (not pinned)
+Secure World judged 440 packets in this run; events it raised: TIMEOUT 1 TRAFFIC_RECOVERED 1 HEARTBEAT_RECOVERED 1 LATE_ANSWER 8
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 31 LATE 0 other 0
+can0 rx_packets counter (frames received by the CAN controller): 7901 -> 8341 (+440)
+socket drops (SO_MEMINFO): 0 frames dropped by the kernel for this socket; SO_RCVBUF 212992 bytes; receive memory in use at exit 0 bytes
+end state: flags 0x0f last_counter 8020 hb_state ANSWERED miss_count 0 starved 0
+
+== counters before/after: LATE_ANSWER 13 -> 21, STALE_ANSWER 0 -> 0

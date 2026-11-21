@@ -1,0 +1,22 @@
+baseline before the stop: hb_state ANSWERED miss 0 TIMEOUT 37
+== samples every ~0.5 s after kill -9 of the forwarder
+T1  last_counter 7580 hb_seq 1198 hb_state ANSWERED hb_miss_count 0 idle_uses 0 | TIMEOUT= TIMEOUT 37
+T2  last_counter 7580 hb_seq 1198 hb_state ANSWERED hb_miss_count 0 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T3  last_counter 7580 hb_seq 1199 hb_state OPEN hb_miss_count 0 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T4  last_counter 7580 hb_seq 1199 hb_state MISSED hb_miss_count 1 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T5  last_counter 7580 hb_seq 1200 hb_state OPEN hb_miss_count 1 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T6  last_counter 7580 hb_seq 1200 hb_state MISSED hb_miss_count 2 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T7  last_counter 7580 hb_seq 1201 hb_state OPEN hb_miss_count 2 idle_uses 0 | TIMEOUT= TIMEOUT 38
+T8  last_counter 7580 hb_seq 1201 hb_state MISSED hb_miss_count 3 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T9  last_counter 7580 hb_seq 1202 hb_state OPEN hb_miss_count 3 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T10  last_counter 7580 hb_seq 1202 hb_state OPEN hb_miss_count 3 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T11  last_counter 7580 hb_seq 1202 hb_state MISSED hb_miss_count 4 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T12  last_counter 7580 hb_seq 1203 hb_state OPEN hb_miss_count 4 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T13  last_counter 7580 hb_seq 1203 hb_state MISSED hb_miss_count 5 idle_uses 0 | TIMEOUT= TIMEOUT 39
+T14  last_counter 7580 hb_seq 1204 hb_state OPEN hb_miss_count 5 idle_uses 0 | TIMEOUT= TIMEOUT 39
+
+== events
+{'seq': 84, 'name': 'HEARTBEAT_RECOVERED', 'counter': 23701, 'detail': 1, 'ticks': 23134451728}
+{'seq': 85, 'name': 'TIMEOUT', 'counter': 0, 'detail': 4, 'ticks': 23236207969}
+{'seq': 86, 'name': 'TIMEOUT', 'counter': 0, 'detail': 2, 'ticks': 23293625159}
+== after restart: HEARTBEAT_RECOVERED 26 hb_state ANSWERED miss 0

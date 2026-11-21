@@ -1,0 +1,10 @@
+after 10 frames: traffic_age 2740966 ticks, TIMEOUT 34
+after 1.5 s of silence: traffic_age 33949382 ticks (1768 ms), TIMEOUT 35
+after 3 more frames: TRAFFIC_RECOVERED delta 1
+events:
+{'seq': 77, 'name': 'LATE_ANSWER', 'counter': 23271, 'detail': 1, 'ticks': 22719552053}
+{'seq': 78, 'name': 'HEARTBEAT_RECOVERED', 'counter': 23272, 'detail': 1, 'ticks': 22719752891}
+{'seq': 79, 'name': 'TRAFFIC_RECOVERED', 'counter': 0, 'detail': 1, 'ticks': 22792224459}
+{'seq': 80, 'name': 'TIMEOUT', 'counter': 0, 'detail': 1, 'ticks': 22800874779}
+{'seq': 81, 'name': 'TRAFFIC_RECOVERED', 'counter': 0, 'detail': 1, 'ticks': 22835596983}
+{'seq': 82, 'name': 'TIMEOUT', 'counter': 0, 'detail': 1, 'ticks': 22842327546}

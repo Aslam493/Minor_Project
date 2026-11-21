@@ -1,0 +1,49 @@
+frames sent (8): warm-up 5, attack 1, follow-up 2
+20 123 361c0000361cdec02939dc549df5740474456a531f2b8f5dd0fb5e4aa6b9b138867c993a288efecb0000000000000000  # valid 7222
+20 123 371c0000371cdec0ade192f5e1642bccf686f2ef63fc52494809f1606142142e8b7134de2e98ca770000000000000000  # valid 7223
+20 123 381c0000381cdec0d9045de3d35b3cb1e6b740336d856fde445d2f7fb4172fce30ee46fb2eb97f8f0000000000000000  # valid 7224
+20 123 391c0000391cdec0eced709ebe494183103338871ea0e556740d18f428d2a1e176960a68e37101b90000000000000000  # valid 7225
+20 123 3a1c00003a1cdec0f84d6b4c9d0b348460ca7bc300ac91fa161c84477dda6e913686ae968267e2810000000000000000  # valid 7226
+100 123 3b1c00003a1cdec06d40c331d01c70dbffb88b4eaa7641f63b004b6f8351a5cae80593dab5cc04dc0000000000000000  # payload bit flipped, original tag
+20 123 3b1c00003b1cdec06d40c331d01c70dbffb88b4eaa7641f63b004b6f8351a5cae80593dab5cc04dc0000000000000000  # valid 7227
+20 123 3c1c00003c1cdec0d2137d855d46e109c6e3b7e371e396bbf3ef4bc84471720e7e7e5ede058459af0000000000000000  # valid 7228
+
+== sender
+sent 8 CAN-FD frames on can0 (no key, no HMAC in this script)
+
+== status after / events from 49
+page 0: version 1 length 128 boot_id 0x9a0e2e23 flags 0x0f mode 2
+  now_ticks 19977220610 core1_poll_age_ticks 8060 poll_count 38496419170
+  skip_count 0 skip_total 236 pta_lock_timeouts 0 pta_timeouts_seen 0
+  last_counter 7228 hb_seq 1028 hb_state ANSWERED hb_miss_count 0 idle_uses 0
+  traffic_age_ticks 58658871 hb_last_ok_age_ticks 15098644 lease_remaining_ticks 0
+  ev_seq 53 ev_ack 48 ev_lost 5 pinned_used 8
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=236
+page 1: version 1 length 128 verdict totals frame 7232 heartbeat 813 crosscheck 0
+  AUTH_FAIL            1
+  REPLAY               3
+  TIMEOUT              23
+  COUNTER_RESYNC       1
+  TRAFFIC_RECOVERED    7
+  HEARTBEAT_RECOVERED  15
+  LEGACY_CMD_REFUSED   28
+  LATE_ANSWER          8
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=236
+seq 49 HEARTBEAT_RECOVERED  counter 20293 detail 1 ticks 19842787031
+seq 50 LATE_ANSWER          counter 1021 detail 0 ticks 19842792055
+seq 51 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 19914715920
+seq 52 AUTH_FAIL            counter 7227 detail 0 ticks 19917593187
+seq 53 TIMEOUT              counter 0 detail 1 ticks 19924329914
+  returned 5, more=0, ev_lost=5
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=236
+
+== forwarder log (tail)
+st 0) p50 10133 us, p99 10365 us, max 29273 us
+CPU COST of this process: 214 ms CPU in 14013 ms wall = 1.5 % of one core; 10 ms poll() polling; 1373 request fetches; pinned to cores: (not pinned)
+Secure World judged 8 packets in this run; events it raised: AUTH_FAIL 1 TIMEOUT 1 TRAFFIC_RECOVERED 1 HEARTBEAT_RECOVERED 1 LATE_ANSWER 1
+frames submitted to the monitor: 0 | verdicts: ACCEPTED 0 GAP 0 RESYNC 0 MALFORMED 0 AUTH_FAIL 0 REPLAY 0 DUPLICATE 0 CONFLICT 0 | BUSY 0 errors 0
+dropped by the forwarder: error frame 0, remote frame 0, wrong length 0
+heartbeat answers: ON_TIME 14 LATE 1 other 0
+can0 rx_packets counter (frames received by the CAN controller): 7224 -> 7232 (+8)
+socket drops (SO_MEMINFO): 0 frames dropped by the kernel for this socket; SO_RCVBUF 212992 bytes; receive memory in use at exit 0 bytes
+end state: flags 0x0f last_counter 7228 hb_state ANSWERED miss_count 0 starved 0
