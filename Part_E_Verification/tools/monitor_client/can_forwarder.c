@@ -9,6 +9,8 @@
  *
  * --rcvbuf BYTES (burst study, step 3a) sets THIS socket's receive buffer with SO_RCVBUFFORCE (root; the kernel doubles the value) and fails if the kernel refuses;
  * without it the system default is used (212,992 bytes = about 238 FD frames). At exit the report prints the kernel's own drop count for this socket (SO_MEMINFO).
+ * --batch N (burst study, step 3c) limits the packets sent in one reply to N (1..32, default 32). A reply costs about 4.0 ms + 4.95 ms per packet at 600 MHz and
+ * 0.8 ms + 1.07 ms per packet at 1200 MHz (measured), and Secure World wants it within 40 ms, so a fixed cap is a WORKAROUND that depends on the CPU clock.
  * --trace FILE records, in memory, the time of every frame read, request fetch, reply (with its batch size) and heartbeat call and writes it as CSV (t_us,kind,a,b) at
  * exit: kind 1 frame read (a = queue depth after), 2 request fetch (a = call us, b = request state), 3 reply (a = batch size, b = call us), 4 heartbeat poll (a = call us).
  * Instrumentation only: it does not change what the forwarder does.
@@ -70,7 +72,7 @@ static unsigned long rx_packets(const char *ifn)
 
 int main(int argc, char **argv)
 {
-	const char *ifn = "can0", *cpus = NULL, *trace_path = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0, rcvbuf = 0; unsigned secs;
+	const char *ifn = "can0", *cpus = NULL, *trace_path = NULL; int a = 1, verbose = 0, hb = 1, pull = 0, s, on = 1, i, stats = 0, spin = 0, rcvbuf = 0, batch_cap = MON_PQ_MAX_BATCH; unsigned secs;
 	struct latstat l_reply, l_gap; uint64_t t_fetch = 0, t_prev_fetch = 0, t_start_us, cpu0_us; unsigned long fetches = 0; struct timespec cpu_ts;
 	static struct cb_queue q; static uint8_t batch[MON_PQ_MAX_BATCH * MON_FRAME_LEN]; uint32_t last_pseq = 0xFFFFFFFFu, pseq, pst, pmax, pdue, rv, proc;
 	unsigned long reqv[5] = {0}, requests = 0, judged_sent = 0, received = 0; struct mon_status1 s1a, s1b; struct mon_status2 s2a, s2b; int have2 = 0;
@@ -85,9 +87,9 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[a], "--cpus") && a + 1 < argc) { cpus = argv[a + 1]; a += 2; }
 		else break;
 	}
-	if (a + 1 >= argc || strcmp(argv[a], "run")) { fprintf(stderr, "usage: can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--trace FILE]\n"); return 2; }
+	if (a + 1 >= argc || strcmp(argv[a], "run")) { fprintf(stderr, "usage: can_forwarder [--iface can0] [--retries N] [--cpus LIST] run SECONDS [--verbose] [--no-heartbeat] [--pull] [--stats] [--spin] [--rcvbuf BYTES] [--batch N] [--trace FILE]\n"); return 2; }
 	secs = (unsigned)strtoul(argv[a + 1], NULL, 0);
-	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; else if (!strcmp(argv[i], "--rcvbuf") && i + 1 < argc) rcvbuf = atoi(argv[++i]); else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i]; }
+	for (i = a + 2; i < argc; i++) { if (!strcmp(argv[i], "--verbose")) verbose = 1; else if (!strcmp(argv[i], "--no-heartbeat")) hb = 0; else if (!strcmp(argv[i], "--pull")) pull = 1; else if (!strcmp(argv[i], "--stats")) stats = 1; else if (!strcmp(argv[i], "--spin")) spin = 1; else if (!strcmp(argv[i], "--rcvbuf") && i + 1 < argc) rcvbuf = atoi(argv[++i]); else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i]; else if (!strcmp(argv[i], "--batch") && i + 1 < argc) { batch_cap = atoi(argv[++i]); if (batch_cap < 1 || batch_cap > MON_PQ_MAX_BATCH) { fprintf(stderr, "--batch: 1..%d\n", MON_PQ_MAX_BATCH); return 2; } } }
 	cb_q_init(&q);
 	if (cpus) {	/* pin to the listed cores; only 0, 2, 3 (core 1 is Secure World's) */
 		cpu_set_t set; char *e, *tok, *dup = strdup(cpus); int any = 0;
@@ -119,7 +121,7 @@ int main(int argc, char **argv)
 	rx0 = rx_packets(ifn);
 	printf("can_forwarder: %s, %u s%s%s; monitor last_counter %u\n", ifn, secs, hb ? ", heartbeat answered" : ", no heartbeat", pull ? ", PULL mode (frames are held until Secure World asks)" : "", s0.last_counter);
 	{ int rb = 0; socklen_t rl = sizeof rb; getsockopt(s, SOL_SOCKET, SO_RCVBUF, &rb, &rl);
-	  printf("socket receive buffer: %d bytes (%s)\n", rb, rcvbuf > 0 ? "forced by --rcvbuf, doubled by the kernel" : "system default"); }
+	  printf("socket receive buffer: %d bytes (%s); batch cap %d packets per reply\n", rb, rcvbuf > 0 ? "forced by --rcvbuf, doubled by the kernel" : "system default", batch_cap); }
 	end = now_ms() + (uint64_t)secs * 1000u;
 	while (now_ms() < end) {
 		struct pollfd pf = { s, POLLIN, 0 };
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
 			if (trace_path) tr_add(tf0, 2, (uint32_t)(now_us() - tf0), r ? 0xFFu : pst);
 			if (stats && !r) { t_fetch = now_us(); fetches++; if (t_prev_fetch) latstat_add(&l_gap, (uint32_t)(t_fetch - t_prev_fetch)); t_prev_fetch = t_fetch; }
 			if (!r && (pst == 1 || pst == 3) && pseq != last_pseq) {		/* OPEN or MISSED: answer once per request number */
-				unsigned n = cb_q_peek(&q, pmax < MON_PQ_MAX_BATCH ? pmax : MON_PQ_MAX_BATCH, batch);
+				unsigned n = cb_q_peek(&q, pmax < (unsigned)batch_cap ? pmax : (unsigned)batch_cap, batch);
 				uint64_t ts0 = trace_path ? now_us() : 0;
 				RETRY(mon_submit_packets(&c, pseq, n, batch, &rv, &proc, &h), r);
 				if (trace_path) tr_add(ts0, 3, n, (uint32_t)(now_us() - ts0));
