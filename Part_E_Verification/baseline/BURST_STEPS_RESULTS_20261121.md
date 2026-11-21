@@ -97,3 +97,19 @@ Predictions MET: about 0.9 ms base, 1.07 ms per HMAC packet, traffic ON within +
 | F 50 SHA-256 of 64 bytes | **61 ms = 1.2 ms each** | 1-3 ms | about 30x too slow |
 **Prediction check:** H1 (secure memory uncached / caches off), H2 (data uncached) and H3 (clock only) are REFUTED: user-mode compute and memory run at normal speed. **H4 holds: the slowness is in the OP-TEE core's system-call and crypto path.** (Two slips on the way, recorded: the first try failed with `0xffff0008` because my TA file was 0600 and the supplicant runs as user `tee`; fixed to 0644.)
 **Leading explanation (not yet tested):** the shipped core is built with `CFG_CORE_DEBUG_CHECK_STACKS=y`, which compiles the whole core with `-finstrument-functions`: every core function entry and exit calls `check_stack_limits()` (`core/kernel/thread.c`), so a system call or an HMAC pays hundreds of hook calls. That is a debug option ("most C functions check the stack pointer against the current stack limits on entry and panic if it is out of range", `mk/config.mk`), the Sep-20 baseline had it on although no makefile sets it (`IMPLEMENTATION_BASELINE.md`). The decisive test is a core built with `=n` and the same measurements (needs a flash).
+
+## ROOT CAUSE CONFIRMED (2026-11-21): CFG_CORE_DEBUG_CHECK_STACKS=y; image `rpi3-sdcard-monitor-modeP-p6-n04-nostk.img` flashed by the user, booted
+`verify_boot` 17 pass, 0 FAIL, 1 skipped (`baseline/verify_boot_nostk_20261121.txt`); `can0` came up in CAN-FD by itself (new `S12can` + `canfdcfg` in the image work). **Board note:** the two SD cards are now in each other's boards (receiver card on board serial ...1b5cbaa9, MAC 5c:ba:a9; sender card on board ...111e9802, MAC 1e:98:02; IPs follow the cards). A before/after comparison is therefore across boards; the effect below (45-100x) cannot come from a board difference.
+Same OP-TEE source (`80b310010`), same monitor code; only `CFG_CORE_DEBUG_CHECK_STACKS=n` (hook calls in the object code: 0 against 5060). Measured (`baseline/nostk_measure_20261121.txt`):
+| 1200 MHz | shipped core (=y) | new core (=n) | factor |
+|---|---|---|---|
+| 2000 trivial syscalls (speedprobe D) | 481 ms | 5 ms | 96x |
+| 50 HMAC via TEE API (E) | 98 ms | 1 ms | 98x |
+| 50 SHA-256 (F) | 61 ms | 1 ms | 61x |
+| empty monitor call (hmac_cost n=0) | 930 us | 65 us | 14x |
+| one HMAC in the monitor | 1027 us | 21.9 us | 47x |
+| no-HMAC packet | 38 us | 0.7 us | 54x |
+| reply with 32 HMAC packets | 35.0 ms | 0.79 ms | 44x |
+600 MHz with the new core: empty call 128 us, one HMAC 46.2 us, reply with 32 packets 1.66 ms (shipped core: 3.9 ms, 4.75 ms, 162 ms): 600 -> 1200 MHz is now 2.0-2.1x (HMAC 46.2 -> 21.9 us), no longer 4.2-4.7x: the super-linear clock effect was the instrumentation. User-mode loops unchanged (register loop 11 ms at 600, 5 ms at 1200).
+**Prediction check:** every threshold written before the build was met (empty call < 0.1 ms: 65 us; one HMAC < 0.15 ms: 22 us; no-HMAC packet < 5 us: 0.7 us; D < 20 ms: 5 ms; E < 10 ms: 1 ms; 600 MHz about 2x slower: 2.0-2.1x).
+**Consequence:** one HMAC is 22-46 us, a reply with 32 packets is under 2 ms even at 600 MHz: the Mode P design ceiling (32 packets per 50 ms = 640 frames/s) is reachable; the 40 ms reply deadline is no longer a problem; the governor change may not be needed. The forwarder's own loop and its 256-entry queue become the limits (next).
