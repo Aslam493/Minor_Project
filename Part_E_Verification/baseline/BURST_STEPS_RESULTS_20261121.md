@@ -189,3 +189,18 @@ Late replies: 24 in 30 runs, every one explained by the restart state. No late a
 
 ## Final pass, step 4: 2000-frame burst x5 (2004 frames each), powersave: prediction MET
 `series_report.py s4_ 5`: 5 of 5 identity PASS; 10020 of 10020 judged; lost: sender 0, chip 0, kernel socket 0, forwarder-rejected 0, Mode P queue 0 (the backlog peaked below the 2048-entry queue as predicted); planted classes exact in 5 of 5; judging window 3.12 / 3.13 / 3.13 s (predicted 3.13 +-0.2); reply p99 1.96-1.97 ms (predicted about 1.7: 15 % higher, with 32-packet batches during 3 s of continuous load); slowest reply 2.0 or 17.5 ms; late answers 5 heartbeat + 1 packet, all at the restart (5 of 5 and 5 of 5 first-state matches).
+
+## Final pass, step 5 (D4) and 6 (D5): overload with plain bursts, powersave, forwarder without --verbose: identity PASS 6 of 6, Secure World gap MATCH 6 of 6
+`series_report.py s5_ 3` (20008 frames x3) and `s6_ 3` (35000 frames x3, about 9.8 s at 3587 frames/s).
+| | prediction | s5 (20008) run 1 / 2 / 3 | s6 (35000) run 1 / 2 / 3 |
+|---|---|---|---|
+| judged (Secure World) | about 5700 / about 8450 | 5632 / 5632 / 5627 | 8320 / 8320 / 8320 |
+| dropped by the Mode P forwarder queue (counted) | about 14300 / about 26500 | 14376 / 14376 / 14381 | 26680 / 26680 / 26680 |
+| sender gave up / chip loss / kernel socket drops / forwarder-rejected / still queued | 0 | 0 | 0 |
+| identity: sent = judged + counted drops | PASS | 20008 = 5632 + 14376 etc., exact | 35000 = 8320 + 26680, exact |
+| Secure World gap: span - advancing frames + tail vs counted drops | MATCH | 14376 = 14376, 14376 = 14376, 14381 = 14381 (tail 0) | 26680 = 26680 in all three (tail 0) |
+| COUNTER_GAP verdicts (exact class counter) | | 99 | 183 |
+| judging window | about 8.9 s / about 13.3 s | 8.81-8.82 s | 13.04-13.05 s |
+| reply p99 / slowest | | 2.0 ms / 2.1, 17.6, 26.1 ms | 2.0 ms / 8.9, 8.9, 17.5 ms |
+| late answers | restart only | heartbeat 2, packet 1, all at restart | heartbeat 2, packet 0, all at restart |
+Prediction met with two small numeric misses: judged and dropped were within 1.5 % and 0.7 % of the predicted values (the 35000 run judges exactly 13.0 s x 640/s = 8320; my 8450 assumed a 2048-entry queue drained after the flood plus a slightly longer window). The pace is the Mode P ceiling of 640 frames/s; the sender, the chip FIFO, the kernel socket (4 MiB asked, 8 MiB granted) and the forwarder read loop lost nothing at 3587 frames/s sustained for 9.8 s; the ONLY loss stage is the forwarder's Mode P queue (drop-oldest, counted), and it equals the Secure World counter gap exactly.
