@@ -1,0 +1,11 @@
+# EXPECTED counts for 10 s of normal traffic, written BEFORE it is sent
+last_counter_start=33264
+frames_attempted=100
+frames_judged=100
+AUTH_FAIL=0
+REPLAY=0
+MALFORMED=0
+COUNTER_GAP=0
+COUNTER_RESYNC=0
+ACCEPTED=100
+last_counter_end=33364
