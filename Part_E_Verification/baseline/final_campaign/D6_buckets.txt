@@ -1,0 +1,33 @@
+txq_receiver 10
+Ring parameters for can0:
+Pre-set maximums:
+RX:		24
+RX Mini:	0
+RX Jumbo:	0
+TX:		8
+Current hardware settings:
+RX:		20
+RX Mini:	0
+RX Jumbo:	0
+TX:		4
+
+Coalesce parameters for can0:
+Adaptive RX: off  TX: off
+stats-block-usecs: 0
+sample-interval: 0
+pkt-rate-low: 0
+pkt-rate-high: 0
+
+rx-usecs: 0
+[   10.635181] mcp251xfd spi0.1 (unnamed net_device) (uninitialized): Failed to read Oscillator Configuration Register (osc=0x00000000).
+[   10.660283] mcp251xfd spi0.1: error -ENODEV: Failed to detect MCP251xFD.
+[   10.689011] mcp251xfd spi0.0 can0: MCP2518FD rev0.0 (-RX_INT -PLL -MAB_NO_WARN +CRC_REG +CRC_RX +CRC_TX +ECC -HD o:40.00MHz c:40.00MHz m:20.00MHz rs:17.00MHz es:16.66MHz rf:17.00MHz ef:16.66MHz) successfully initialized.
+212992
+212992
+
+== sender
+txqueuelen 2000
+
+== canbridge.h CB_QCAP 2048
+event ring: 24 pinned slots (RPI3_MON_PINNED_PER_CLASS 4 x 6 evidence classes) + 40 ordinary slots = 64 slots, events limited to 1 per second per type after the first 4 of a class (counters stay exact)
+granted SO_RCVBUF in the forwarder runs: 8388608 bytes (4194304 requested; see baseline/burst_20261122_*b1*)

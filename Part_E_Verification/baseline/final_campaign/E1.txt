@@ -1,0 +1,10 @@
+restart 1: first heartbeat state/verdict (3, 1), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 2: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 3, late packet replies 1 -> hb OK, pk OK
+restart 3: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 3, late packet replies 1 -> hb OK, pk OK
+restart 4: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 5: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 6: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 7: first heartbeat state/verdict (3, 1), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 8: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK
+restart 9: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 3, late packet replies 1 -> hb OK, pk OK
+restart 10: first heartbeat state/verdict (1, 0), later late heartbeat answers 0, first request state 1, late packet replies 0 -> hb OK, pk OK

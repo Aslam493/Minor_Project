@@ -1,0 +1,11 @@
+series p1_, 5 runs
+ run 1: MISSING
+ run 2: MISSING
+ run 3: MISSING
+ run 4: MISSING
+ run 5: MISSING
+TOTAL over the series: {'att': 0, 'judged': 0, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0}
+late answers: heartbeat 0, packet 0
+late packet replies NOT at the restart (event later than 1 s after the start, i.e. the harness status snapshot at about 22 s): 0
+restart-phase match: heartbeat 0 of 0 runs (first state MISSED <=> first answer LATE), packet 0 of 0 runs (first request MISSED <=> late packet reply)
+RESULT: FAIL (5 run(s) with an uncounted frame or a missing run; 0 run(s) UNVERIFIED because the after-run snapshot is missing: [])

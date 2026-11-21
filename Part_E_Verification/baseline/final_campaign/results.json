@@ -169,5 +169,113 @@
   "evidence": "forwarder saw LATE 8 STALE 0; Secure World request counters (page 2): LATE 8; LATE_ANSWER counter +8 (includes a heartbeat one at most), STALE_ANSWER +0",
   "file": "baseline/final_campaign/C9.txt",
   "time": "2026-11-22 00:47:37"
+ },
+ "D1a": {
+  "id": "D1a",
+  "test": "1004 burst at governor powersave (600 MHz), 5 runs",
+  "expected": "1004 judged, identity PASS, 0 loss",
+  "result": "PASS",
+  "evidence": "series p1: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 5020, 'judged': 5020, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 1.56 median 1.57 max 1.62 | CORRECTION: the runner first looked up the series under the tag p1_ (all 5 runs 'MISSING', reported FAIL); the files are saved under p1: same report, right tag, no new run",
+  "file": "baseline/final_campaign/D1a_p1.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D1b": {
+  "id": "D1b",
+  "test": "1004 burst at governor performance (1200 MHz), 5 runs",
+  "expected": "1004 judged, identity PASS, 0 loss",
+  "result": "PASS",
+  "evidence": "series p2_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 5020, 'judged': 5020, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 1.56 median 1.56 max 1.60 ",
+  "file": "baseline/final_campaign/D1b_p2_.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D2": {
+  "id": "D2",
+  "test": "30 x N=500 (504 frames), powersave: min/median/max window and late count",
+  "expected": "30 of 30 identity PASS, 504 judged each",
+  "result": "PASS",
+  "evidence": "series s3_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 15120, 'judged': 15120, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 0.76 median 0.76 max 0.81 ",
+  "file": "baseline/final_campaign/D2_s3_.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D3": {
+  "id": "D3",
+  "test": "2000-frame burst x5 (2004 frames)",
+  "expected": "5 of 5 identity PASS, 0 loss",
+  "result": "PASS",
+  "evidence": "series s4_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 10020, 'judged': 10020, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 3.12 median 3.13 max 3.13 ",
+  "file": "baseline/final_campaign/D3_s4_.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D4": {
+  "id": "D4",
+  "test": "20008-frame burst x3 (overload)",
+  "expected": "sent = judged + counted drops; Secure World gap = drops",
+  "result": "PASS",
+  "evidence": "series s5_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 60024, 'judged': 16891, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 43133, 'rej': 0} | judging window s: min 8.81 median 8.82 max 8.82 ",
+  "file": "baseline/final_campaign/D4_s5_.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D5a": {
+  "id": "D5a",
+  "test": "Flood 35000 frames at ~3587 frames/s x3",
+  "expected": "sent = judged + counted drops; Secure World gap = drops",
+  "result": "PASS",
+  "evidence": "series s6_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 105000, 'judged': 24960, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 80040, 'rej': 0} | judging window s: min 13.04 median 13.04 max 13.05 ",
+  "file": "baseline/final_campaign/D5a_s6_.txt",
+  "time": "2026-11-22 00:52:26"
+ },
+ "D5b": {
+  "id": "D5b",
+  "test": "Sustained 480 frames/s x3 (below 640)",
+  "expected": "0 loss",
+  "result": "PASS",
+  "evidence": "series s8a_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 21000, 'judged': 21000, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 13.99 median 13.99 max 14.00 ",
+  "file": "baseline/final_campaign/D5b_s8a_.txt",
+  "time": "2026-11-22 00:52:27"
+ },
+ "D5c": {
+  "id": "D5c",
+  "test": "Sustained 943 frames/s x3 (above 640)",
+  "expected": "drops counted at one stage, equal to the gap",
+  "result": "PASS",
+  "evidence": "series s8b_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 42000, 'judged': 32797, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 9203, 'rej': 0} | judging window s: min 17.16 median 17.16 max 17.21 ",
+  "file": "baseline/final_campaign/D5c_s8b_.txt",
+  "time": "2026-11-22 00:52:27"
+ },
+ "D5d": {
+  "id": "D5d",
+  "test": "Lossless limit: 2400 frames x3 and 2600 frames x3",
+  "expected": "2400 lossless; 2600 counted drops",
+  "result": "PASS",
+  "evidence": "series s7a_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 7200, 'judged': 7200, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0} | judging window s: min 3.73 median 3.73 max 3.73 (2600: see D5e)",
+  "file": "baseline/final_campaign/D5d_s7a_.txt",
+  "time": "2026-11-22 00:52:27"
+ },
+ "D5e": {
+  "id": "D5e",
+  "test": "2600-frame burst x3",
+  "expected": "counted drops = gap",
+  "result": "PASS",
+  "evidence": "series s7b_: ALL PASS (0 run(s) with an uncounted frame or a missing run; | {'att': 7800, 'judged': 7528, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 272, 'rej': 0} | judging window s: min 3.88 median 3.93 max 3.93 ",
+  "file": "baseline/final_campaign/D5e_s7b_.txt",
+  "time": "2026-11-22 00:52:27"
+ },
+ "D6": {
+  "id": "D6",
+  "test": "Bucket sizes",
+  "expected": "documented",
+  "result": "PASS",
+  "evidence": "sender txqueuelen 2000 (runtime setting, NOT persistent: after the reboot it was 10 until set again); receiver can0 tx qlen 10; chip RX FIFO (ethtool -g) current 20, max 24; chip TX ring 4, max 8; forwarder queue CB_QCAP 2048 frames; SO_RCVBUF requested 4194304, granted 8388608 bytes = about 9380 frames (derived: linear scaling of the measured 238 frames at 212992 bytes, 894 B/frame); sysctl rmem_default/rmem_max 212992 (unchanged); batch 32 packets per reply, request every 50 ms; event ring: 24 pinned slots (RPI3_MON_PINNED_PER_CLASS 4 x 6 evidence classes) + 40 ordinary slots = 64 slots, events limited to 1 per second per type after the first 4 of a class (counters stay exact)",
+  "file": "baseline/final_campaign/D6_buckets.txt",
+  "time": "2026-11-22 00:52:27"
+ },
+ "E1": {
+  "id": "E1",
+  "test": "Restart the forwarder 10x at random phase",
+  "expected": "only the first answer may be LATE and only when its first state was MISSED (heartbeat and packet request)",
+  "result": "PASS",
+  "evidence": "heartbeat: 10 of 10 match (first MISSED <=> first LATE, later answers on time); packet request: 10 of 10 match; first-state MISSED in 2 hb runs",
+  "file": "baseline/final_campaign/E1.txt",
+  "time": "2026-11-22 00:53:34"
  }
 }

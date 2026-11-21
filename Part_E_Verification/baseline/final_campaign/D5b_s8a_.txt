@@ -1,0 +1,10 @@
+series s8a_, 3 runs
+ run  1 PASS | powersave 600 MHz | sent 7000 = judged 7000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 13.99 s | reply p99 1.452 max 8.809 ms | late: heartbeat 1, packet 0 | hb first state 3 verdict 1, pk first state 1 | classes {} | SECURE-WORLD GAP: span 7000 - advancing 7000 = missing 0, tail 0 => 0 vs counted drops 0 MATCH
+ run  2 PASS | powersave 600 MHz | sent 7000 = judged 7000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 13.99 s | reply p99 1.454 max 17.532 ms | late: heartbeat 0, packet 1 | hb first state 1 verdict 0, pk first state 3 | classes {} | SECURE-WORLD GAP: span 7000 - advancing 7000 = missing 0, tail 0 => 0 vs counted drops 0 MATCH
+ run  3 PASS | powersave 600 MHz | sent 7000 = judged 7000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 14.00 s | reply p99 1.457 max 8.803 ms | late: heartbeat 0, packet 1 | hb first state 1 verdict 0, pk first state 3 | classes {} | SECURE-WORLD GAP: span 7000 - advancing 7000 = missing 0, tail 0 => 0 vs counted drops 0 MATCH
+TOTAL over the series: {'att': 21000, 'judged': 21000, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0}
+judging window s: min 13.99 median 13.99 max 14.00
+late answers: heartbeat 1, packet 2
+late packet replies NOT at the restart (event later than 1 s after the start, i.e. the harness status snapshot at about 22 s): 0
+restart-phase match: heartbeat 3 of 3 runs (first state MISSED <=> first answer LATE), packet 3 of 3 runs (first request MISSED <=> late packet reply)
+RESULT: ALL PASS (0 run(s) with an uncounted frame or a missing run; 0 run(s) UNVERIFIED because the after-run snapshot is missing: [])

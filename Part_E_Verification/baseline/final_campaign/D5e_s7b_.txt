@@ -1,0 +1,10 @@
+series s7b_, 3 runs
+ run  1 PASS | powersave 600 MHz | sent 2600 = judged 2496 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 104 + still-queued 0 | ENOBUFS-retried 3780 | window 3.88 s | reply p99 1.975 max 8.872 ms | late: heartbeat 0, packet 0 | hb first state 1 verdict 0, pk first state 1 | classes {'COUNTER_GAP': 1} | SECURE-WORLD GAP: span 2600 - advancing 2496 = missing 104, tail 0 => 104 vs counted drops 104 MATCH
+ run  2 PASS | powersave 600 MHz | sent 2600 = judged 2504 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 96 + still-queued 0 | ENOBUFS-retried 3763 | window 3.93 s | reply p99 1.977 max 17.495 ms | late: heartbeat 1, packet 0 | hb first state 3 verdict 1, pk first state 1 | classes {'COUNTER_GAP': 1} | SECURE-WORLD GAP: span 2600 - advancing 2504 = missing 96, tail 0 => 96 vs counted drops 96 MATCH
+ run  3 PASS | powersave 600 MHz | sent 2600 = judged 2528 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 72 + still-queued 0 | ENOBUFS-retried 3777 | window 3.93 s | reply p99 1.953 max 8.852 ms | late: heartbeat 1, packet 1 | hb first state 3 verdict 1, pk first state 3 | classes {'COUNTER_GAP': 2} | SECURE-WORLD GAP: span 2600 - advancing 2528 = missing 72, tail 0 => 72 vs counted drops 72 MATCH
+TOTAL over the series: {'att': 7800, 'judged': 7528, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 272, 'rej': 0}
+judging window s: min 3.88 median 3.93 max 3.93
+late answers: heartbeat 2, packet 1
+late packet replies NOT at the restart (event later than 1 s after the start, i.e. the harness status snapshot at about 22 s): 0
+restart-phase match: heartbeat 3 of 3 runs (first state MISSED <=> first answer LATE), packet 3 of 3 runs (first request MISSED <=> late packet reply)
+RESULT: ALL PASS (0 run(s) with an uncounted frame or a missing run; 0 run(s) UNVERIFIED because the after-run snapshot is missing: [])

@@ -1,0 +1,12 @@
+series p1, 5 runs
+ run  1 PASS | powersave 600 MHz | sent 1004 = judged 1004 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 1438 | window 1.57 s | reply p99 1.7 max 1.986 ms | late: heartbeat 1, packet 0 | hb first state 3 verdict 1, pk first state 1 | classes {'AUTH_FAIL': 1, 'REPLAY': 2, 'MALFORMED': 1, 'COUNTER_GAP': 1}
+ run  2 PASS | powersave 600 MHz | sent 1004 = judged 1004 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 1435 | window 1.62 s | reply p99 1.699 max 2.009 ms | late: heartbeat 1, packet 0 | hb first state 3 verdict 1, pk first state 1 | classes {'AUTH_FAIL': 1, 'REPLAY': 2, 'MALFORMED': 1, 'COUNTER_GAP': 1}
+ run  3 PASS | powersave 600 MHz | sent 1004 = judged 1004 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 1421 | window 1.56 s | reply p99 1.737 max 17.666 ms | late: heartbeat 0, packet 0 | hb first state 1 verdict 0, pk first state 1 | classes {'AUTH_FAIL': 1, 'REPLAY': 2, 'MALFORMED': 1, 'COUNTER_GAP': 1}
+ run  4 PASS | powersave 600 MHz | sent 1004 = judged 1004 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 1430 | window 1.57 s | reply p99 1.71 max 2.01 ms | late: heartbeat 1, packet 0 | hb first state 3 verdict 1, pk first state 1 | classes {'AUTH_FAIL': 1, 'REPLAY': 2, 'MALFORMED': 1, 'COUNTER_GAP': 1}
+ run  5 PASS | powersave 600 MHz | sent 1004 = judged 1004 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 1434 | window 1.57 s | reply p99 1.742 max 26.178 ms | late: heartbeat 1, packet 1 | hb first state 3 verdict 1, pk first state 1 | classes {'AUTH_FAIL': 1, 'REPLAY': 2, 'MALFORMED': 1, 'COUNTER_GAP': 1}
+TOTAL over the series: {'att': 5020, 'judged': 5020, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0}
+judging window s: min 1.56 median 1.57 max 1.62
+late answers: heartbeat 4, packet 1
+late packet replies NOT at the restart (event later than 1 s after the start, i.e. the harness status snapshot at about 22 s): 1
+restart-phase match: heartbeat 5 of 5 runs (first state MISSED <=> first answer LATE), packet 5 of 5 runs (first request MISSED <=> late packet reply)
+RESULT: ALL PASS (0 run(s) with an uncounted frame or a missing run; 0 run(s) UNVERIFIED because the after-run snapshot is missing: [])
