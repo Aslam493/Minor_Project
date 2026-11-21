@@ -1,0 +1,20 @@
+# EXPECTED counts for this burst, written BEFORE it is sent (lossless, in order)
+last_counter_start=62546
+n_valid=2000
+frames_attempted=2004
+frames_judged=2004
+AUTH_FAIL=1
+REPLAY=2
+MALFORMED=1
+COUNTER_GAP=1
+COUNTER_RESYNC=0
+ACCEPTED=1999
+last_counter_end=64548
+planted_positions(a,b,d,j,w)=[400, 800, 1100, 1400, 1700]
+# MODEL PREDICTION from the design limits (50 ms request, 32 per reply, queue 256, ~290 us per frame); not a measurement
+model_burst_on_bus_ms=581
+model_ceiling_fps_secure_world=640
+model_drained_while_arriving=384
+model_lost_at_forwarder_queue(256, drop oldest)=1364
+model_judged=640
+model_total_drain_ms=1000

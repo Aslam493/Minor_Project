@@ -186,3 +186,6 @@ Report: `python3 scripts/real_bus/series_report.py s3_ 30` (files `burst_2026112
 | late packet replies | restart only | 7 (all at restart; 30 of 30 runs: first request MISSED <=> late reply); 0 at the 22 s snapshot |
 | chip FIFO loss | 0 (rule of three: below 10 % per burst with 95 % confidence if 0 of 30) | 0 of 30 (rx_over_errors 0 in every run) |
 Late replies: 24 in 30 runs, every one explained by the restart state. No late answer anywhere else.
+
+## Final pass, step 4: 2000-frame burst x5 (2004 frames each), powersave: prediction MET
+`series_report.py s4_ 5`: 5 of 5 identity PASS; 10020 of 10020 judged; lost: sender 0, chip 0, kernel socket 0, forwarder-rejected 0, Mode P queue 0 (the backlog peaked below the 2048-entry queue as predicted); planted classes exact in 5 of 5; judging window 3.12 / 3.13 / 3.13 s (predicted 3.13 +-0.2); reply p99 1.96-1.97 ms (predicted about 1.7: 15 % higher, with 32-packet batches during 3 s of continuous load); slowest reply 2.0 or 17.5 ms; late answers 5 heartbeat + 1 packet, all at the restart (5 of 5 and 5 of 5 first-state matches).

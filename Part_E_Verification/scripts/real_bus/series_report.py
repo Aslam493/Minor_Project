@@ -90,12 +90,25 @@ def main(argv):
             # match: a MISSED first request must come with a late reply at the start (listed, or unlisted while nothing else explains it); an OPEN one must not
             pkm[0] += (at_start > 0 or (unloc > 0 and not later)) == pk_start_expected
         pk_other[0] += len(later)
+        # Secure World gap accounting (plain bursts only: no planted frame, so every counter step is a real frame). Exact, no event list:
+        #   counter span seen by Secure World = last_counter_after - last_counter_start; each frame that ADVANCES the counter (ACCEPTED, GAP, RESYNC) is one valid frame;
+        #   missing counters inside the span = span - advancing frames; counters after the last judged frame (tail) = expected end - last_counter_after.
+        #   PASS needs: counted drops (sender + chip + socket + rejected + Mode P queue) == missing in the span + tail.
+        swline = ""
+        ex = j.get("expected") or {}
+        if ex.get("plain") and not snap_missing:
+            cd = j["class_delta"]; nonadv = sum(cd.get(k, 0) for k in ("AUTH_FAIL", "REPLAY", "MALFORMED", "ALTERED", "UNACCOUNTED"))
+            adv = j["judged"] - nonadv; span = j["last_counter_after"] - ex["last_counter_start"]
+            miss = span - adv; tail = ex["last_counter_end"] - j["last_counter_after"]; counted = ls + chip + sock + rej + qd
+            gapok = (miss + tail == counted) and nonadv == 0
+            swline = " | SECURE-WORLD GAP: span %d - advancing %d = missing %d, tail %d => %d vs counted drops %d %s" % (span, adv, miss, tail, miss + tail, counted, "MATCH" if gapok else "MISMATCH")
+            if not gapok: okid = False
         w = j["judged_window_s"]; wins.append(w) if w else None
         cl = {k: v for k, v in j["class_delta"].items() if v and k in ("AUTH_FAIL", "REPLAY", "MALFORMED", "COUNTER_GAP")}
         print(" run %2d %s | %s | %s | %s | window %s s | reply p99 %s max %s ms | late: heartbeat %d, packet %d | hb first %s, pk first %s | classes %s%s" % (
             i, "UNVERIFIED" if okid is None else ("PASS" if okid else "FAIL"), gov, ident, "ENOBUFS-retried %d" % sd["enobufs"], "%.2f" % w if w else "-", j["reply_p99_ms"], j["reply_max_ms"],
             hb_late, pk_late, ("state %d verdict %d" % hbs) if hbs else "n/a", ("state %d" % pks) if pks is not None else "n/a", cl,
-            ("" if okid else " | RESIDUALS " + str(res))))
+            ("" if okid else " | RESIDUALS " + str(res)) + swline))
         bad += 0 if (okid or okid is None) else 1
         if snap_missing: continue
         tot["att"] += att; tot["judged"] += j["judged"]; tot["lost_sender"] += ls; tot["chip"] += chip; tot["sock"] += sock; tot["fq"] += qd; tot["rej"] += rej

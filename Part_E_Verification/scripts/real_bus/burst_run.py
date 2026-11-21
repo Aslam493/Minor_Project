@@ -129,6 +129,8 @@ def run_one(kind, date, scratch, idx=0):
         N, policy, tag = 100, "paced", "normal_%s" % time.strftime("%H%M%S")
     elif kind.startswith("wrongid:"):                           # experiment W: N frames with CAN id 0x124, rejected as MALFORMED before the HMAC
         N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "wrongid%d_%s" % (N, policy)
+    elif kind.startswith("plain:"):                             # N valid frames, consecutive counters, NOTHING planted (for the exact gap accounting of overload tests)
+        N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "plain%d_%s" % (N, policy)
     else:
         N, policy = int(kind.split(":")[0]), kind.split(":")[1]; tag = "N%d_%s" % (N, policy)
     nocd = os.environ.get("NOCD") == "1"                      # measurement option: do NOT run the extra candump (to see whether it adds load)
@@ -150,6 +152,16 @@ def run_one(kind, date, scratch, idx=0):
         exd = {"last_counter_start": L, "frames_attempted": 100, "frames_judged": 100, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0,
                "COUNTER_RESYNC": resync, "ACCEPTED": 100 - resync, "last_counter_end": L + 100}
         open(exp_path, "w").write("# EXPECTED counts for 10 s of normal traffic, written BEFORE it is sent\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
+    elif kind.startswith("plain:"):
+        sys.path.insert(0, MC); import packet_gen as g
+        key = g.key_from_source(); lines = ["# plain burst: %d valid packets, counters %d..%d, no planted frame, delay 0\n" % (N, L + 1, L + N)]
+        for i in range(1, N + 1):
+            c = L + i; lines.append(g.line(0, 0x123, g.packet(key, 0x123, c, 0xC0DE0000 | (c & 0xFFFF)), "valid counter %d" % c))
+        open(pre + ".txt", "w").write("".join(lines))
+        resync = 1 if L == 0 else 0
+        exd = {"last_counter_start": L, "frames_attempted": N, "frames_judged": N, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0, "COUNTER_RESYNC": resync,
+               "ACCEPTED": N - resync, "last_counter_end": L + N, "plain": 1}
+        open(exp_path, "w").write("# EXPECTED for a plain burst, written BEFORE sending, only if NOTHING is lost: every frame ACCEPTED, last_counter_end = start + N; a loss shows as COUNTER_GAP\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
     elif kind.startswith("wrongid:"):
         sys.path.insert(0, MC); import packet_gen as g
         key = g.key_from_source(); lines = ["# experiment W: %d frames with can id 0x124 (MALFORMED before the HMAC)\n" % N]
@@ -168,11 +180,11 @@ def run_one(kind, date, scratch, idx=0):
     b_rx, b_sn = snap_rx(), snap_sn(); M = page0(b_rx)["ev_seq"]
     ssh("root", RX, MCL + " ack %d" % M)
     ssh("root", RX, "rm -f /tmp/burst_cd.log /tmp/burst_fwd.log; " + ("echo 0 > /tmp/cd.pid; : > /tmp/burst_cd.log; " if nocd else "/tmp/candump_aarch64 -d -ta can0 > /tmp/burst_cd.log 2>&1 < /dev/null & echo $! > /tmp/cd.pid; ") +
-        "%s %s run %d --pull --verbose --stats %s > /tmp/burst_fwd.log 2>&1 < /dev/null & echo $! > /tmp/fwd.pid" % (FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS))
+        "%s %s run %d --pull %s--stats %s > /tmp/burst_fwd.log 2>&1 < /dev/null & echo $! > /tmp/fwd.pid" % (FWD_PREFIX, FWD_BIN, FWD_SECONDS, "" if os.environ.get("QUIET") == "1" else "--verbose ", FWD_ARGS))
     t_start = time.time(); time.sleep(4)
     # what was really in force for this run (a setting that silently did not take effect is the main risk of the plan)
-    settings = ssh("root", RX, "echo \"sysctl: $(sysctl -n net.core.rmem_default) $(sysctl -n net.core.rmem_max)  (rmem_default rmem_max)\"; echo \"forwarder: $(sha256sum %s | cut -c1-16)  cmd: %s %s run %d --pull --verbose --stats %s\"; "
-                   "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"; echo \"cpu governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) at $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq) kHz\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS)) \
+    settings = ssh("root", RX, "echo \"sysctl: $(sysctl -n net.core.rmem_default) $(sysctl -n net.core.rmem_max)  (rmem_default rmem_max)\"; echo \"forwarder: $(sha256sum %s | cut -c1-16)  cmd: %s %s run %d --pull %s--stats %s\"; "
+                   "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"; echo \"cpu governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) at $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq) kHz\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, "" if os.environ.get("QUIET") == "1" else "--verbose ", FWD_ARGS)) \
         + ssh("sender", SN, "echo \"sender can0 qlen $(cat /sys/class/net/can0/tx_queue_len)\"")
     cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
     send_out = ssh("sender", SN, cmd, timeout=120); t_sent = time.time() - t_start
