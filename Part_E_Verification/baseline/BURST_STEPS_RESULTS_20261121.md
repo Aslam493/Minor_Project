@@ -152,3 +152,24 @@ Next: `--trace` on bursts to see the forwarder's heartbeat polls and the call ti
 
 ## Heartbeat trace (`--hblog`), 21 runs with random restart phase: H-restart CONFIRMED, prediction met except two numbers
 Records: `baseline/hblog_20261121_n7h1..21.csv` and the run files `burst_20261121_*_n7h*_r1.txt`; details and the table in `REAL_BUS_RESULTS.md` 10.9. Met: (1) late first heartbeat answer 10 of 21 (47 %), bursts 6/13, no burst 4/8; (2) first poll state MISSED in all 10 late runs and OPEN in all 11 on-time runs; (3) all 756 later heartbeats ON_TIME, seen OPEN, 0 TEEC errors, 0 zero-nonce polls, largest poll gap 92.5 ms, answer sent 0.00-0.02 ms after the poll; (4) clock: Secure World counter and CNTVCT differ by 0.0-0.1 ms (my first reading of 36 s was a bug of mine: the CSV header took the end-of-run Secure World time). Missed: (5) the packet-request late first reply occurred in 8 of 21 runs (38 %), predicted 10-30 %. Not refuted: no late answer in or near any burst window. The "no-burst LATE_ANSWER = stale event" guess is refuted (new events 0.51-0.53 s after the start snapshot, exact counter +1). No Secure World change proposed.
+
+## Final pass, step 1: governor. The 1.56 s result was measured at `performance` (1200 MHz); rerun at `powersave` (600 MHz, the default after a reboot): SAME RESULT
+Which governor: the 1.56 s runs (3b, 4, 7) used `performance` (set by `echo performance` before the n1200 runs; the printout `governor performance` came right before the 3b runs). The run files did not record it; from now on every run file has `cpu governor <name> at <kHz>` (harness change, log line only). Series p1 (5 bursts of 1004 frames, governor powersave 600000 kHz, new core, forwarder `--rcvbuf 4 MiB`, `--trace`, `--hblog`, random restart phase), report `scripts/real_bus/series_report.py p1 5`:
+| | prediction (written before) | performance 1200 MHz (3b+4+7: 29 bursts) | powersave 600 MHz (p1, 5 bursts) |
+|---|---|---|---|
+| judged | 1004 of 1004, 0 lost at every stage | 1004 of 1004 | **1004 of 1004 in all 5** (identity PASS 5 of 5; sender 0, chip 0, socket 0, forwarder 0, queue 0) |
+| planted classes | exact | exact | exact in 5 of 5 |
+| judging window | 1.56 +-0.15 s | 1.55-1.61 s | 1.56 / 1.57 / 1.57 / 1.57 / 1.62 s (median 1.57) |
+| reply p99 | under 3 ms (about 1.7) | 0.82-0.89 ms | 1.70-1.74 ms; max 2.0 ms (17.7 and 26.2 ms once each) |
+| late | restart-phase only | restart-phase | heartbeat 4 (all at restart, 5 of 5 first-state match), packet 1 (at 22.36 s: the harness status snapshot, see step 2) |
+Prediction met. At 600 MHz the reply time doubles (0.83 -> 1.7 ms) but the pace is set by the Mode P request period (32 per 50 ms), so the 1.56 s does not change. Proposal in the verdict section after steps 3-5 (they run at powersave).
+
+## Final pass, step 2: late packet reply at restart (8 of 21 in the n7h series): the restart-phase effect, plus one other cause found
+Method: `series_report.py` classifies each late packet reply by time on the forwarder timeline (Secure World LATE_ANSWER events with detail 1, Secure World clock against the clock check at the forwarder start) and compares the first packet request the forwarder saw (trace kind 2, b = state 1 OPEN / 3 MISSED) with it.
+| series | runs with trace | first request MISSED <=> late reply at the start | late reply NOT at the start |
+|---|---|---|---|
+| n5t | 6 | 6 of 6 match | 1 (23.29 s in run 3) |
+| p1 | 5 | 5 of 5 match | 1 (22.36 s in run 5) |
+| n7h | 0 (heartbeat log only) | 7 late replies listed, all at 0.01 s after the start | 0; run 20: counter +1 but no listed event (its after-run snapshot is empty, see below) |
+**11 of 11 runs with a trace match.** The two late replies at 22-23 s coincide with the harness's own status snapshot (SNAP_AT): the trace shows fetch calls of 21 ms and 22 ms and a 57.6 ms gap between fetches at 22.3 s, while the burst (4.5-6.1 s) is clean. That is a second cause, introduced by my measurement (a `status` read during the run), not by the burst or the restart. The packet request is OPEN for 40 ms of every 50 ms, so a restart is MISSED in 20 % of the cases; over all 32 runs the late reply at the start occurred 10 times (31 %; the n7h series alone 8 of 21 = 38 %, one standard deviation of chance above 20 %).
+**Harness finding:** in n7h run 20 (a normal paced run) the after-run snapshot of both Pis is empty (`status_after` all None), so the harness deltas are negative (tx_packets -35436 etc.). Not a frame loss: the forwarder side of that run is complete (100 received = 100 handed = 100 judged by its own status delta). `series_report.py` marks such a run UNVERIFIED and demands a rerun; it is not counted as PASS.
