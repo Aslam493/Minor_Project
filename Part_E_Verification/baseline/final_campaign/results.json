@@ -358,5 +358,23 @@
   "evidence": "run  1 PASS | powersave 600 MHz | sent 600 = judged 600 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 11.97 s | reply p99 0.33 max 0.399 ms | late: heartbeat 0, packet 0",
   "file": "baseline/final_campaign/R2_B1h.txt",
   "time": "2026-11-22 01:38:06"
+ },
+ "A2r2": {
+  "id": "A2r2",
+  "test": "board_full_check.sh --mode-p with the service image, service stopped for the run",
+  "expected": "32 PASS, 0 FAIL, 4 SKIP",
+  "result": "PASS",
+  "evidence": "32 PASS, 0 FAIL, 0 KNOWN, 4 SKIP; service started again afterwards: 1 hb_state OPEN hb_miss_count 0",
+  "file": "baseline/final_campaign/R2_A2_service_stopped.txt",
+  "time": "2026-11-22 01:39:19"
+ },
+ "B1r2": {
+  "id": "B1r2",
+  "test": "600 valid frames at 50 frames/s through the boot SERVICE, not the first packet after boot",
+  "expected": "frame total +600, attack classes +0, last_counter +600 (a traffic TIMEOUT after the stream is expected)",
+  "result": "PASS",
+  "evidence": "judged +600, class deltas {'TIMEOUT': 1}, last_counter 1200 -> 1800",
+  "file": "baseline/final_campaign/R2_B1r2.txt",
+  "time": "2026-11-22 01:39:38"
  }
 }

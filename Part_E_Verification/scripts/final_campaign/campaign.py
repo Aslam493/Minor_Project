@@ -441,6 +441,33 @@ def stage_R2d():
         "PASS" if (judged == 600 and not any(d[x] for x in ATTACK) and q0["last_counter"] == L + 600 and L > 0) else "FAIL",
         "judged +%d, class deltas %s, last_counter %s -> %s" % (judged, {a: v for a, v in d.items() if v}, L, q0["last_counter"]), f)
 
+def stage_E2r():
+    """Software reboot of the receiver with the service image: forwarder back by itself, monitor back, boot grace, read INSIDE the 60 s window."""
+    rx("sync; (sleep 1; reboot) > /dev/null 2>&1 < /dev/null &", 20); time.sleep(8)
+    t, up = wait_ssh("root", RX, 240)
+    if t is None:
+        print("receiver does not answer at %s after the reboot" % RX); return
+    first = ""
+    for _ in range(10):
+        first = rx("echo uptime $(cut -d' ' -f1 /proc/uptime); ps | grep '[u]sr/bin/can_forwarder'; cat /var/log/can_forwarder.log 2>&1 | head -2")
+        if "starting:" in first: break
+        time.sleep(2)
+    B.scp([os.path.join(PV, "tools/monitor_client/mon_client"), os.path.join(PV, "tools/canmode/canmode")], "root", RX, "/tmp/"); rx("chmod +x /tmp/mon_client /tmp/canmode")
+    rows = []
+    for _ in range(2):
+        p0, p1, _t = status(); up1 = float(rx("cut -d' ' -f1 /proc/uptime").strip())
+        rows.append((up1, p0.get("hb_state"), p0.get("hb_miss_count"), p1.get("ev_TIMEOUT", 0), p0.get("init_ok"), p0.get("starved"))); time.sleep(3)
+    can = rx("/tmp/canmode can0 | grep -E 'nominal bit timing|data bit timing|controller state|ctrlmode ACTIVE'")
+    text = "first ssh answer at uptime %.0f s (%.0f s after the reboot command)\n== first login: %s\n== status reads (uptime, hb_state, hb_miss_count, TIMEOUT counter, init_ok, starved):\n%s\n== can0\n%s" % (up, t, first, "\n".join(str(r) for r in rows), can)
+    f = save("E2r_reboot_service", text)
+    running = "can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304" in first and "starting:" in first
+    inwin = rows[0][0] < 60
+    rec("E2br2", "Reboot of the receiver with the service image: forwarder back by itself", "forwarder process and log line present without any manual step; heartbeat answered", "PASS" if (running and rows[-1][1] in ("ANSWERED", "OPEN") and rows[-1][2] <= 1) else "FAIL",
+        "ssh at uptime %.0f s; service running=%s; read at uptime %.0f s: hb_state %s miss %s" % (up, running, rows[-1][0], rows[-1][1], rows[-1][2]), f)
+    rec("E2ar2", "Reboot of the receiver with the service image: monitor back, boot grace respected (read inside the 60 s window)", "read at uptime under 60 s: init_ok 1, starved 0, TIMEOUT counter 0; can0 FD 500k/2M with no manual step",
+        "PASS" if (inwin and rows[0][3] == 0 and rows[0][4] == 1 and rows[0][5] == 0 and "500000" in can and "2000000" in can and "ERROR-ACTIVE" in can) else "FAIL",
+        "first status read at uptime %.0f s (inside G=60 s: %s): TIMEOUT %s init_ok %s starved %s hb_state %s miss %s; can0: %s" % (rows[0][0], inwin, rows[0][3], rows[0][4], rows[0][5], rows[0][1], rows[0][2], " ".join(can.split())[:120]), f)
+
 
 def main(argv):
     st = argv or ["all"]
@@ -454,6 +481,7 @@ def main(argv):
         if s_ in ("R2",): stage_R2()
         if s_ in ("R2c",): stage_R2c()
         if s_ in ("R2d",): stage_R2d()
+        if s_ in ("E2r",): stage_E2r()
 
 
 if __name__ == "__main__":
