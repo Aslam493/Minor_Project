@@ -1,0 +1,8 @@
+status   rc=0 0.1s can_forwarder supervisor running (pid 371)
+stop     rc=0 0.2s Stopping can_forwarder: OK
+start    HUNG (no return after 25 s) output so far: Starting can_forwarder: OK
+status   rc=0 0.1s can_forwarder supervisor running (pid 427)
+restart  HUNG (no return after 25 s) output so far: Stopping can_forwarder: OK Starting can_forwarder: OK
+status   rc=0 0.1s can_forwarder supervisor running (pid 442)
+heartbeat after the commands: hb_state ANSWERED hb_miss_count 0
+fds of the supervisor (busybox ash keeps saved copies of the ssh pipes on fds 10 and 11 and the forked supervisor inherits them): 0 -> /dev/null 1 -> /dev/null 10 -> pipe:[3051] 11 -> pipe:[3052] 12 -> /dev/null 2 -> /dev/null

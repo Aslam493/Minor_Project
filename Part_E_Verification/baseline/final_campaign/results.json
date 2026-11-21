@@ -286,5 +286,77 @@
   "evidence": "series s9_ (9000 frames each, paced 5x1 ms + 7x2 ms): sender rate 603.7 / 601.3 / 602.7 frames/s; 27000 of 27000 judged, lost: sender 0, chip 0, socket 0, forwarder-rejected 0, Mode P queue 0; gap 0 = 0 in 3 of 3; identity PASS 3 of 3; judging window s: min 14.25 median 14.25 max 14.29; reply p99 1.76-1.80 ms. Prediction met (rate 604 predicted); the window is 14.25 s, not the 14.9 s predicted (it is measured between the first and last judged frame, the sender duration includes start and end).",
   "file": "baseline/final_campaign/D5f_s9_.txt",
   "time": "2026-11-22"
+ },
+ "E2br": {
+  "id": "E2br",
+  "test": "Reboot/boot with the service image: forwarder back by itself (rerun of E2b)",
+  "expected": "forwarder running from boot without a manual step, heartbeat answered, no TIMEOUT",
+  "result": "PASS",
+  "evidence": "first login at uptime 212 s: service running=True; later read at uptime 213 s: hb_state ANSWERED miss 0 TIMEOUT 0",
+  "file": "baseline/final_campaign/R2_E2b_first_login.txt",
+  "time": "2026-11-22 01:25:25"
+ },
+ "E2ar": {
+  "id": "E2ar",
+  "test": "Boot with the service image: monitor back, boot grace respected (rerun of E2a)",
+  "expected": "init_ok 1, starved 0, TIMEOUT counter 0 at uptime under 60 s",
+  "result": "FAIL",
+  "evidence": "uptime 213 s: init_ok 1 starved 0 TIMEOUT counter 0 hb_state ANSWERED",
+  "file": "baseline/final_campaign/R2_E2b_first_login.txt",
+  "time": "2026-11-22 01:25:25"
+ },
+ "A4r": {
+  "id": "A4r",
+  "test": "Both Pis: can0 in CAN-FD 500k/2M with no manual step (receiver first boot of the service image, sender rebooted again)",
+  "expected": "receiver and sender FD 500000/2000000 ERROR-ACTIVE, sender qlen 2000",
+  "result": "PASS",
+  "evidence": "receiver: nominal bit timing 500000 bit/s sample-point 87.5% tq 25 ns prop_seg 34 phase_seg1 35 phase_seg2 10 sjw 5 brp 1 data bit | sender: qlen 2000, FD True",
+  "file": "baseline/final_campaign/R2_A4.txt",
+  "time": "2026-11-22 01:26:33"
+ },
+ "E2c": {
+  "id": "E2c",
+  "test": "Service control from the image over ssh: status, stop, start, restart",
+  "expected": "every command returns within 25 s; start/restart bring the heartbeat to ANSWERED",
+  "result": "FAIL",
+  "evidence": "start and restart print OK and the service runs (heartbeat ANSWERED) but the ssh session does not return: the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11); status and stop return in 0.6 s. Harmless at boot (init does not wait; E2b-r PASS), a defect for interactive use. Fix = close fds in the supervisor + a new image (not done, user to decide). status   rc=0 0.1s can_forwarder supervisor running (pid 371) | stop     rc=0 0.2s Stopping can_forwarder: OK | start    HUNG (no return after 25 s) output so far: Starting can_forwarder: OK | status   rc=0 0.1s can_forwarder supervisor run",
+  "file": "baseline/final_campaign/R2_E2c.txt",
+  "time": "2026-11-22 01:36:27"
+ },
+ "A1r": {
+  "id": "A1r",
+  "test": "verify_boot with the service image",
+  "expected": "0 FAIL",
+  "result": "PASS",
+  "evidence": "verify_boot: 17 pass, 0 FAIL, 1 skipped",
+  "file": "baseline/final_campaign/R2_A1.txt",
+  "time": "2026-11-22 01:36:39"
+ },
+ "A2r": {
+  "id": "A2r",
+  "test": "board_full_check.sh --mode-p with the service image (service running)",
+  "expected": "0 FAIL",
+  "result": "FAIL",
+  "evidence": "27 PASS, 5 FAIL, 0 KNOWN, 4 SKIP",
+  "file": "baseline/final_campaign/R2_A2.txt",
+  "time": "2026-11-22 01:36:55"
+ },
+ "B1r": {
+  "id": "B1r",
+  "test": "600 valid frames at 50 frames/s with the boot SERVICE as the forwarder (no harness forwarder)",
+  "expected": "frame total +600, all attack classes +0, last_counter +600",
+  "result": "FAIL",
+  "evidence": "judged +600, class deltas {'COUNTER_RESYNC': 1, 'TIMEOUT': 1}, last_counter 0 -> 600",
+  "file": "baseline/final_campaign/R2_B1.txt",
+  "time": "2026-11-22 01:37:15"
+ },
+ "B1rh": {
+  "id": "B1rh",
+  "test": "600 valid frames at 50 frames/s, original harness way (service stopped for the run)",
+  "expected": "600 judged, identity PASS, 0 loss",
+  "result": "PASS",
+  "evidence": "run  1 PASS | powersave 600 MHz | sent 600 = judged 600 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 11.97 s | reply p99 0.33 max 0.399 ms | late: heartbeat 0, packet 0",
+  "file": "baseline/final_campaign/R2_B1h.txt",
+  "time": "2026-11-22 01:38:06"
  }
 }

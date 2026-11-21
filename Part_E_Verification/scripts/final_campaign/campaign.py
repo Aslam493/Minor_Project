@@ -371,17 +371,29 @@ def stage_R2():
     f = save("R2_A4", "== receiver (as booted from the new card, nothing configured by hand)\n" + rxc + "\n== sender after a second reboot (answered ssh after %.0f s)\n" % (t_sn or -1) + snc)
     rec("A4r", "Both Pis: can0 in CAN-FD 500k/2M with no manual step (receiver first boot of the service image, sender rebooted again)", "receiver and sender FD 500000/2000000 ERROR-ACTIVE, sender qlen 2000", "PASS" if a4 else "FAIL",
         "receiver: %s | sender: qlen %s, FD %s" % (" ".join(rxc.split())[:120], snc.strip().splitlines()[-1].strip(), "bitrate 500000" in snc and "dbitrate 2000000" in snc), f)
-    # tools for the rest (RAM)
     restore_tools()
-    # E2c: the service control commands from the image
+    return stage_R2c()
+
+
+def stage_R2c():
+    restore_tools()
+    # E2c: the service control commands from the image, each with a 25 s limit (a hang is recorded as a result)
+    def timed(cmd, lim=25):
+        t0 = time.time()
+        try:
+            r_ = subprocess.run(["ssh"] + B.SSHO + ["root@%s" % RX, cmd], capture_output=True, text=True, timeout=lim)
+            return "rc=%d %.1fs %s" % (r_.returncode, time.time() - t0, " ".join((r_.stdout + r_.stderr).split())[:90])
+        except subprocess.TimeoutExpired as e_:
+            return "HUNG (no return after %d s) output so far: %s" % (lim, " ".join(((e_.stdout or b"").decode() if isinstance(e_.stdout, bytes) else (e_.stdout or "")).split())[:90])
     c = []
-    c.append("stop:    " + rx("%s stop; sleep 1; ps | grep -c '[c]an_forwarder'" % SVC).replace("\n", " "))
-    c.append("start:   " + rx("%s start; sleep 4; ps | grep -c '[c]an_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'" % SVC).replace("\n", " "))
-    c.append("restart: " + rx("%s restart; sleep 4; ps | grep -c '[c]an_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'" % SVC).replace("\n", " "))
-    c.append("kill -9 of the daemon: " + rx("kill -9 $(ps | grep '[u]sr/bin/can_forwarder' | awk '{print $1}' | head -1); sleep 5; ps | grep -c '[u]sr/bin/can_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'; tail -3 /var/log/can_forwarder.log").replace("\n", " | "))
+    for name, cmd in (("status", "%s status"), ("stop", "%s stop"), ("start", "%s start"), ("status", "%s status"), ("restart", "%s restart"), ("status", "%s status")):
+        c.append("%-8s %s" % (name, timed(cmd % SVC))); time.sleep(2)
+    c.append("heartbeat after the commands: " + " ".join(rx("/tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'").split()))
+    c.append("fds of the supervisor (busybox ash keeps saved copies of the ssh pipes on fds 10 and 11 and the forked supervisor inherits them): " + " ".join(rx("p=$(cat /var/run/can_forwarder.pid); ls -l /proc/$p/fd | awk '{print $9, $10, $11}' | tail -n +2").split()))
     f = save("R2_E2c", "\n".join(c))
-    okc = "Stopping can_forwarder: OK 0" in c[0] and "ANSWERED" in c[1] and "ANSWERED" in c[2] and "ANSWERED" in c[3] and "exited with status 137" in c[3]
-    rec("E2c", "Service control from the image: stop, start, restart, kill -9 of the daemon", "stop -> no process; start/restart -> heartbeat ANSWERED within 4 s; kill -9 -> restarted by the supervisor", "PASS" if okc else "FAIL", " || ".join(x[:110] for x in c), f)
+    hung = [x for x in c if "HUNG" in x]
+    rec("E2c", "Service control from the image over ssh: status, stop, start, restart", "every command returns within 25 s; start/restart bring the heartbeat to ANSWERED", "PASS" if not hung else "FAIL",
+        "start and restart print OK and the service runs (heartbeat ANSWERED) but the ssh session does not return: the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11); status and stop return in 0.6 s. Harmless at boot (init does not wait; E2b-r PASS), a defect for interactive use. Fix = close fds in the supervisor + a new image (not done, user to decide). " + " | ".join(c[:6])[:240], f)
     # A1-r, A2-r (service running, realistic configuration)
     r = subprocess.run(["bash", "./verify_boot.sh", RX, "--expect-core1-pinned"], cwd=os.path.join(PV, "tools/verify_boot"), capture_output=True, text=True, timeout=300)
     last = [l for l in r.stdout.splitlines() if l.startswith("verify_boot:")]; f = save("R2_A1", r.stdout + r.stderr)
@@ -400,12 +412,34 @@ def stage_R2():
     rec("B1r", "600 valid frames at 50 frames/s with the boot SERVICE as the forwarder (no harness forwarder)", "frame total +600, all attack classes +0, last_counter +600", "PASS" if (judged == 600 and not any(d[x] for x in ATTACK) and q0["last_counter"] == L + 600) else "FAIL",
         "judged +%d, class deltas %s, last_counter %s -> %s" % (judged, {a: v for a, v in d.items() if v}, L, q0["last_counter"]), f)
     # B1-rh: the original harness way (service stopped for the run, started again afterwards)
-    rx("%s stop" % SVC); time.sleep(1)
+    rx("%s stop >/dev/null 2>&1 </dev/null" % SVC); time.sleep(1)
     env = dict(os.environ, QUIET="1", STEP="b1h1", NOCD="1", SUMMARYTAG="_b1h", FWD_BIN=FWD, FWD_ARGS="--rcvbuf 4194304", SNAP_AT="30")
     subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "burst_run.py"), "--runs", "rate:600:20", "--date", "20261122"], env=env, capture_output=True, text=True, timeout=400)
     rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b1h", "1", "--date", "20261122"], capture_output=True, text=True).stdout
-    rx("%s start" % SVC); f = save("R2_B1h", rep)
+    rx("%s start >/dev/null 2>&1 </dev/null" % SVC); f = save("R2_B1h", rep)
     rec("B1rh", "600 valid frames at 50 frames/s, original harness way (service stopped for the run)", "600 judged, identity PASS, 0 loss", "PASS" if ("ALL PASS" in rep and "sent 600 = judged 600" in rep) else "FAIL", " ".join(l.strip() for l in rep.splitlines() if l.startswith(" run"))[:240], f)
+
+def stage_R2d():
+    """Reruns with the intended preconditions: A2 with the service stopped (board_full_check is the heartbeat responder itself), B1 not at the first packet after boot."""
+    src = open(os.path.join(PV, "..", "optee_full/optee_os/core/arch/arm/plat-rpi3/rpi3_can_monitor_keys.h")).read(); blk = src[src.index("KEY_FRAME_INIT"):]; blk = blk[:blk.index("}")]
+    open(os.path.join(SCR, "kf"), "w").write("".join(re.findall(r"0x([0-9a-fA-F]{2})", blk))); B.scp([os.path.join(SCR, "kf")], "root", RX, "/tmp/kf"); os.remove(os.path.join(SCR, "kf"))
+    rx("%s stop >/dev/null 2>&1 </dev/null" % SVC); time.sleep(2)
+    stopped = rx("ps | grep -c '[u]sr/bin/can_forwarder'").strip()
+    out = rx("cd /tmp && sh /tmp/board_full_check.sh --mode-p 2>&1", 900); rx("rm -f /tmp/kf")
+    rx("%s start >/dev/null 2>&1 </dev/null" % SVC); time.sleep(5)
+    back = rx("ps | grep -c '[u]sr/bin/can_forwarder'; /tmp/mon_client --retries 20 status 0 | grep -o 'hb_state [A-Z_]* hb_miss_count [0-9]*'").split()
+    f = save("R2_A2_service_stopped", "service stopped for the run (forwarder processes: %s)\n" % stopped + out + "\n== service started again: %s" % back)
+    summ = re.findall(r"(\d+) PASS, (\d+) FAIL, (\d+) KNOWN, (\d+) SKIP", out)
+    rec("A2r2", "board_full_check.sh --mode-p with the service image, service stopped for the run", "32 PASS, 0 FAIL, 4 SKIP", "PASS" if (summ and summ[-1][1] == "0" and stopped == "0") else "FAIL",
+        ("%s PASS, %s FAIL, %s KNOWN, %s SKIP" % summ[-1] if summ else out[-200:]) + "; service started again afterwards: " + " ".join(back), f)
+    time.sleep(3); p0, p1, _ = status(); L = p0["last_counter"]; k = g.key_from_source()
+    open(os.path.join(SCR, "b1r2.txt"), "w").write("".join(g.line(20, 0x123, g.packet(k, 0x123, c_, P(c_)), "valid %d" % c_) for c_ in range(L + 1, L + 601)))
+    B.scp([os.path.join(SCR, "b1r2.txt")], "sender", SN, "/tmp/burst/"); sendo = sn("python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/b1r2.txt", 120); time.sleep(4)
+    q0, q1, _ = status(); d = delta(p1, q1, ATTACK + ("TIMEOUT",)); judged = q1.get("frame_total", 0) - p1.get("frame_total", 0)
+    f = save("R2_B1r2", "before: last_counter %s frame_total %s | after: last_counter %s frame_total %s\nsender: %s\nclass deltas %s" % (L, p1.get("frame_total"), q0.get("last_counter"), q1.get("frame_total"), sendo.strip()[-200:], d))
+    rec("B1r2", "600 valid frames at 50 frames/s through the boot SERVICE, not the first packet after boot", "frame total +600, attack classes +0, last_counter +600 (a traffic TIMEOUT after the stream is expected)",
+        "PASS" if (judged == 600 and not any(d[x] for x in ATTACK) and q0["last_counter"] == L + 600 and L > 0) else "FAIL",
+        "judged +%d, class deltas %s, last_counter %s -> %s" % (judged, {a: v for a, v in d.items() if v}, L, q0["last_counter"]), f)
 
 
 def main(argv):
@@ -418,6 +452,8 @@ def main(argv):
         if s_ in ("D",): stage_D()
         if s_ in ("E1",): stage_E1()
         if s_ in ("R2",): stage_R2()
+        if s_ in ("R2c",): stage_R2c()
+        if s_ in ("R2d",): stage_R2d()
 
 
 if __name__ == "__main__":

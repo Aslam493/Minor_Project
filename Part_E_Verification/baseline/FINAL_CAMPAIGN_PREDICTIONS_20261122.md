@@ -44,3 +44,9 @@ Runner: `scripts/final_campaign/campaign.py R2` (no reboot of the receiver: the 
 | B1-r | **PASS** with the SERVICE as the forwarder (no harness forwarder started): 600 frames at 50 frames/s, Secure World frame total +600, all attack classes +0, last_counter +600 | any class delta |
 | B1-rh | **PASS** in the original harness way (service stopped for the run and started again): 600 of 600, identity PASS | |
 Risks: the receiver's DHCP address can change after the flash (then I stop and ask for it); the Pi's clock shows 1970 (no RTC) so log timestamps are relative only.
+
+### Addendum after the first post-flash run (written before the two reruns below)
+What the first run showed (not hidden): E2b-r PASS, A4-r PASS, A1-r PASS, B1-rh PASS; E2a-r FAIL by an extra freshness clause of my runner; E2c FAIL (start/restart over ssh never return); A2-r FAIL (5: E13-E18); B1-r FAIL (COUNTER_RESYNC +1 at the first packet after the boot).
+- **A2-r2**: the same board_full_check but with the service STOPPED for the run (it plays the heartbeat responder itself and E13-E18 test "responder silent", "responder back"; two responders cannot both be right), then the service started again. Prediction: 32 PASS, 0 FAIL, 4 SKIP, as before the flash. If this FAILs the service is not the cause.
+- **B1-r2**: the same 600 frames through the boot service, but not as the first packet after the boot (last_counter is now above 0). Prediction: frame total +600, AUTH_FAIL/REPLAY/MALFORMED/COUNTER_GAP/COUNTER_RESYNC all +0, last_counter +600; a TIMEOUT +1 (traffic timeout during the 4 s of silence after the stream) is expected and is not a failure.
+- My B1-r prediction ("all attack classes +0") was wrong for the first packet after a boot: the design raises COUNTER_RESYNC once when last_counter is 0 (documented in burst_packets.py and handled by the harness). Kept as a FAIL row with this explanation; the rerun is the case with the intended precondition.

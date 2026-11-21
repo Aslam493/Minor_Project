@@ -1,0 +1,11 @@
+== E2b-r: receiver at first ssh login (nothing copied yet), reading the process list and the service status
+uptime 212.31
+  210 root     {S95can_forwarde} /bin/sh /etc/init.d/S95can_forwarder start
+  215 root     /usr/bin/can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304
+can_forwarder supervisor running (pid 210)
+---log
+1970-01-01 00:00:28 starting: /usr/bin/can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304
+-rwxr-xr-x    1 root     root          2678 Nov 21  2026 /etc/init.d/S95can_forwarder
+-rwxr-xr-x    1 root     root         78856 Nov 21  2026 /usr/bin/can_forwarder
+
+== heartbeat read with a mon_client copied afterwards, uptime 213 s: hb_state ANSWERED hb_miss_count 0 TIMEOUT counter 0 init_ok 1 starved 0
