@@ -14,7 +14,7 @@ LIMITS = [
   "e.g. a late heartbeat answer and a late packet reply at the same restart appear as one event; the exact counters (page 1) are used for every PASS/FAIL here"),
  ("F4", "First answer after a forwarder (re)start can be LATE", "documented, explained and tested (E1): the request is already MISSED when the forwarder starts in the second half of the heartbeat period (about 50 %) or in the last 10 ms of the 50 ms packet period (about 20 %)",
   "E1 10 of 10, series s3_ 30 of 30, n7h 21 of 21: first state MISSED <=> first answer LATE"),
- ("F5", "Settings that are not persistent", "documented: governor (powersave after every reboot; performance only by hand), sender `txqueuelen` 2000 (was 10 after a reboot during the campaign; PERSISTENT since 2026-11-22, verified after a sender reboot), the forwarder is not a service (E2b; fix in progress), all test tools live in /tmp (RAM)",
+ ("F5", "Settings that are not persistent", "documented: governor (powersave after every reboot; performance only by hand), sender `txqueuelen` 2000 (was 10 after a reboot during the campaign; PERSISTENT since 2026-11-22, verified after a sender reboot), the forwarder is a boot service only since the image of 2026-11-22 (E2b fixed, see the post-flash table), all test tools live in /tmp (RAM)",
   "A4/E2 reboot: governor powersave, sender qlen reset; D6"),
  ("F6", "Reading the monitor during a run costs time", "documented: a status read while the forwarder runs delays the next packet fetch by 20-30 ms (a late packet reply at the harness snapshot), heavy PTA polling disturbs the heartbeat (cf. F24)",
   "baseline/BURST_STEPS_RESULTS_20261121.md (traces n5t, p1 run 5); the campaign reads status only between traffic phases"),
@@ -22,6 +22,10 @@ LIMITS = [
   "D6, baseline/can1_investigation_20261121.md"),
  ("F8", "Pi 3 has no TZASC; detection only", "documented: Linux is kept out of the secure DRAM by the DTB reservation (A3, N-04) and not by hardware protection of Secure World memory; the monitor detects and reports, it prevents nothing",
   "A3; memory-isolation options are stored in the repo"),
+ ("F11", "board_full_check.sh must run with the forwarder service STOPPED", "documented: its heartbeat tests (E13-E18) play the heartbeat responder themselves ('responder silent 5 s', 'responder back'); with the boot service answering in parallel they FAIL (A2r: 27 PASS, 5 FAIL); with the service stopped: 32 PASS, 0 FAIL (A2r2)",
+  "stop it with `/etc/init.d/S95can_forwarder stop`, start it again afterwards"),
+ ("F12", "S95can_forwarder `start`/`restart` over ssh do not return (defect, open)", "documented defect of the script on the card: the forked supervisor inherits busybox ash's saved copies of the ssh pipes (fds 10, 11), so `ssh host '/etc/init.d/S95can_forwarder start'` never returns although the service runs; at boot (init does not wait) and with the output redirected (`start >/dev/null 2>&1 </dev/null`) it is fine; `status` and `stop` return at once",
+  "E2c; the fix (close fds 3-12 in the supervisor, `exec` the redirections) needs a new image: the user decides"),
  ("F9", "Secure audit log", "out of scope for this campaign (later)", "-"),
  ("F10", "STALE verdict not exercised", "documented: C9 produced 8 LATE Mode P answers (exact, forwarder count = Secure World count); a STALE answer needs the request to advance between fetch and answer (microseconds) and was not triggered in 40 freezes (STALE 0)",
   "C9, baseline/final_campaign/C9.txt"),
@@ -50,7 +54,7 @@ L.append("""## PACKET_LOSS_VERDICT
 Evidence: D1-D5 (273,000+ frames, 18 of 18 runs with the exact Secure World gap accounting: sent = judged + sender give-ups + chip loss + kernel socket drops + forwarder-rejected + Mode P queue drops, and the Secure World counter span minus its advancing frames plus the tail equals the counted drops), `REAL_BUS_RESULTS.md` section 10.10.
 """)
 L.append("## Conditions\n")
-L.append("- Image `rpi3-sdcard-monitor-modeP-p6-n04-nostk.img` (sha256 `9700049351af848f...0f6eec`): Mode P, N-04 DTB, core without `CFG_CORE_DEBUG_CHECK_STACKS`, `S12can` + `canfdcfg` in the root filesystem. Receiver 10.237.27.77, sender 10.237.27.144 (their SD cards sit in each other's boards compared with the start of the session; IPs follow the cards).")
+L.append("- Main table: image `rpi3-sdcard-monitor-modeP-p6-n04-nostk.img` (sha256 `9700049351af848f...0f6eec`): Mode P, N-04 DTB, core without `CFG_CORE_DEBUG_CHECK_STACKS`, `S12can` + `canfdcfg` in the root filesystem. Post-flash table: the same image plus the forwarder service (`...-nostk-svc.img`, sha256 `d77dd4a5aa4b1a5a...674c34`); receiver then at 10.237.27.212. Receiver 10.237.27.77, sender 10.237.27.144 (their SD cards sit in each other's boards compared with the start of the session; IPs follow the cards).")
 L.append("- Governor `powersave` 600 MHz (default after reboot) for every case except D1b (`performance`, set by hand and set back). Forwarder `can_forwarder` (build with `--hblog`, queue 2048, `--rcvbuf 4194304`), run by hand from /tmp.")
 L.append("- No flash, no Secure World change, no test or threshold changed in this campaign. Both Pis were rebooted (A4/E2), which the task asked for.")
 L.append("- Exact class counters (status page 1) decide every verdict; the event list is read only for the detail code.\n")
@@ -62,16 +66,32 @@ for o in order:
         L.append("| %s | (not run) | | MISSING | | |" % o); continue
     r = d[o]; L.append("| %s | %s | %s | **%s** | %s | %s |" % (o, cell(r["test"], 120), cell(r["expected"], 160), r["result"], cell(r["evidence"], 420), ("`%s`" % r["file"]) if r["file"] != "-" else "-"))
 L.append("")
+post = ["E2br", "E2br2", "E2ar", "E2ar2", "A4r", "A1r", "A2r", "A2r2", "B1r", "B1r2", "B1rh", "E2c"]
+ppass = sum(1 for o in post if o in d and d[o]["result"] == "PASS"); pfail = sum(1 for o in post if o in d and d[o]["result"] == "FAIL")
+L.append("## After the service image (`...-nostk-svc.img`, flashed by the user on 2026-11-22): reruns A1, A2, A4, E2a, E2b, B1 (decision 1)\n")
+L.append("The image is the previous one plus `/usr/bin/can_forwarder` and `/etc/init.d/S95can_forwarder` (sha256 `d77dd4a5...674c34`; rollback `9700049351af...0f6eec`). **%d PASS / %d FAIL in this table.** E2b is fixed: the forwarder starts by itself at boot (uptime 20 s) and the heartbeat is answered before the first ssh login (E2br, E2br2). Of the FAIL rows three are conditions of my test that did not fit (E2ar: my runner required a read within 90 s of boot, but the first login was at uptime 212 s because the address had changed; A2r: board_full_check is itself the heartbeat responder; B1r: first packet after a boot is COUNTER_RESYNC by design); each was rerun with the intended condition and PASSES (E2ar2, A2r2, B1r2). **E2c is a real defect of the script (F12) and stays open.**\n" % (ppass, pfail))
+L.append("| ID | Test | Expected | Result | Evidence | File |")
+L.append("|---|---|---|---|---|---|")
+for o in post:
+    if o not in d:
+        L.append("| %s | (not run) | | MISSING | | |" % o); continue
+    r = d[o]; L.append("| %s | %s | %s | **%s** | %s | %s |" % (o, cell(r["test"], 120), cell(r["expected"], 160), r["result"], cell(r["evidence"], 520), ("`%s`" % r["file"]) if r["file"] != "-" else "-"))
+L.append("")
 L.append("## FAIL cases\n")
 for o in fails:
     L.append("- **%s**: %s" % (o, cell(d[o]["evidence"], 600)))
+L.append("- **Post-flash table**: FAIL rows E2ar, A2r, B1r are explained above and have passing reruns (E2ar2, A2r2, B1r2); **E2c is open** (F12).")
 L.append("""
 ## Mistakes made during the campaign (all in my test runner, none in the system; the rules were not changed)
 1. B1: the report looked for the series under the wrong name (`b1` instead of tag + index), so a run that had judged 600 of 600 showed MISSING; renamed, no new data needed except that I reran group B.
 2. B2: the 5-minute run crashed in my harness (a fixed 120 s limit on the sender command, the run sends for 300 s); I waited for the orphaned run to end on both Pis, added `SEND_TIMEOUT`, and reran group B. The first evaluation of the rerun then read `hb_miss_count` from the PRE-run snapshot (14, taken while no forwarder was running) and reported FAIL; the rule (0 misses at the end) is unchanged, the end-of-run record says 0, B2 was corrected and the correction is written in its evidence.
 3. D1a: the powersave series was looked up under `p1_`; it is saved as `p1`; same report, right tag, corrected in the evidence.
 4. D4 "20008": taken literally as 20,008 plain frames (a plain burst has no planted frames, so the Secure World gap check is exact).
-5. The heartbeat log holds 6,000 records (about 300 s), so for the 320 s run it shows 311 answers while the forwarder's own counter shows 321; both are on time.
+5. (post-flash) E2ar: my runner required a read within 90 s of boot (a clause that was not in the written prediction); the first login was at uptime 212 s. Recorded as FAIL, not reclassified; redone after a reboot (E2ar2 PASS).
+6. (post-flash) A2r: I ran board_full_check with the forwarder service running, although the script is the heartbeat responder itself (E13-E18); my prediction had said that a service-caused FAIL would be reported and nothing changed, and that is what was done; rerun with the service stopped passes (A2r2).
+7. (post-flash) B1r: my prediction 'all attack classes +0' ignored the documented COUNTER_RESYNC of the first packet after a boot (last_counter 0); rerun at a later point (B1r2).
+8. (post-flash) E2c: the defect in `S95can_forwarder` (start/restart over ssh never return) is MINE, found only because I tested the service control over ssh; the boot path was tested earlier from /tmp with plain ssh calls that happened to return, because my first test redirected nothing but ran the commands in a way that did not keep the pipes (it passed), and I did not test the exact ssh form that the campaign runner uses. It is open (F12).
+9. The heartbeat log holds 6,000 records (about 300 s), so for the 320 s run it shows 311 answers while the forwarder's own counter shows 321; both are on time.
 """)
 L.append("## What is not shown\n")
 L.append("- A3 checks the DTB hash on the image that was flashed (compose read-back, `dd` + `cmp` MATCH) and the live reserved-memory node, not a hash of the live device tree (the bootloader may modify it).")

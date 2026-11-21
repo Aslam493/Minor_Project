@@ -1,0 +1,13 @@
+first ssh answer at uptime 23 s (35 s after the reboot command)
+== first login: uptime 23.13
+  201 root     /usr/bin/can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304
+1970-01-01 00:00:20 starting: /usr/bin/can_forwarder --iface can0 run 4000000000 --pull --rcvbuf 4194304
+
+== status reads (uptime, hb_state, hb_miss_count, TIMEOUT counter, init_ok, starved):
+(23.82, 'ANSWERED', 0, 0, 1, 0)
+(26.98, 'ANSWERED', 0, 0, 1, 0)
+== can0
+  nominal bit timing     500000 bit/s  sample-point 87.5%  tq 25 ns  prop_seg 34  phase_seg1 35  phase_seg2 10  sjw 5  brp 1
+  data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1
+  controller state       ERROR-ACTIVE (0)
+  ctrlmode ACTIVE        0x00000020  <FD>

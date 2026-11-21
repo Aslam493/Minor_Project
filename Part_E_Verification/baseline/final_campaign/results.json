@@ -301,7 +301,7 @@
   "test": "Boot with the service image: monitor back, boot grace respected (rerun of E2a)",
   "expected": "init_ok 1, starved 0, TIMEOUT counter 0 at uptime under 60 s",
   "result": "FAIL",
-  "evidence": "uptime 213 s: init_ok 1 starved 0 TIMEOUT counter 0 hb_state ANSWERED",
+  "evidence": "uptime 213 s: init_ok 1 starved 0 TIMEOUT counter 0 hb_state ANSWERED || REASON (not hidden): my runner required the read within 90 s of boot (an extra clause that is not in the written prediction); the first login was at uptime 212 s because the receiver's address had changed and I had to wait for it. The cumulative TIMEOUT counter 0 at 213 s covers the first 60 s as well, but I did not reclassify the row; the in-window test was redone after a software reboot: E2ar2 PASS.",
   "file": "baseline/final_campaign/R2_E2b_first_login.txt",
   "time": "2026-11-22 01:25:25"
  },
@@ -337,7 +337,7 @@
   "test": "board_full_check.sh --mode-p with the service image (service running)",
   "expected": "0 FAIL",
   "result": "FAIL",
-  "evidence": "27 PASS, 5 FAIL, 0 KNOWN, 4 SKIP",
+  "evidence": "27 PASS, 5 FAIL, 0 KNOWN, 4 SKIP || REASON: FAIL lines E13-E18 (fresh challenge, answer ON_TIME, responder silent 5 s -> TIMEOUT, responder back, event log): board_full_check plays the heartbeat responder itself; with the boot service answering in parallel it cannot have a silent responder. Rerun with the service stopped: A2r2 32 PASS, 0 FAIL.",
   "file": "baseline/final_campaign/R2_A2.txt",
   "time": "2026-11-22 01:36:55"
  },
@@ -346,7 +346,7 @@
   "test": "600 valid frames at 50 frames/s with the boot SERVICE as the forwarder (no harness forwarder)",
   "expected": "frame total +600, all attack classes +0, last_counter +600",
   "result": "FAIL",
-  "evidence": "judged +600, class deltas {'COUNTER_RESYNC': 1, 'TIMEOUT': 1}, last_counter 0 -> 600",
+  "evidence": "judged +600, class deltas {'COUNTER_RESYNC': 1, 'TIMEOUT': 1}, last_counter 0 -> 600 || REASON: last_counter was 0 (first packet after the boot), so COUNTER_RESYNC +1 is the documented design behaviour; my prediction 'all attack classes +0' ignored it. The TIMEOUT +1 is the traffic timeout in the 4 s of silence after the stream. Rerun not at the first packet: B1r2 PASS.",
   "file": "baseline/final_campaign/R2_B1.txt",
   "time": "2026-11-22 01:37:15"
  },
@@ -376,5 +376,23 @@
   "evidence": "judged +600, class deltas {'TIMEOUT': 1}, last_counter 1200 -> 1800",
   "file": "baseline/final_campaign/R2_B1r2.txt",
   "time": "2026-11-22 01:39:38"
+ },
+ "E2br2": {
+  "id": "E2br2",
+  "test": "Reboot of the receiver with the service image: forwarder back by itself",
+  "expected": "forwarder process and log line present without any manual step; heartbeat answered",
+  "result": "PASS",
+  "evidence": "ssh at uptime 23 s; service running=True; read at uptime 27 s: hb_state ANSWERED miss 0",
+  "file": "baseline/final_campaign/E2r_reboot_service.txt",
+  "time": "2026-11-22 01:41:03"
+ },
+ "E2ar2": {
+  "id": "E2ar2",
+  "test": "Reboot of the receiver with the service image: monitor back, boot grace respected (read inside the 60 s window)",
+  "expected": "read at uptime under 60 s: init_ok 1, starved 0, TIMEOUT counter 0; can0 FD 500k/2M with no manual step",
+  "result": "PASS",
+  "evidence": "first status read at uptime 24 s (inside G=60 s: True): TIMEOUT 0 init_ok 1 starved 0 hb_state ANSWERED miss 0; can0: nominal bit timing 500000 bit/s sample-point 87.5% tq 25 ns prop_seg 34 phase_seg1 35 phase_seg2 10 sjw 5 brp 1 data bit",
+  "file": "baseline/final_campaign/E2r_reboot_service.txt",
+  "time": "2026-11-22 01:41:03"
  }
 }
