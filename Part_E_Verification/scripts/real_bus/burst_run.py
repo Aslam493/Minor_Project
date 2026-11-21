@@ -18,7 +18,11 @@ import collections, datetime, json, os, re, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__)); PV = os.path.abspath(os.path.join(HERE, "../.."))
 MC = os.path.join(PV, "tools/monitor_client"); BL = os.path.join(PV, "baseline")
 RX = os.environ.get("RX", "10.237.27.77"); SN = os.environ.get("SN", "10.237.27.144")
-FWD_SECONDS, SNAP_AT = 36, 22
+FWD_SECONDS, SNAP_AT = int(os.environ.get("FWD_SECONDS", "36")), int(os.environ.get("SNAP_AT", "22"))
+STEP = os.environ.get("STEP", "")                                   # step name of the plan, e.g. s1, s2a: goes into every tag
+FWD_PREFIX = os.environ.get("FWD_PREFIX", "")                       # e.g. "chrt -f 50"
+FWD_BIN = os.environ.get("FWD_BIN", "/tmp/can_forwarder")
+FWD_ARGS = os.environ.get("FWD_ARGS", "")                           # extra forwarder arguments, e.g. "--cpus 2,3"
 SSHO = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/burst_cm_%C", "-o", "ControlPersist=600"]
 
 
@@ -124,7 +128,11 @@ def run_one(kind, date, scratch, idx=0):
         N, policy = int(kind.split(":")[0]), kind.split(":")[1]; tag = "N%d_%s" % (N, policy)
     nocd = os.environ.get("NOCD") == "1"                      # measurement option: do NOT run the extra candump (to see whether it adds load)
     if nocd:
-        tag += "_nocd_r%d" % idx                             # the same burst can be repeated: every run gets its own files
+        tag += "_nocd"
+    if STEP:
+        tag += "_" + STEP
+    if nocd or STEP:
+        tag += "_r%d" % idx                                  # the same burst can be repeated: every run gets its own files
     p0 = page0(ssh("root", RX, MCL + " status 0")); L = p0["last_counter"]
     pre = os.path.join(scratch, "burst"); exp_path = os.path.join(BL, "burst_%s_%s.expected.txt" % (date, tag))
     if kind == "normal":
@@ -147,8 +155,12 @@ def run_one(kind, date, scratch, idx=0):
     b_rx, b_sn = snap_rx(), snap_sn(); M = page0(b_rx)["ev_seq"]
     ssh("root", RX, MCL + " ack %d" % M)
     ssh("root", RX, "rm -f /tmp/burst_cd.log /tmp/burst_fwd.log; " + ("echo 0 > /tmp/cd.pid; : > /tmp/burst_cd.log; " if nocd else "/tmp/candump_aarch64 -d -ta can0 > /tmp/burst_cd.log 2>&1 < /dev/null & echo $! > /tmp/cd.pid; ") +
-        "/tmp/can_forwarder run %d --pull --verbose --stats > /tmp/burst_fwd.log 2>&1 < /dev/null & echo $! > /tmp/fwd.pid" % FWD_SECONDS)
+        "%s %s run %d --pull --verbose --stats %s > /tmp/burst_fwd.log 2>&1 < /dev/null & echo $! > /tmp/fwd.pid" % (FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS))
     t_start = time.time(); time.sleep(4)
+    # what was really in force for this run (a setting that silently did not take effect is the main risk of the plan)
+    settings = ssh("root", RX, "echo \"sysctl: $(sysctl -n net.core.rmem_default) $(sysctl -n net.core.rmem_max)  (rmem_default rmem_max)\"; echo \"forwarder: $(sha256sum %s | cut -c1-16)  cmd: %s %s run %d --pull --verbose --stats %s\"; "
+                   "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, FWD_ARGS)) \
+        + ssh("sender", SN, "echo \"sender can0 qlen $(cat /sys/class/net/can0/tx_queue_len)\"")
     cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
     send_out = ssh("sender", SN, cmd, timeout=120); t_sent = time.time() - t_start
     sj = None
@@ -173,6 +185,9 @@ def run_one(kind, date, scratch, idx=0):
     miss_rx = sum((sent_ok_ms - seen).values())     # sent by the sender but never seen by candump on the receiver
     extra_rx = sum((seen - sent_ok_ms).values())
     fw = fwd_parse(fwd_txt)
+    r_sock = dR("rx_packets") - fw.get("fwd_received_queued", 0)          # frames the receiver chip delivered to Linux that the forwarder never read (kernel socket drops, derived)
+    m_rep = re.search(r"p99 (\d+) us, max (\d+) us", fw.get("linux_reply", ""))
+    rep_p99_ms, rep_max_ms = (int(m_rep.group(1)) / 1000.0, int(m_rep.group(2)) / 1000.0) if m_rep else (None, None)
     classes = ("AUTH_FAIL", "REPLAY", "MALFORMED", "COUNTER_GAP", "COUNTER_RESYNC", "TRAFFIC_RECOVERED", "TIMEOUT", "HEARTBEAT_RECOVERED", "LATE_ANSWER", "STALE_ANSWER")
     cdelta = {c: r1.get("ev_" + c, 0) - r0.get("ev_" + c, 0) for c in classes}
     recorded = collections.Counter(e["name"] for e in evs)
@@ -192,12 +207,14 @@ def run_one(kind, date, scratch, idx=0):
            "candump_window_s": ts_window, "candump_rate_fps": ((cd_total - 1) / ts_window if ts_window else None), "candump_max_gap_ms": round(maxgap * 1000, 2),
            "fwd": fw, "judged": judged, "class_delta": cdelta, "events_recorded": dict(recorded), "events_suppressed": suppressed, "events_total_recorded": len(evs),
            "ev_lost_delta": q1.get("ev_lost", 0) - q0.get("ev_lost", 0), "judged_window_s": window_s, "sender_elapsed_s": round(t_sent, 2),
+           "reply_p99_ms": rep_p99_ms, "reply_max_ms": rep_max_ms, "settings": settings.strip(), "step": STEP, "hb_late": (fw.get("hb_answers_on_time_late_other") or [0, 0, 0])[1], "late_answers": cdelta.get("LATE_ANSWER", 0),
+           "stale_answers": cdelta.get("STALE_ANSWER", 0), "socket_loss_derived": r_sock,
            "status_before": q0, "status_after": q1, "last_counter_after": q1.get("last_counter"),
            "lock_timeouts_delta": q1.get("pta_lock_timeouts", 0) - q0.get("pta_lock_timeouts", 0), "skip_total_delta": q1.get("skip_total", 0) - q0.get("skip_total", 0),
            "starved": q1.get("starved"), "init_ok": q1.get("init_ok"), "core1_poll_age_ticks": q1.get("core1_poll_age_ticks"), "hb_state": q1.get("hb_state"), "hb_miss_count": q1.get("hb_miss_count")}
     with open(os.path.join(BL, "burst_%s_%s.txt" % (date, tag)), "w") as f:
-        f.write("# burst run %s on %s\n## EXPECTED\n%s\n## SENDER (json)\n%s\n## SENDER can0 before\n%s\n## SENDER can0 after\n%s\n## RECEIVER before\n%s\n## RECEIVER after\n%s\n"
-                % (tag, datetime.datetime.now().isoformat(timespec="seconds"), open(exp_path).read(), json.dumps(sj), b_sn, a_sn, b_rx, a_rx))
+        f.write("# burst run %s on %s\n## EXPECTED\n%s\n## SENDER (json)\n%s\n## SENDER can0 before\n%s\n## SENDER can0 after\n%s\n## RECEIVER before\n%s\n## RECEIVER after\n%s\n## SETTINGS IN FORCE\n%s\n"
+                % (tag, datetime.datetime.now().isoformat(timespec="seconds"), open(exp_path).read(), json.dumps(sj), b_sn, a_sn, b_rx, a_rx, settings))
         f.write("## EVENTS from seq %d\n%s\n## FORWARDER log (tail)\n%s\n## CANDUMP (first 3 / last 3 lines, %d lines, drops %d)\n%s\n## ANALYSIS (json)\n%s\n"
                 % (M + 1, ev_txt, "\n".join(fwd_txt.splitlines()[-14:]), cd_total, cd_drops, "\n".join(cd_txt.splitlines()[:3] + ["..."] + cd_txt.splitlines()[-3:]), json.dumps(res, indent=1, default=str)))
         f.write("## FORWARDER full log\n" + fwd_txt + "\n")
@@ -209,7 +226,7 @@ def row(r):
     e, fw, s = r["expected"], r["fwd"], r["sender"]
     return [r["tag"], e["frames_attempted"], s.get("sent_ok"), s.get("enobufs"), r["sender_tx_packets"], r["rx_can0"], "%d/%d/%d/%d" % (r["rx_over_errors"], r["rx_fifo_errors"], r["rx_dropped"], r["rx_errors"]),
             "%d (-%d, drops %d)" % (r["candump_seen"], r["sent_ok_not_seen_by_candump"], r["candump_drops"]), fw.get("fwd_received_queued"), fw.get("queue_dropped"), fw.get("handed_judged"),
-            r["judged"], e["frames_judged"]]
+            r["judged"], e["frames_judged"], r["hb_late"], r["late_answers"], r["reply_p99_ms"], r["reply_max_ms"], "%.2f" % r["judged_window_s"] if r["judged_window_s"] else None, r["socket_loss_derived"]]
 
 
 def main(argv):
@@ -231,7 +248,7 @@ def main(argv):
             r["tag"], r["expected"]["frames_attempted"], r["sender"].get("sent_ok"), r["sender"].get("enobufs"), r["rx_can0"], r["fwd"].get("fwd_received_queued"),
             r["fwd"].get("handed_judged"), r["judged"]), flush=True)
         time.sleep(8)
-    hdr = ["run", "attempted", "sender_ok", "ENOBUFS", "sender_tx_pk", "rx_can0", "over/fifo/drop/err", "candump_seen", "fwd_queued", "queue_dropped", "handed_judged", "judged", "expected_judged"]
+    hdr = ["run", "attempted", "sender_ok", "ENOBUFS", "sender_tx_pk", "rx_can0", "over/fifo/drop/err", "candump_seen", "fwd_queued", "queue_dropped", "handed_judged", "judged", "expected_judged", "hb_late", "LATE_ANS", "reply_p99_ms", "reply_max_ms", "window_s", "socket_loss"]
     with open(os.path.join(BL, "burst_%s_SUMMARY%s.txt" % (date, os.environ.get("SUMMARYTAG", ""))), "w") as f:
         f.write("\t".join(hdr) + "\n")
         for r in results:
