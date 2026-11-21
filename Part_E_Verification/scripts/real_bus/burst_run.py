@@ -129,6 +129,8 @@ def run_one(kind, date, scratch, idx=0):
         N, policy, tag = 100, "paced", "normal_%s" % time.strftime("%H%M%S")
     elif kind.startswith("wrongid:"):                           # experiment W: N frames with CAN id 0x124, rejected as MALFORMED before the HMAC
         N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "wrongid%d_%s" % (N, policy)
+    elif kind.startswith("rate:"):                              # N valid frames PACED by the sender at DELAY_MS between frames (sustained rate test)
+        N, dly = int(kind.split(":")[1]), int(kind.split(":")[2]); policy = "paced"; tag = "rate%d_d%d" % (N, dly)
     elif kind.startswith("plain:"):                             # N valid frames, consecutive counters, NOTHING planted (for the exact gap accounting of overload tests)
         N, policy = int(kind.split(":")[1]), kind.split(":")[2]; tag = "plain%d_%s" % (N, policy)
     else:
@@ -152,6 +154,16 @@ def run_one(kind, date, scratch, idx=0):
         exd = {"last_counter_start": L, "frames_attempted": 100, "frames_judged": 100, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0,
                "COUNTER_RESYNC": resync, "ACCEPTED": 100 - resync, "last_counter_end": L + 100}
         open(exp_path, "w").write("# EXPECTED counts for 10 s of normal traffic, written BEFORE it is sent\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
+    elif kind.startswith("rate:"):
+        sys.path.insert(0, MC); import packet_gen as g
+        key = g.key_from_source(); lines = ["# rate test: %d valid packets, counters %d..%d, %d ms between frames\n" % (N, L + 1, L + N, dly)]
+        for i in range(1, N + 1):
+            c = L + i; lines.append(g.line(dly, 0x123, g.packet(key, 0x123, c, 0xC0DE0000 | (c & 0xFFFF)), "valid counter %d" % c))
+        open(pre + ".txt", "w").write("".join(lines))
+        resync = 1 if L == 0 else 0
+        exd = {"last_counter_start": L, "frames_attempted": N, "frames_judged": N, "AUTH_FAIL": 0, "REPLAY": 0, "MALFORMED": 0, "COUNTER_GAP": 0, "COUNTER_RESYNC": resync,
+               "ACCEPTED": N - resync, "last_counter_end": L + N, "plain": 1}
+        open(exp_path, "w").write("# EXPECTED for a paced rate test, written BEFORE sending, only if NOTHING is lost\n" + "".join("%s=%s\n" % kv for kv in exd.items()))
     elif kind.startswith("plain:"):
         sys.path.insert(0, MC); import packet_gen as g
         key = g.key_from_source(); lines = ["# plain burst: %d valid packets, counters %d..%d, no planted frame, delay 0\n" % (N, L + 1, L + N)]
@@ -186,7 +198,7 @@ def run_one(kind, date, scratch, idx=0):
     settings = ssh("root", RX, "echo \"sysctl: $(sysctl -n net.core.rmem_default) $(sysctl -n net.core.rmem_max)  (rmem_default rmem_max)\"; echo \"forwarder: $(sha256sum %s | cut -c1-16)  cmd: %s %s run %d --pull %s--stats %s\"; "
                    "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"; echo \"cpu governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) at $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq) kHz\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, "" if os.environ.get("QUIET") == "1" else "--verbose ", FWD_ARGS)) \
         + ssh("sender", SN, "echo \"sender can0 qlen $(cat /sys/class/net/can0/tx_queue_len)\"")
-    cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
+    cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" and not kind.startswith("rate:") else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
     send_out = ssh("sender", SN, cmd, timeout=120); t_sent = time.time() - t_start
     sj = None
     for ln in send_out.splitlines():
@@ -194,8 +206,8 @@ def run_one(kind, date, scratch, idx=0):
             sj = json.loads(ln)
     if sj is None:
         m = re.search(r"sent (\d+) CAN-FD frames", send_out)
-        sj = {"policy": "paced", "attempted": N, "sent_ok": int(m.group(1)) if m else 0, "enobufs": 0, "lost_at_sender": 0, "retries": 0, "other_errors": 0, "duration_s": None,
-              "rate_fps": 10.0, "longest_stall_ms": None, "lost_indices": [], "raw": send_out.strip()[:200]}
+        sj = {"policy": "paced", "attempted": N, "sent_ok": int(m.group(1)) if m else 0, "enobufs": 0, "lost_at_sender": 0, "retries": 0, "other_errors": 0, "duration_s": round(t_sent - 4.0, 2),
+              "rate_fps": round(N / max(t_sent - 4.0, 0.01), 1) if kind.startswith("rate:") else 10.0, "longest_stall_ms": None, "lost_indices": [], "raw": send_out.strip()[:200]}
     time.sleep(max(1, SNAP_AT - (time.time() - t_start)))
     a_rx, a_sn = snap_rx(), snap_sn()
     ev_txt = ssh("root", RX, MCL + " events --from %d --all" % (M + 1))
