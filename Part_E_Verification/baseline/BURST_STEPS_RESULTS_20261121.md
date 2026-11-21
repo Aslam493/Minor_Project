@@ -207,3 +207,12 @@ Prediction met with two small numeric misses: judged and dropped were within 1.5
 
 ## Final pass, step 7: where the lossless range ends (plain bursts, full bus rate 3587 frames/s): prediction MET
 `series_report.py s7a_ 3` / `s7b_ 3`. N=2400: judged 2400, dropped 0, gap 0 = 0 in 3 of 3 (predicted lossless). N=2600: judged 2496 / 2504 / 2528, dropped by the Mode P queue 104 / 96 / 72 (predicted about 90 +-60), counted; Secure World gap 104 = 104, 96 = 96, 72 = 72 (tail 0); identity PASS 3 of 3. So the calculated limit (2048 / (1 - 640/3587) = about 2490 frames in one burst at full bus rate) is confirmed by bracketing: lossless at 2400 (3 of 3), losing 72-104 at 2600.
+
+## Final pass, step 8: sustained rate with a paced sender (powersave, QUIET=1, SNAP_AT=30): prediction MET
+| | prediction | result |
+|---|---|---|
+| 8a `rate:7000:2`, measured sender rate | about 470-490 frames/s | 480.1 / 481.1 / 478.6 frames/s over 14.6 s |
+| 8a judged, drops at every stage, gap | 7000, 0, 0 = 0 | **7000 of 7000, 0 lost at every stage, gap 0 = 0, identity PASS 3 of 3**; judging window 13.99-14.00 s (follows the sender, no backlog) |
+| 8b `rate:14000:1`, measured sender rate | about 900-950 | 942.4 / 943.9 / 947.5 frames/s over 14.8 s |
+| 8b dropped at the Mode P forwarder queue | about 2300 (+-900), recomputed with the measured rate: (943 - 640) x 14.8 - 2048 = 2436 | **3076 / 3059 / 3068**, counted; sender, chip, socket, forwarder-rejected 0; identity PASS 3 of 3; gap 3076 = 3076, 3059 = 3059, 3068 = 3068 (tail 0) |
+The drop count is about 600 (26 %) above my model: it is inside the +-900 stated before, but the model is not exact (judged 10924-10941 in 17.2 s = 635-637 frames/s; the queue holds about 1500 rather than 2048 frames when the sender stops). I did not investigate further; it does not change the verdict (every drop counted at one stage).
