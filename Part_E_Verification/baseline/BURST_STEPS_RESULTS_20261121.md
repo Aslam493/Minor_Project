@@ -60,3 +60,14 @@ Before: governor powersave, 600 MHz (min 600, max 1200 MHz, all online CPUs shar
 Runs: judged 1004 x3, planted exact, kernel drops 0, chip loss 0, batches up to 32 (42-43 replies carry packets), LATE_ANSWER 2 / 0 / 1, STALE 0 / 1 / 1, late heartbeat 1 / 0 / 0, lock timeouts 0, starved 0.
 **Prediction check:** predicted "about 2x faster if CPU-bound" (drain about 5 s); measured 4-5x faster (drain 2 s): the dependence on the clock is stronger than linear, so halving the clock costs more than half the speed (cause not yet known: candidates are memory/bus clocks tied to the ARM clock at 600 MHz, or timer-based waits). The batch of 32 now takes 35 ms, inside the 40 ms deadline but close to it: occasional late replies remain.
 **Side effects to validate before adopting 1200 MHz permanently:** the Core 1 loop cadence is counted in passes (C4 measured pass 26.6 ns, attempt 12.6 us, interval 448 us at 600 MHz); at 1200 MHz it runs about twice as often. `verify_boot` and `board_full_check --mode-p` must be repeated at 1200 MHz.
+
+## Step 2 / 3c', forwarder `--batch 6` (workaround; 1200 MHz, buffer 4 MiB), 3 runs: replies short, but 62 % of the burst LOST at the forwarder queue; prediction NOT met
+| | predicted | r1 | r2 | r3 |
+|---|---|---|---|---|
+| judged | 1004 | **384** | **377** | **377** |
+| dropped by the forwarder queue (256, drop-oldest) | 0 | **620** | **627** | **627** |
+| reply max (forwarder side) | < 40 ms | 19.3 | 28.5 | 7.8 ms |
+| LATE_ANSWER / late heartbeat | 0 / 0 | 0 / 0 | 1 / 1 | 0 / 0 |
+| window | about 8.4 s | 3.19 s (120 fps) | 3.15 s | 3.17 s |
+All 1004 frames reached the forwarder (kernel drops 0, chip loss 0) and were queued; only 6 per 50 ms request (120/s) could leave, while the forwarder, now fast at 1200 MHz (one frame read per 0.9 ms fetch), filled the 256-entry queue in about a second and dropped the oldest (counted exactly: 620/627/627 = the verbose "queue full" lines). My prediction ignored that the forwarder's read rate rose with the clock.
+**Conclusion:** a batch cap is only safe together with a queue large enough for the burst (plan step 3b/B3, `CB_QCAP` 256 -> 2048); alone it converts a speed limit into loss. At 1200 MHz an uncapped batch of 32 (35 ms) judged all 1004 in 2 s with occasional late replies (step 2d); the right cap depends on the clock (reply = 0.8 ms + 1.07 ms/packet at 1200 MHz: n <= 22 for 25 ms; 4.0 + 4.95 n at 600 MHz: n <= 4), so a time-budget (adaptive) cap is better than a fixed 6.
