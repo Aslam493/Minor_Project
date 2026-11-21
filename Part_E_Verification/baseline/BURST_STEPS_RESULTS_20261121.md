@@ -27,3 +27,7 @@ Confirmed in force: forwarder `SCHED_FIFO 50`. judged 1004 x3, planted exact, no
 
 ## Step 3a-V, counter validation (new forwarder `can_forwarder_3a`, default buffer, 1 run): prediction MET
 Judged 239; the forwarder's own new line `socket drops (SO_MEMINFO): 765 frames dropped by the kernel for this socket; SO_RCVBUF 212992` equals the 765 derived from the chip counter minus frames read. The counter is trustworthy.
+
+## Step 3a, forwarder `--rcvbuf 4194304` (system buffer back at the default 212992), 3 repeats: prediction MET
+judged 1004 / 1004 / 1004, kernel drops reported by the forwarder 0 / 0 / 0, effective buffer 8,388,608 in all (forced 4 MiB, doubled by the kernel), planted counts exact, `last_counter` = expected end, window 9.97 / 9.92 / 9.89 s, no chip loss in these 3. Reply p99 58.8 / 58.8 / 58.1 ms, reply max 215.0 (one outlier) / 64.3 / 59.7 ms, LATE_ANSWER 1 / 1 / 2, STALE 1 / 1 / 1, late heartbeat 0 / 1 / 1, lock timeouts 0, starved 0.
+The socket loss is fixed inside the forwarder itself and every loss at its socket is now counted exactly (kernel counter validated: 765 = 765 in 3a-V). Still slow (9.9 s for 1004 frames): step 3b.
