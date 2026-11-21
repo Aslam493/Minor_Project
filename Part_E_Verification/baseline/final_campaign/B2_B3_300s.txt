@@ -1,0 +1,33 @@
+receiver: data bit timing        2000000 bit/s  sample-point 75.0%  tq 25 ns  prop_seg 7  phase_seg1 7  phase_seg2 5  sjw 2  brp 1 | controller state       ERROR-ACTIVE (0) | FD mode                ENABLED
+sender: can <FD,TDC-AUTO> state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0 | dbitrate 2000000 dsample-point 0.750
+
+##### run rate3000_d100_nocd_b2x1_r1: expected counts written to burst_20261122_rate3000_d100_nocd_b2x1_r1.expected.txt before sending:
+# EXPECTED for a paced rate test, written BEFORE sending, only if NOTHING is lost
+last_counter_start=4200
+frames_attempted=3000
+frames_judged=3000
+AUTH_FAIL=0
+REPLAY=0
+MALFORMED=0
+COUNTER_GAP=0
+COUNTER_RESYNC=0
+ACCEPTED=3000
+last_counter_end=7200
+plain=1
+
+run rate3000_d100_nocd_b2x1_r1 done: attempted 3000, sender ok 3000, ENOBUFS 0, receiver can0 3000, forwarder queued 3000, handed 3000, judged 3000
+
+run	attempted	sender_ok	ENOBUFS	sender_tx_pk	rx_can0	over/fifo/drop/err	candump_seen	fwd_queued	queue_dropped	handed_judged	judged	expected_judged	hb_late	LATE_ANS	reply_p99_ms	reply_max_ms	window_s	socket_loss	kernel_drops
+rate3000_d100_nocd_b2x1_r1	3000	3000	0	3000	3000	0/0/0/0	0 (-3000, drops 0)	3000	0	3000	3000	3000	0	0	0.259	17.525	299.90	0	0
+
+== series_report
+series b2x, 1 runs
+ run  1 PASS | powersave 600 MHz | sent 3000 = judged 3000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 299.90 s | reply p99 0.259 max 17.525 ms | late: heartbeat 0, packet 0 | hb first state 1 verdict 0, pk first state 1 | classes {} | SECURE-WORLD GAP: span 3000 - advancing 3000 = missing 0, tail 0 => 0 vs counted drops 0 MATCH
+TOTAL over the series: {'att': 3000, 'judged': 3000, 'lost_sender': 0, 'chip': 0, 'sock': 0, 'fq': 0, 'rej': 0}
+judging window s: min 299.90 median 299.90 max 299.90
+late answers: heartbeat 0, packet 0
+late packet replies NOT at the restart (event later than 1 s after the start, i.e. the harness status snapshot at about 22 s): 0
+restart-phase match: heartbeat 1 of 1 runs (first state MISSED <=> first answer LATE), packet 1 of 1 runs (first request MISSED <=> late packet reply)
+RESULT: ALL PASS (0 run(s) with an uncounted frame or a missing run; 0 run(s) UNVERIFIED because the after-run snapshot is missing: [])
+
+== heartbeat answers 311, first state 1 first verdict 0, late after the first 0

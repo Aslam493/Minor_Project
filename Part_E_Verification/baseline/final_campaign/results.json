@@ -52,5 +52,32 @@
   "evidence": "image DTB e8ac38faebc78f87; live node: #address-cells #size-cells linux,cma name optee_secure@10000000 phandle ranges /sys/firmware/devicetree/base/reserved-memory/optee_secure@10",
   "file": "baseline/final_campaign/A3_dtb_n04.txt",
   "time": "2026-11-22 00:28:54"
+ },
+ "B1": {
+  "id": "B1",
+  "test": "600 valid frames at a steady 50 frames/s",
+  "expected": "600 judged, all ACCEPTED, 0 loss at every stage, Secure World gap 0",
+  "result": "PASS",
+  "evidence": "run  1 PASS | powersave 600 MHz | sent 600 = judged 600 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | ENOBUFS-retried 0 | window 11.97 s | reply p99 0.353 max 26.256 ms | late: heartbeat 1, packet 0 | hb first state ",
+  "file": "baseline/final_campaign/B1_steady_600.txt",
+  "time": "2026-11-22 00:36:33"
+ },
+ "B2": {
+  "id": "B2",
+  "test": "Heartbeat for 5 minutes",
+  "expected": "0 late and 0 missed (the first answer after the forwarder start may be LATE only if its first state was MISSED)",
+  "result": "PASS",
+  "evidence": "311 heartbeat answers (forwarder: ON_TIME 321, LATE 0), later than the first: 0 late; first answer verdict 0 (first request state 1); end of run hb_state ANSWERED hb_miss_count 0; late_answers 0. CORRECTION: the first evaluation by the runner read the pre-run snapshot (hb_miss_count 14, taken while no forwarder was running) and reported FAIL; the rule (0 misses at the end) is unchanged, the runner now reads the end-of-run record.",
+  "file": "baseline/final_campaign/B2_B3_300s.txt",
+  "time": "2026-11-22 00:42:07"
+ },
+ "B3": {
+  "id": "B3",
+  "test": "Mode P for 5 minutes with 10 frames/s",
+  "expected": "all requests on time (a restart-phase LATE on the first request is the only allowed exception)",
+  "result": "PASS",
+  "evidence": "requests 6361: ON_TIME 6361 LATE 0 STALE 0 UNISSUED 0 DUPLICATE 0; run  1 PASS | powersave 600 MHz | sent 3000 = judged 3000 + sender 0 + chip 0 + socket 0 + forwarder-rejected 0 + Mode-P-queue 0 + still-queued 0 | EN",
+  "file": "baseline/final_campaign/B2_B3_300s.txt",
+  "time": "2026-11-22 00:42:07"
  }
 }

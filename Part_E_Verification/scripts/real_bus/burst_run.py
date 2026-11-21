@@ -199,7 +199,7 @@ def run_one(kind, date, scratch, idx=0):
                    "p=$(cat /tmp/fwd.pid); echo \"forwarder pid $p: $(chrt -p $p 2>&1 | tr '\\n' ' ')\"; grep -E 'Cpus_allowed_list' /proc/$p/status; echo \"can0 qlen $(cat /sys/class/net/can0/tx_queue_len); irq186 smp_affinity $(cat /proc/irq/186/smp_affinity)\"; echo \"cpu governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor) at $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq) kHz\"" % (FWD_BIN, FWD_PREFIX, FWD_BIN, FWD_SECONDS, "" if os.environ.get("QUIET") == "1" else "--verbose ", FWD_ARGS)) \
         + ssh("sender", SN, "echo \"sender can0 qlen $(cat /sys/class/net/can0/tx_queue_len)\"")
     cmd = ("python3 /tmp/burst/burst_send.py /tmp/burst/burst.txt %s" % policy) if kind != "normal" and not kind.startswith("rate:") else "python3 /tmp/burst/laptop_can_send.py --iface can0 /tmp/burst/burst.txt"
-    send_out = ssh("sender", SN, cmd, timeout=120); t_sent = time.time() - t_start
+    send_out = ssh("sender", SN, cmd, timeout=int(os.environ.get("SEND_TIMEOUT", "120"))); t_sent = time.time() - t_start
     sj = None
     for ln in send_out.splitlines():
         if ln.startswith("{"):

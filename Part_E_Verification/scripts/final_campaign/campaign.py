@@ -146,25 +146,26 @@ def stage_A():
 def stage_B():
     p0, p1, _ = status(); L = p0["last_counter"]; M = p0["ev_seq"]
     # B1: 600 valid frames at a steady 50 frames/s (20 ms), Mode P
-    env = dict(os.environ, QUIET="1", STEP="b1", NOCD="1", SUMMARYTAG="_b1", FWD_BIN=FWD, FWD_ARGS="--rcvbuf 4194304 --trace /tmp/b1_tr.csv --hblog /tmp/b1_hb.csv", SNAP_AT="30")
+    env = dict(os.environ, QUIET="1", STEP="b1x1", NOCD="1", SUMMARYTAG="_b1x", FWD_BIN=FWD, FWD_ARGS="--rcvbuf 4194304 --trace /tmp/b1_tr.csv --hblog /tmp/b1_hb.csv", SNAP_AT="30")
     r = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "burst_run.py"), "--runs", "rate:600:20", "--date", "20261122"], env=env, capture_output=True, text=True, timeout=400)
-    subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b1_tr.csv" % RX, os.path.join(B.BL, "trace_20261122_b1.csv")]); subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b1_hb.csv" % RX, os.path.join(B.BL, "hblog_20261122_b1.csv")])
-    rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b1", "1", "--date", "20261122"], capture_output=True, text=True).stdout
+    subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b1_tr.csv" % RX, os.path.join(B.BL, "trace_20261122_b1x1.csv")]); subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b1_hb.csv" % RX, os.path.join(B.BL, "hblog_20261122_b1x1.csv")])
+    rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b1x", "1", "--date", "20261122"], capture_output=True, text=True).stdout
     f = save("B1_steady_600", r.stdout[-3000:] + "\n== series_report\n" + rep)
     ok = "ALL PASS" in rep and re.search(r"sent 600 = judged 600", rep)
     rec("B1", "600 valid frames at a steady 50 frames/s", "600 judged, all ACCEPTED, 0 loss at every stage, Secure World gap 0", "PASS" if ok else "FAIL",
         " ".join(l.strip() for l in rep.splitlines() if l.startswith(" run"))[:260], f)
     # B2 + B3 in one run of 300 s: heartbeat every second and Mode P requests every 50 ms, normal traffic 10 frames/s
-    env = dict(os.environ, QUIET="1", STEP="b2", NOCD="1", SUMMARYTAG="_b2", FWD_BIN=FWD, FWD_SECONDS="320", SNAP_AT="312", FWD_ARGS="--rcvbuf 4194304 --trace /tmp/b2_tr.csv --hblog /tmp/b2_hb.csv")
+    env = dict(os.environ, QUIET="1", STEP="b2x1", NOCD="1", SUMMARYTAG="_b2x", FWD_BIN=FWD, FWD_SECONDS="320", SNAP_AT="312", SEND_TIMEOUT="500", FWD_ARGS="--rcvbuf 4194304 --trace /tmp/b2_tr.csv --hblog /tmp/b2_hb.csv")
     r = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "burst_run.py"), "--runs", "rate:3000:100", "--date", "20261122"], env=env, capture_output=True, text=True, timeout=900)
-    subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b2_tr.csv" % RX, os.path.join(B.BL, "trace_20261122_b2.csv")]); subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b2_hb.csv" % RX, os.path.join(B.BL, "hblog_20261122_b2.csv")])
-    rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b2", "1", "--date", "20261122"], capture_output=True, text=True).stdout
-    hb = [l.split(",") for l in open(os.path.join(B.BL, "hblog_20261122_b2.csv")).read().splitlines()[2:]]
+    subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b2_tr.csv" % RX, os.path.join(B.BL, "trace_20261122_b2x1.csv")]); subprocess.run(["scp", "-q"] + B.SSHO + ["root@%s:/tmp/b2_hb.csv" % RX, os.path.join(B.BL, "hblog_20261122_b2x1.csv")])
+    rep = subprocess.run([sys.executable, os.path.join(HERE, "..", "real_bus", "series_report.py"), "b2x", "1", "--date", "20261122"], capture_output=True, text=True).stdout
+    hb = [l.split(",") for l in open(os.path.join(B.BL, "hblog_20261122_b2x1.csv")).read().splitlines()[2:]]
     ans = [l for l in hb if l[0] == "23"]; late_after_first = sum(1 for l in ans[1:] if l[9] != "0"); first_v = ans[0][9] if ans else "?"
     first_state = next((l[7] for l in hb if l[0] == "22" and l[5] == "0x0" and l[7] in ("1", "3") and l[8] == "1"), "?")
-    res = open(os.path.join(B.BL, [x for x in os.listdir(B.BL) if x.startswith("burst_20261122_") and "_b2_r1.txt" in x and "expected" not in x][0])).read()
+    res = open(os.path.join(B.BL, [x for x in os.listdir(B.BL) if x.startswith("burst_20261122_") and "_b2x1_r1.txt" in x and "expected" not in x][0])).read()
     pq = re.search(r"requests answered: (\d+) \(ON_TIME (\d+), LATE (\d+), STALE (\d+), UNISSUED (\d+), DUPLICATE (\d+)", res)
-    miss = re.search(r"hb_miss_count (\d+)", res)
+    aj = json.loads(res[res.index("## ANALYSIS (json)") + 19:res.index("## FORWARDER full log")])
+    miss = re.match(r"(\d+)", str(aj["hb_miss_count"]))      # END of run (analysis record); the first hb_miss_count in the file is the pre-run snapshot
     f = save("B2_B3_300s", r.stdout[-2500:] + "\n== series_report\n" + rep + "\n== heartbeat answers %d, first state %s first verdict %s, late after the first %d\n" % (len(ans), first_state, first_v, late_after_first))
     rec("B2", "Heartbeat for 5 minutes", "0 late and 0 missed (the first answer after the forwarder start may be LATE only if its first state was MISSED)",
         "PASS" if (late_after_first == 0 and miss and miss.group(1) == "0" and ((first_v == "0") or first_state == "3")) else "FAIL",
