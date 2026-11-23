@@ -123,3 +123,44 @@ The Secure World sends a challenge every second; Linux must answer. After 3 miss
 | `/tmp/mon_client events --from N --all` | receiver | the Secure World's event log (what it decided and why) |
 | `/tmp/canmode can0` | receiver | CAN-FD settings and state of the interface |
 | `/etc/init.d/S95can_forwarder start\|stop\|status` | receiver | controls the postman |
+
+## 9. From zero: show AUTH_FAIL, a counter mismatch, a timeout, and the time (rehearsed 2026-11-23)
+
+**What a message (packet) is.** `[ ID | counter | data | signature ]`. The sender writes a **counter** that goes up by one for every message (1, 2, 3 ...) and a **signature** (HMAC) made with a secret key. The Secure World knows the key and remembers the last counter. It then decides:
+
+| What goes wrong | The Secure World says | Why |
+|---|---|---|
+| the data was changed, the signature is old | **AUTH_FAIL** | the signature does not match the data (needs the key to notice) |
+| the counter is **too old or repeated** (same as before) | **REPLAY** (detail 1 old, 2 duplicate, 3 same counter other data) | an old message sent again |
+| the counter **jumps ahead** (1, 2, 3, then 8) | **COUNTER_GAP** (detail = how many are missing) | messages were removed or injected |
+| **nothing arrives** for more than 0.3 s | **TIMEOUT** detail 1 | the bus went silent |
+| Linux **stops answering** the heartbeat (3 times) | **TIMEOUT** detail 2 | the postman is dead |
+
+**Step 1, laptop (window L):** `cd ~/Minor_Project/Part_E_Verification && python3 scripts/demo_prepare.py` (builds fresh files from the live counter).
+
+**Step 2, receiver (window R):** `ssh root@10.237.27.212`, then paste these helpers once. `evt` shows the last events **with the time** ("x s ago"), `age` shows how long ago the last good message arrived, `alarms` shows the exact alarm counters:
+```sh
+evt()  { now=$(/tmp/mon_client --retries 20 status 0 | grep -o "now_ticks [0-9]*" | cut -d" " -f2); n=$(/tmp/mon_client --retries 20 status 0 | grep -o "ev_seq [0-9]*" | cut -d" " -f2); f=$((n>7?n-7:1)); /tmp/mon_client --retries 20 events --from $f --all | awk -v now=$now '/^seq/ {printf "event %s  %-18s detail %-3s  %.1f s ago\n", $2, $3, $7, (now-$9)/19200000}'; }
+age()  { /tmp/mon_client --retries 20 status 0 | grep -o "traffic_age_ticks [0-9]*" | awk '{printf "last good message arrived %.2f s ago\n", $2/19200000}'; }
+alarms() { /tmp/mon_client --retries 20 status 1 | grep -E "AUTH_FAIL|REPLAY|COUNTER_GAP|MALFORMED|TIMEOUT|verdict totals"; }
+```
+Type `alarms` now: write down the numbers (this is the "before").
+
+**Step 3, sender (window S):** `ssh sender@10.237.27.144`, then `cd /tmp/demo`. Send the files **in order**, one at a time; after each, type `alarms` or `evt` in window R:
+
+| Order | Sender command | Receiver shows (rehearsal) |
+|---|---|---|
+| 1 | `python3 laptop_can_send.py --iface can0 1_normal.txt` | 10 more messages judged, no new alarm |
+| 2 | `python3 laptop_can_send.py --iface can0 2_tamper.txt` | **AUTH_FAIL 1 -> 2** (`event 37 AUTH_FAIL detail 0  5.4 s ago`) |
+| 3 | `python3 laptop_can_send.py --iface can0 3_replay.txt` | **REPLAY 3 -> 4** (`event 40 REPLAY detail 1  2.4 s ago`): the counter mismatch "too old" |
+| 4, 5, 6 | `... 4_duplicate.txt`, `... 5_conflict.txt`, `... 6_wrongid.txt` | REPLAY detail 2, REPLAY detail 3, MALFORMED (send these before file 7: its counters continue after them) |
+| 7 | `python3 laptop_can_send.py --iface can0 7_jump.txt` | **COUNTER_GAP +1, detail 4**: the counter mismatch "jumped ahead, 4 missing" |
+
+**Step 4, the timeout and the time (stop sending, look at window R):**
+```sh
+age       # "last good message arrived 2.04 s ago"
+sleep 3; age   # "... 5.97 s ago"   the number grows while the bus is silent
+evt       # every file ends with: event 41  TIMEOUT detail 1  1.9 s ago
+```
+Say: "the Secure World keeps its own clock: after 0.3 seconds without a valid message it raised TIMEOUT detail 1; when I send again it raises TRAFFIC_RECOVERED". The times come from the Secure World's own counter (19.2 million ticks per second), not from Linux.
+For the other timeout (Linux dead) use part 5 of this guide: stop the forwarder, wait 6 s, type `evt` -> `TIMEOUT detail 4` and `TIMEOUT detail 2`.
