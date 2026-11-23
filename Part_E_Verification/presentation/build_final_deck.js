@@ -58,6 +58,15 @@ async function main() {
     ],
   });
 
+  pres.defineSlideMaster({
+    title: "DARK_LAYOUT", background: { color: K.dk1 },
+    slideNumber: { x: 12.0, y: 7.05, w: 0.8, h: 0.3, fontFace: "Calibri", fontSize: 10, color: "8FA3BF", align: "right" },
+    objects: [
+      { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 0.55, w: 8, h: 0.4, fontFace: "Calibri", fontSize: 14, bold: true, color: "6FA8FF", charSpacing: 3, align: "left", valign: "middle", margin: 0 }, text: "" } },
+      { text: { text: "Secure CAN Monitor  |  Minor Project  |  IIT Delhi", options: { x: 0.6, y: 7.05, w: 8, h: 0.3, fontFace: "Calibri", fontSize: 10, color: "8FA3BF", margin: 0 } } },
+    ],
+  });
+
   // icons (rendered once)
   const ic = {
     net: await icon(fa.FaNetworkWired), car: await icon(fa.FaCar), laptop: await icon(fa.FaLaptopCode), shield: await icon(fa.FaShieldAlt),
@@ -88,32 +97,40 @@ async function main() {
   s.addText("Supervisor: Prof. Kolin Paul  |  Indian Institute of Technology Delhi", { x: 0.7, y: 6.1, w: 7.6, h: 0.4, fontFace: "Calibri", fontSize: 16, color: C.text2, margin: 0, isTextBox: true });
   s.addNotes("Title slide. One sentence for the idea: a CAN monitor where the judge is the Secure World of the processor (ARM TrustZone with OP-TEE), not Linux. Linux only carries the messages. Everything in this talk was measured on real hardware: two Raspberry Pi 3 boards on a real CAN-FD bus.");
 
-  // ================================================================ SLIDE 2: problem statement
-  s = pres.addSlide({ masterName: "CONTENT_LAYOUT", sectionTitle: "Introduction" });
-  s.addText("Problem statement", { placeholder: "title" });
-  s.addText("A CAN message carries no proof of who sent it, and the software that checks it can be attacked.", { x: 0.6, y: 1.25, w: 11.2, h: 0.5, fontFace: "Calibri", fontSize: 18, color: C.text2, margin: 0, isTextBox: true });
-  const cy0 = 2.15, ch = 2.2;
-  const card = (x, w, img, circleFill, head, body, opts) => {
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, Object.assign({ x, y: cy0, w, h: ch, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, shadow: shadow(), objectName: head + " card" }, opts || {}));
-    circleIcon(s, img, x + 0.65, cy0 + 0.7, 0.8, circleFill, head);
-    s.addText(head, { x: x + 0.3, y: cy0 + 1.2, w: w - 0.5, h: 0.4, fontFace: "Calibri", fontSize: 20, bold: true, color: C.text1, margin: 0, isTextBox: true });
-    s.addText(body, { x: x + 0.3, y: cy0 + 1.6, w: w - 0.5, h: 0.45, fontFace: "Calibri", fontSize: 16, color: C.text2, margin: 0, isTextBox: true });
-  };
-  card(0.6, 3.6, ic.car, C.accent5, "CAN bus", "No proof of the sender");
-  card(4.85, 3.6, ic.laptop, C.accent4, "Linux checks it", "Linux can be hacked", { fill: { color: C.accent4, transparency: 90 }, line: { color: C.accent4, width: 1.5 } });
-  card(9.1, 3.6, ic.q, C.accent1, "Accept or drop?", "Can we trust the verdict?");
-  arrow(s, 4.25, cy0 + ch / 2, 4.8, cy0 + ch / 2, C.accent5, "Arrow bus to Linux");
-  arrow(s, 8.5, cy0 + ch / 2, 9.05, cy0 + ch / 2, C.accent5, "Arrow Linux to verdict");
-  s.addText("ATTACKS TO DETECT", { x: 0.6, y: 4.6, w: 6, h: 0.3, fontFace: "Calibri", fontSize: 12, bold: true, color: C.accent1, charSpacing: 2, margin: 0, isTextBox: true });
-  [["Forged message", ic.spy], ["Replayed message", ic.redo], ["Message flood", ic.bolt]].forEach(([t, img], i) => {
-    const x = 0.6 + i * 4.15;
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 4.95, w: 3.8, h: 0.85, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, objectName: t + " chip" });
-    circleIcon(s, img, x + 0.55, 5.375, 0.55, C.accent4, t);
-    s.addText(t, { x: x + 1.05, y: 5.0, w: 2.7, h: 0.75, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+  // ================================================================ SLIDE 2: problem statement (dark, one idea)
+  s = pres.addSlide({ masterName: "DARK_LAYOUT", sectionTitle: "Introduction" });
+  s.addText("PROBLEM STATEMENT", { placeholder: "title" });
+  s.addShape(pres.shapes.OVAL, { x: 12.0, y: 0.3, w: 0.95, h: 0.95, fill: { color: C.background1 }, line: { color: C.background1, width: 0 }, objectName: "Logo badge" });
+  s.addImage({ path: LOGO, x: 12.07, y: 0.37, w: 0.81, h: 0.81, altText: "IIT Delhi logo" });
+  s.addText([
+    { text: "A CAN message cannot prove", options: { breakLine: true } },
+    { text: "who", options: { color: "FFB454" } },
+    { text: " sent it." },
+  ], { x: 0.7, y: 1.05, w: 11, h: 1.55, fontFace: "Calibri", fontSize: 44, bold: true, color: C.background1, valign: "top", margin: 0, isTextBox: true });
+  // the message, drawn as a strip: ID | DATA | missing sender proof
+  const sy = 2.85, sh = 1.05;
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.7, y: sy, w: 2.3, h: sh, rectRadius: 0.1, fill: { color: "1F4272" }, line: { color: "3A6199", width: 1 }, objectName: "Message ID" });
+  s.addText([{ text: "ID", options: { fontSize: 14, color: "9DB4D3", breakLine: true } }, { text: "0x123", options: { fontSize: 24, bold: true, color: C.background1 } }], { x: 0.7, y: sy, w: 2.3, h: sh, align: "center", valign: "middle", fontFace: "Calibri", margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 3.15, y: sy, w: 4.4, h: sh, rectRadius: 0.1, fill: { color: "1F4272" }, line: { color: "3A6199", width: 1 }, objectName: "Message data" });
+  s.addText([{ text: "DATA", options: { fontSize: 14, color: "9DB4D3", breakLine: true } }, { text: "speed = 80 km/h", options: { fontSize: 24, bold: true, color: C.background1 } }], { x: 3.15, y: sy, w: 4.4, h: sh, align: "center", valign: "middle", fontFace: "Calibri", margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 7.7, y: sy, w: 4.9, h: sh, rectRadius: 0.1, fill: { color: "FF6B6B", transparency: 85 }, line: { color: "FF6B6B", width: 2, dashType: "dash" }, objectName: "Missing sender proof" });
+  circleIcon(s, ic.q, 8.4, sy + sh / 2, 0.7, "FF6B6B", "Missing sender proof");
+  s.addText([{ text: "SENDER PROOF", options: { fontSize: 14, color: "FF9A9A", breakLine: true } }, { text: "missing", options: { fontSize: 24, bold: true, color: "FF9A9A" } }], { x: 9.0, y: sy, w: 3.4, h: sh, align: "left", valign: "middle", fontFace: "Calibri", margin: 0, isTextBox: true });
+  s.addText("Any node on the bus can send any message.", { x: 0.7, y: sy + sh + 0.12, w: 8, h: 0.4, fontFace: "Calibri", fontSize: 16, color: "C9D6E8", margin: 0, isTextBox: true });
+  // three attacks
+  s.addText("THREE ATTACKS THAT FOLLOW", { x: 0.7, y: 4.5, w: 8, h: 0.3, fontFace: "Calibri", fontSize: 12, bold: true, color: "6FA8FF", charSpacing: 2, margin: 0, isTextBox: true });
+  [["Forged", "a message nobody sent", ic.spy, "D64545"], ["Replayed", "an old message, sent again", ic.redo, "E8871E"], ["Flood", "too many to handle", ic.bolt, "C13584"]].forEach(([t, sub, img, col], i) => {
+    const x = 0.7 + i * 4.05, y = 4.85;
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w: 3.8, h: 1.1, rectRadius: 0.12, fill: { color: "152E52" }, line: { color: "2A4a7a", width: 1 }, objectName: t + " tile" });
+    circleIcon(s, img, x + 0.65, y + 0.55, 0.72, col, t);
+    s.addText(t, { x: x + 1.2, y: y + 0.1, w: 2.5, h: 0.45, fontFace: "Calibri", fontSize: 20, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
+    s.addText(sub, { x: x + 1.2, y: y + 0.55, w: 2.5, h: 0.5, fontFace: "Calibri", fontSize: 14, color: "C9D6E8", valign: "top", margin: 0, isTextBox: true });
   });
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.6, y: 6.1, w: 12.1, h: 0.75, rectRadius: 0.12, fill: { color: C.text1 }, line: { color: C.text1, width: 1 }, objectName: "Goal banner" });
-  s.addText([{ text: "Goal: ", options: { bold: true } }, { text: "detect these attacks in the Secure World, where Linux cannot reach, and report them." }], { x: 0.9, y: 6.1, w: 11.6, h: 0.75, fontFace: "Calibri", fontSize: 18, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
-  s.addNotes("Problem statement. CAN has no sender authentication: any node on the bus can send any message. Today the check is done by normal software (Linux). If an attacker controls Linux, the verdict cannot be trusted. We want the verdict to come from a place Linux cannot read or change. Three attacks we care about: forged messages, replayed (old) messages, and floods that overload the system.");
+  // the answer
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.7, y: 6.2, w: 11.9, h: 0.68, rectRadius: 0.12, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "Need banner" });
+  s.addImage({ data: ic.shield, x: 0.95, y: 6.3, w: 0.48, h: 0.48, altText: "Shield" });
+  s.addText("We need a judge that attackers cannot reach, not even through Linux.", { x: 1.65, y: 6.2, w: 10.8, h: 0.68, fontFace: "Calibri", fontSize: 20, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
+  s.addNotes("Problem statement. A CAN message has an ID and data, but nothing in it proves who sent it: any node on the bus can send any message. From this follow three attacks: forged messages (nobody really sent them), replayed messages (an old valid message sent again) and floods (so many messages that the system chokes). Today the check is done by normal software, Linux, and Linux can be attacked. So we need a judge that attackers cannot reach, not even through Linux. That judge is the Secure World of the processor.");
 
   // ================================================================ SLIDE 3: before the midterm
   pres.addSection({ title: "Midterm recap" });
