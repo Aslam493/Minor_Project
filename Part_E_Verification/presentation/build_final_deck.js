@@ -45,7 +45,7 @@ async function main() {
     title: "TITLE_LAYOUT", background: { color: K.lt2 },
     objects: [
       logoObj,
-      { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 1.75, w: 7.4, h: 2.1, fontFace: "Calibri", fontSize: 40, bold: true, color: C.text1, align: "left", valign: "top", margin: 0 }, text: "" } },
+      { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 1.75, w: 11.2, h: 1.8, fontFace: "Calibri", fontSize: 40, bold: true, color: C.text1, align: "left", valign: "top", margin: 0 }, text: "" } },
     ],
   });
   pres.defineSlideMaster({
@@ -80,27 +80,12 @@ async function main() {
   s.addText([
     { text: "Secure CAN Monitor", options: { color: C.text1, breakLine: true } },
     { text: "using ARM ", options: { color: C.text1 } },
-    { text: "TrustZone", options: { color: C.accent1, breakLine: true } },
-    { text: "and OP-TEE", options: { color: C.text1 } },
+    { text: "TrustZone", options: { color: C.accent1 } },
+    { text: " and OP-TEE", options: { color: C.text1 } },
   ], { placeholder: "title" });
-  s.addText("A monitor whose verdict Linux cannot change, tested on a real CAN-FD bus", { x: 0.7, y: 4.05, w: 7.2, h: 0.9, fontFace: "Calibri", fontSize: 20, color: C.text2, margin: 0, valign: "top", isTextBox: true });
+  s.addText("A monitor whose verdict Linux cannot change, tested on a real CAN-FD bus", { x: 0.7, y: 3.6, w: 11.4, h: 0.9, fontFace: "Calibri", fontSize: 20, color: C.text2, margin: 0, valign: "top", isTextBox: true });
   s.addText("Aslam", { x: 0.7, y: 5.55, w: 7, h: 0.5, fontFace: "Calibri", fontSize: 28, bold: true, color: C.text1, margin: 0, isTextBox: true });
   s.addText("Supervisor: Prof. Kolin Paul  |  Indian Institute of Technology Delhi", { x: 0.7, y: 6.1, w: 7.6, h: 0.4, fontFace: "Calibri", fontSize: 16, color: C.text2, margin: 0, isTextBox: true });
-  // mini picture of the idea
-  const bx = 8.85, bw = 3.9;
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: bx, y: 1.7, w: bw, h: 1.05, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, shadow: shadow(), objectName: "Bus box" });
-  s.addImage({ data: ic.netDark, x: bx + 0.2, y: 1.98, w: 0.5, h: 0.5, altText: "CAN bus" });
-  s.addText([{ text: "CAN-FD bus", options: { bold: true, fontSize: 20, color: C.text1, breakLine: true } }, { text: "real hardware", options: { fontSize: 14, color: C.text2 } }], { x: bx + 0.9, y: 1.78, w: 2.9, h: 0.9, valign: "middle", margin: 0, isTextBox: true });
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: bx, y: 3.3, w: bw, h: 1.05, rectRadius: 0.12, fill: { color: C.accent1, transparency: 85 }, line: { color: C.accent1, width: 1 }, objectName: "Linux box" });
-  s.addImage({ data: ic.lapDark, x: bx + 0.2, y: 3.58, w: 0.5, h: 0.5, altText: "Linux" });
-  s.addText([{ text: "Linux", options: { bold: true, fontSize: 20, color: C.text1, breakLine: true } }, { text: "only the postman", options: { fontSize: 14, color: C.text2 } }], { x: bx + 0.9, y: 3.38, w: 2.9, h: 0.9, valign: "middle", margin: 0, isTextBox: true });
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: bx, y: 4.95, w: bw, h: 1.2, rectRadius: 0.12, fill: { color: C.text1 }, line: { color: C.text1, width: 1 }, shadow: shadow(), objectName: "Secure World box" });
-  s.addImage({ data: ic.shield, x: bx + 0.2, y: 5.3, w: 0.5, h: 0.5, altText: "Secure World" });
-  s.addText([{ text: "Secure World", options: { bold: true, fontSize: 20, color: C.background1, breakLine: true } }, { text: "the judge (OP-TEE)", options: { fontSize: 14, color: C.background1 } }], { x: bx + 0.9, y: 5.02, w: 2.9, h: 1.05, valign: "middle", margin: 0, isTextBox: true });
-  arrow(s, bx + 1.95, 2.78, bx + 1.95, 3.27, C.accent5, "Arrow bus to Linux");
-  arrow(s, bx + 1.95, 4.38, bx + 1.95, 4.92, C.accent5, "Arrow Linux to Secure World");
-  s.addShape(pres.shapes.LINE, { x: bx - 0.25, y: 4.66, w: bw + 0.5, h: 0, line: { color: C.accent4, width: 1.5, dashType: "dash" }, objectName: "TrustZone boundary" });
-  s.addText("TrustZone boundary", { x: bx + 2.1, y: 4.38, w: 1.95, h: 0.25, fontFace: "Calibri", fontSize: 10, color: C.accent4, align: "right", margin: 0, isTextBox: true });
   s.addNotes("Title slide. One sentence for the idea: a CAN monitor where the judge is the Secure World of the processor (ARM TrustZone with OP-TEE), not Linux. Linux only carries the messages. Everything in this talk was measured on real hardware: two Raspberry Pi 3 boards on a real CAN-FD bus.");
 
   // ================================================================ SLIDE 2: problem statement
