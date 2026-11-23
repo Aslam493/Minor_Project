@@ -1,0 +1,21 @@
+# rehearsal of the live-demo steps, exactly as the user does them (sender: cd /tmp/demo; send files in order), 2026-11-23 16:41:15
+1_normal.txt     judged +10  last_counter 0 -> 10 | alarms {'COUNTER_RESYNC': 1} | events [('COUNTER_RESYNC', 0)]
+2_tamper.txt     judged +6   last_counter 10 -> 15 | alarms {'AUTH_FAIL': 1} | events [('AUTH_FAIL', 0)]
+3_replay.txt     judged +5   last_counter 15 -> 19 | alarms {'REPLAY': 1} | events [('REPLAY', 1)]
+4_duplicate.txt  judged +3   last_counter 19 -> 21 | alarms {'REPLAY': 1} | events [('REPLAY', 2)]
+5_conflict.txt   judged +3   last_counter 21 -> 23 | alarms {'REPLAY': 1} | events [('REPLAY', 3)]
+6_wrongid.txt    judged +4   last_counter 23 -> 26 | alarms {'MALFORMED': 1} | events [('MALFORMED', 3)]
+7_jump.txt       judged +3   last_counter 26 -> 33 | alarms {'COUNTER_GAP': 1} | events [('COUNTER_GAP', 4)]
+8_burst2000      sender said: attempted 2000 sent_ok 2000 rate 3752.6/s | Secure World judged +2000 (want 2000), gap events +0
+9_flood12000     sender said: attempted 12000 sent_ok 12000 | Secure World judged +4203, so dropped 7797; Secure World's own gap: span 12000 - judged 4203 = 7797 missing
+
+--- events helper on the receiver (last events):
+seq 25 TRAFFIC_RECOVERED    counter 0 detail 1 ticks 21202922445
+seq 26 COUNTER_GAP          counter 2496 detail 32 ticks 21216449090
+seq 27 COUNTER_GAP          counter 6066 detail 146 ticks 21235780319
+seq 28 COUNTER_GAP          counter 9636 detail 147 ticks 21255108173
+  returned 5, more=1, ev_lost=0
+seq 29 TIMEOUT              counter 0 detail 1 ticks 21335402998
+  returned 1, more=0, ev_lost=0
+  health: core1 last poll 0 ms ago, init_ok=1 starved=0 skip_count=0 pta_lock_timeouts=0 skip_total=327
+
