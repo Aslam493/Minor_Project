@@ -73,6 +73,7 @@ async function main() {
     q: await icon(fa.FaQuestion), spy: await icon(fa.FaUserSecret), redo: await icon(fa.FaRedo), bolt: await icon(fa.FaBolt),
     tools: await icon(fa.FaTools), check: await icon(fa.FaCheck), search: await icon(fa.FaSearch), chip: await icon(fa.FaMicrochip), lock: await icon(fa.FaLock),
     netDark: await icon(fa.FaNetworkWired, "#2F6FD0"), lapDark: await icon(fa.FaLaptopCode, "#2F6FD0"),
+    times: await icon(fa.FaTimes), excl: await icon(fa.FaExclamation), key: await icon(fa.FaKey), chipDark: await icon(fa.FaMicrochip, "#2F6FD0"),
   };
   const arrow = (slide, x1, y1, x2, y2, color, name) => {
     slide.addShape(pres.shapes.LINE, { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1), flipV: y2 < y1, flipH: x2 < x1, line: { color, width: 2.25, endArrowType: "triangle" }, objectName: name });
@@ -132,69 +133,91 @@ async function main() {
   s.addText("We need a judge that attackers cannot reach, not even through Linux.", { x: 1.65, y: 6.2, w: 10.8, h: 0.68, fontFace: "Calibri", fontSize: 20, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
   s.addNotes("Problem statement. A CAN message has an ID and data, but nothing in it proves who sent it: any node on the bus can send any message. From this follow three attacks: forged messages (nobody really sent them), replayed messages (an old valid message sent again) and floods (so many messages that the system chokes). Today the check is done by normal software, Linux, and Linux can be attacked. So we need a judge that attackers cannot reach, not even through Linux. That judge is the Secure World of the processor.");
 
-  // ================================================================ SLIDE 3: before the midterm
+  // ================================================================ SLIDE 3: midterm recap, the idea
   pres.addSection({ title: "Midterm recap" });
   s = pres.addSlide({ masterName: "CONTENT_LAYOUT", sectionTitle: "Midterm recap" });
-  s.addText("Before the midterm: what was built", { placeholder: "title" });
-  s.addText("23 August to 24 September 2026", { x: 0.6, y: 1.25, w: 11.2, h: 0.4, fontFace: "Calibri", fontSize: 18, color: C.text2, margin: 0, isTextBox: true });
+  s.addText("Midterm recap: the idea", { placeholder: "title" });
+  s.addText("Put the judge inside the processor, where Linux cannot reach.", { x: 0.6, y: 1.25, w: 11.2, h: 0.4, fontFace: "Calibri", fontSize: 18, color: C.text2, margin: 0, isTextBox: true });
+  s.addText("HOW CAN PROCESSING IS PROTECTED", { x: 0.6, y: 1.95, w: 5.6, h: 0.3, fontFace: "Calibri", fontSize: 12, bold: true, color: C.accent1, charSpacing: 2, margin: 0, isTextBox: true });
+  [
+    ["Software only", "Linux does everything. Breaks if Linux is hacked.", ic.laptop, C.accent5, ic.times, C.accent4, false],
+    ["External security chip", "A separate HSM. Extra hardware and cost.", ic.chip, C.accent5, ic.excl, C.accent3, false],
+    ["TrustZone + OP-TEE", "Inside the processor. No extra hardware.", ic.shield, C.accent1, ic.check, C.accent2, true],
+  ].forEach(([t, sub, img, fill, mark, markFill, ours], i) => {
+    const x = 0.6, y = 2.35 + i * 1.22, w = 5.6, h = 1.1;
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w, h, rectRadius: 0.12, fill: ours ? { color: C.accent1, transparency: 90 } : { color: C.background1 }, line: { color: ours ? C.accent1 : C.accent5, width: ours ? 2 : 1 }, shadow: ours ? undefined : shadow(), objectName: t + " card" });
+    circleIcon(s, img, x + 0.65, y + h / 2, 0.7, fill, t);
+    s.addText(t, { x: x + 1.2, y: y + 0.08, w: 3.3, h: 0.4, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    s.addText(sub, { x: x + 1.2, y: y + 0.5, w: 3.3, h: 0.55, fontFace: "Calibri", fontSize: 14, color: C.text2, valign: "top", margin: 0, isTextBox: true });
+    circleIcon(s, mark, x + w - 0.6, y + h / 2, 0.5, markFill, t + " verdict");
+  });
+  // our approach, as one clean picture
+  s.addText("OUR APPROACH", { x: 6.9, y: 1.95, w: 5.5, h: 0.3, fontFace: "Calibri", fontSize: 12, bold: true, color: C.accent1, charSpacing: 2, margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 8.15, y: 2.35, w: 3.0, h: 0.62, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, shadow: shadow(), objectName: "CAN chip box" });
+  s.addImage({ data: ic.chipDark, x: 8.32, y: 2.5, w: 0.32, h: 0.32, altText: "CAN chip" });
+  s.addText("CAN chip", { x: 8.78, y: 2.35, w: 2.3, h: 0.62, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+  arrow(s, 9.65, 2.99, 9.65, 3.37, C.accent5, "Arrow chip to Secure World");
+  s.addText("interrupt", { x: 9.8, y: 3.0, w: 1.6, h: 0.3, fontFace: "Calibri", fontSize: 12, italic: true, color: C.text2, margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 6.9, y: 3.4, w: 5.5, h: 1.8, rectRadius: 0.12, fill: { color: C.text1 }, line: { color: C.text1, width: 1 }, shadow: shadow(), objectName: "Secure World container" });
+  s.addText("Secure World  ·  Core 1", { x: 7.15, y: 3.46, w: 5.0, h: 0.4, fontFace: "Calibri", fontSize: 18, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
+  ["ID", "Counter", "Time", "HMAC"].forEach((t, i) => {
+    const x = 7.15 + i * 1.29;
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 3.95, w: 1.17, h: 0.5, rectRadius: 0.08, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: t + " check" });
+    s.addText(t, { x, y: 3.95, w: 1.17, h: 0.5, fontFace: "Calibri", fontSize: 16, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true });
+  });
+  [["ACCEPT", C.accent2, 7.95], ["DROP", C.accent4, 9.85]].forEach(([t, col, x]) => {
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 4.58, w: 1.5, h: 0.5, rectRadius: 0.25, fill: { color: col }, line: { color: col, width: 0 }, objectName: t + " pill" });
+    s.addText(t, { x, y: 4.58, w: 1.5, h: 0.5, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true });
+  });
+  s.addShape(pres.shapes.LINE, { x: 6.6, y: 5.55, w: 6.1, h: 0, line: { color: C.accent4, width: 1.5, dashType: "dash" }, objectName: "TrustZone boundary" });
+  s.addText("TrustZone boundary", { x: 10.2, y: 5.29, w: 2.2, h: 0.22, fontFace: "Calibri", fontSize: 10, color: C.accent4, align: "right", margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 6.9, y: 5.68, w: 5.5, h: 0.45, rectRadius: 0.1, fill: { color: C.accent1, transparency: 88 }, line: { color: C.accent1, width: 1 }, objectName: "Linux box" });
+  s.addText("Linux  ·  cores 0, 2, 3  ·  runs normally", { x: 6.9, y: 5.68, w: 5.5, h: 0.45, fontFace: "Calibri", fontSize: 14, color: C.text1, align: "center", valign: "middle", margin: 0, isTextBox: true });
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.6, y: 6.25, w: 12.1, h: 0.62, rectRadius: 0.12, fill: { color: C.text1 }, line: { color: C.text1, width: 0 }, objectName: "Research gap banner" });
+  s.addText([{ text: "Research gap: ", options: { bold: true } }, { text: "can one TrustZone core validate CAN traffic, with no extra hardware, even if Linux is hacked?" }], { x: 0.9, y: 6.25, w: 11.6, h: 0.62, fontFace: "Calibri", fontSize: 16, color: C.background1, valign: "middle", margin: 0, isTextBox: true });
+  s.addNotes("Midterm recap, part 1: the idea. Three ways to protect CAN processing. Software only: Linux does everything, so a hacked Linux breaks it. An external security chip (HSM) isolates the check but adds hardware and cost. Our approach uses ARM TrustZone with OP-TEE: the CAN chip's interrupt goes to the Secure World on CPU core 1, which checks the ID, the message counter, the time and the HMAC signature, then accepts or drops. Linux keeps running on cores 0, 2 and 3. The research gap from the midterm: can one TrustZone core do this with no extra hardware, even if Linux is hacked?");
+
+  // ================================================================ SLIDE 4: midterm recap, built by 24 September
+  s = pres.addSlide({ masterName: "CONTENT_LAYOUT", sectionTitle: "Midterm recap" });
+  s.addText("Midterm recap: built by 24 September", { placeholder: "title" });
+  s.addText("Five pieces of work, seven milestones: three proven on hardware, one blocked.", { x: 0.6, y: 1.25, w: 11.2, h: 0.4, fontFace: "Calibri", fontSize: 18, color: C.text2, margin: 0, isTextBox: true });
   const steps = [
     ["Aug 23 - Sep 6", "Platform built", "TF-A, OP-TEE, U-Boot, Linux for the Pi 3", ic.tools],
-    ["Sep 8", "OP-TEE runs", "Tests pass; first own Trusted App", ic.check],
-    ["Sep 14 - 16", "Secure checks", "Simulated CAN frames checked in the Secure World", ic.search],
-    ["Sep 16", "Real CAN hardware", "CAN-FD shield (MCP2518FD), can0 works", ic.chip],
-    ["Sep 17 - 18", "Secure ownership", "Secure World owns the CAN chip and its interrupt", ic.lock],
+    ["Sep 8", "OP-TEE runs", "36,114 tests pass; first own Trusted App", ic.check],
+    ["Sep 16", "Signature check", "HMAC in a Trusted App rejects a changed byte", ic.key],
+    ["Sep 16 - 17", "CAN chip alive", "MCP2518FD shield works as can0", ic.chip],
+    ["Sep 17 - 18", "Secure ownership", "Secure World owns the chip and its interrupt", ic.lock],
   ];
-  const colx = [0.85, 3.2, 5.55, 7.9, 10.25], ly = 2.95;
+  const colx = [0.85, 3.2, 5.55, 7.9, 10.25], ly = 2.7;
   s.addShape(pres.shapes.LINE, { x: 1.25, y: ly, w: 11.2, h: 0, line: { color: C.accent5, width: 3 }, objectName: "Timeline" });
   steps.forEach(([date, head, desc, img], i) => {
     const x = colx[i];
-    s.addText(date, { x, y: 1.95, w: 2.2, h: 0.35, fontFace: "Calibri", fontSize: 14, bold: true, color: C.accent1, margin: 0, isTextBox: true });
-    circleIcon(s, img, x + 0.4, ly, 0.8, i === 4 ? C.text1 : C.accent1, head);
-    s.addText(head, { x, y: 3.55, w: 2.2, h: 0.4, fontFace: "Calibri", fontSize: 16, bold: true, color: C.text1, margin: 0, isTextBox: true });
-    s.addText(desc, { x, y: 3.98, w: 2.2, h: 1.25, fontFace: "Calibri", fontSize: 14, color: C.text2, valign: "top", margin: 0, isTextBox: true });
+    s.addText(date, { x, y: 1.9, w: 2.2, h: 0.32, fontFace: "Calibri", fontSize: 14, bold: true, color: C.accent1, margin: 0, isTextBox: true });
+    circleIcon(s, img, x + 0.4, ly, 0.8, C.accent1, head);
+    s.addText(head, { x, y: 3.25, w: 2.2, h: 0.35, fontFace: "Calibri", fontSize: 16, bold: true, color: C.text1, margin: 0, isTextBox: true });
+    s.addText(desc, { x, y: 3.62, w: 2.2, h: 0.95, fontFace: "Calibri", fontSize: 14, color: C.text2, valign: "top", margin: 0, isTextBox: true });
   });
-  [["36,114", "OP-TEE tests passed"], ["Core 1", "kept for the Secure World"], ["0x123", "the one CAN id accepted"]].forEach(([big, lab], i) => {
-    const x = 0.85 + i * 3.9;
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 5.6, w: 3.7, h: 1.2, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, shadow: shadow(), objectName: big + " stat" });
-    s.addText(big, { x: x + 0.2, y: 5.7, w: 1.8, h: 1.0, fontFace: "Calibri", fontSize: 32, bold: true, color: C.accent1, valign: "middle", margin: 0, isTextBox: true });
-    s.addText(lab, { x: x + 2.0, y: 5.7, w: 1.55, h: 1.0, fontFace: "Calibri", fontSize: 14, color: C.text2, valign: "middle", margin: 0, isTextBox: true });
-  });
-  s.addNotes("Work before the midterm (23 August to 24 September). First the platform: Trusted Firmware-A, OP-TEE, U-Boot, Linux and the root filesystem for the Raspberry Pi 3. Then OP-TEE ran and passed 36,114 tests, and our own Trusted App worked. Then simulated CAN frames were checked in the Secure World. Then the real CAN-FD shield (MCP2518FD) came up as can0. Last, the Secure World took ownership of the CAN chip: it reads the chip over SPI and the chip's interrupt arrives in the Secure World. CPU core 1 is reserved for the Secure World, Linux runs on the other three cores.");
-
-  // ================================================================ SLIDE 4: midterm review
-  s = pres.addSlide({ masterName: "CONTENT_LAYOUT", sectionTitle: "Midterm recap" });
-  s.addText("Midterm review: where the project stood", { placeholder: "title" });
-  s.addText("Status on 24 September: the checks worked on real hardware, authentication was the blocker.", { x: 0.6, y: 1.25, w: 11.2, h: 0.4, fontFace: "Calibri", fontSize: 18, color: C.text2, margin: 0, isTextBox: true });
-  const st = {
-    green: { fill: K.accent2, txt: "HARDWARE-PROVEN" }, orange: { fill: K.accent3, txt: "IN PROGRESS" }, grey: { fill: K.accent5, txt: "NOT STARTED" }, input: { fill: K.accent6, txt: "INPUT" },
-  };
-  const flow = [
-    ["CAN frame", "from the MCP2518FD chip", st.input], ["Secure FIQ", "interrupt reaches Core 1", st.green],
-    ["Frame checks", "ID, counter, timestamp", st.green], ["HMAC check", "runtime issue open", st.orange], ["Secure log", "tamper-evident", st.grey],
+  // the seven milestones of the midterm
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.6, y: 4.75, w: 12.1, h: 2.15, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: C.accent5, width: 1 }, shadow: shadow(), objectName: "Milestone panel" });
+  s.addText("3 of 7", { x: 0.85, y: 5.0, w: 2.6, h: 0.9, fontFace: "Calibri", fontSize: 48, bold: true, color: C.accent2, valign: "middle", margin: 0, isTextBox: true });
+  s.addText("milestones proven on hardware", { x: 0.85, y: 5.9, w: 2.6, h: 0.7, fontFace: "Calibri", fontSize: 14, color: C.text2, valign: "top", margin: 0, isTextBox: true });
+  const ms = [
+    ["Boot & core pinning", "proven", C.accent2], ["Secure CAN ownership", "proven", C.accent2], ["ID, replay, timestamp", "proven", C.accent2],
+    ["HMAC in the Core 1 loop", "blocked", C.accent3], ["Rate & flood detection", "not started", C.accent5], ["Tamper-evident log", "not started", C.accent5], ["Final demo & metrics", "not started", C.accent5],
   ];
-  const fw = 2.15, fg = 0.395, fy = 1.95, fh = 1.55;
-  flow.forEach(([head, sub, stt], i) => {
-    const x = 0.5 + i * (fw + fg);
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: fy, w: fw, h: fh, rectRadius: 0.12, fill: { color: C.background1 }, line: { color: stt.fill, width: 2 }, shadow: shadow(), objectName: head + " box" });
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: x + 0.15, y: fy + 0.12, w: fw - 0.3, h: 0.3, rectRadius: 0.08, fill: { color: stt.fill }, line: { color: stt.fill, width: 0 }, objectName: head + " status" });
-    s.addText(stt.txt, { x: x + 0.15, y: fy + 0.12, w: fw - 0.3, h: 0.3, fontFace: "Calibri", fontSize: 11, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true });
-    s.addText(head, { x: x + 0.12, y: fy + 0.5, w: fw - 0.24, h: 0.5, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text1, align: "center", valign: "middle", margin: 0, isTextBox: true });
-    s.addText(sub, { x: x + 0.12, y: fy + 1.0, w: fw - 0.24, h: 0.45, fontFace: "Calibri", fontSize: 14, color: C.text2, align: "center", valign: "top", margin: 0, isTextBox: true });
-    if (i < flow.length - 1) arrow(s, x + fw + 0.03, fy + fh / 2, x + fw + fg - 0.03, fy + fh / 2, C.accent5, "Arrow " + head);
+  const mx0 = 3.95, mstep = 1.2, my = 5.3;
+  for (let i = 0; i < ms.length - 1; i++) {
+    s.addShape(pres.shapes.LINE, { x: mx0 + i * mstep + 0.3, y: my, w: mstep - 0.6, h: 0, line: { color: ms[i + 1][2] === C.accent5 ? C.accent5 : ms[i][2], width: 2.5, dashType: ms[i + 1][2] === C.accent5 ? "dash" : "solid" }, objectName: "Link " + (i + 1) });
+  }
+  ms.forEach(([t, stt, col], i) => {
+    const cx = mx0 + i * mstep;
+    s.addShape(pres.shapes.OVAL, { x: cx - 0.3, y: my - 0.3, w: 0.6, h: 0.6, fill: { color: col }, line: { color: col, width: 0 }, objectName: "Milestone " + (i + 1) });
+    s.addText(String(i + 1), { x: cx - 0.3, y: my - 0.3, w: 0.6, h: 0.6, fontFace: "Calibri", fontSize: 16, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true });
+    s.addText(t, { x: cx - 0.58, y: my + 0.4, w: 1.16, h: 0.55, fontFace: "Calibri", fontSize: 12, bold: true, color: C.text1, align: "center", valign: "top", margin: 0, isTextBox: true });
+    s.addText(stt, { x: cx - 0.58, y: my + 0.95, w: 1.16, h: 0.25, fontFace: "Calibri", fontSize: 11, color: col, align: "center", valign: "top", margin: 0, isTextBox: true });
   });
-  s.addChart(pres.charts.DOUGHNUT, [{ name: "Milestones", labels: ["Proven", "In progress", "Not started"], values: [3, 1, 3] }], {
-    x: 0.6, y: 3.8, w: 5.0, h: 3.1, holeSize: 55, chartColors: [K.accent2, K.accent3, K.accent5], showLegend: true, legendPos: "r", legendFontSize: 14, legendColor: K.dk2, legendFontFace: "+mn-lt",
-    showValue: true, showPercent: false, dataLabelColor: "FFFFFF", dataLabelFontSize: 16, dataLabelFontBold: true, dataLabelFontFace: "+mn-lt",
-    showTitle: true, title: "7 milestones at the midterm", titleFontSize: 16, titleColor: K.dk1, titleFontFace: "+mn-lt", dataBorder: { pt: 2, color: "F2F4F7" },
-  });
-  s.addText("Promised for the final presentation", { x: 6.2, y: 3.85, w: 6.5, h: 0.4, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text1, margin: 0, isTextBox: true });
-  ["HMAC authentication", "Faster validation (latency)", "Stored, tamper-evident log", "Flood detection", "End-to-end demo with real numbers"].forEach((t, i) => {
-    const y = 4.4 + i * 0.5;
-    s.addShape(pres.shapes.OVAL, { x: 6.2, y, w: 0.38, h: 0.38, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "Number " + (i + 1) });
-    s.addText(String(i + 1), { x: 6.2, y, w: 0.38, h: 0.38, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true });
-    s.addText(t, { x: 6.75, y: y - 0.02, w: 5.9, h: 0.42, fontFace: "Calibri", fontSize: 16, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-  });
-  s.addNotes("Midterm review. At the midterm the path from the CAN chip to the Secure World worked on real hardware: the interrupt reached Core 1 as a Secure FIQ, and the ID, counter and timestamp checks were proven. HMAC authentication was blocked by a runtime problem in the Secure World. Flood detection, the tamper-evident log and the final demo had not started: 3 of 7 milestones proven, 1 in progress, 3 not started. The five promises on the right are what the rest of this talk answers, one by one.");
+  s.addText("HMAC already worked in a Trusted App (16 Sep); inside the Core 1 loop it hit a runtime issue.", { x: 3.5, y: 6.5, w: 9.0, h: 0.28, fontFace: "Calibri", fontSize: 12, italic: true, color: C.text2, margin: 0, isTextBox: true });
+  s.addNotes("Midterm recap, part 2: what was built by 24 September. Platform: Trusted Firmware-A, OP-TEE, U-Boot and Linux for the Raspberry Pi 3. OP-TEE passed 36,114 tests and our own Trusted App ran. On 16 September a Trusted App authenticated simulated CAN frames with HMAC-SHA256 and rejected a frame with one changed byte. The same days the CAN-FD shield (MCP2518FD) came up as can0. By 17 and 18 September the Secure World owned the CAN chip and its interrupt, and CPU core 1 was reserved for the Secure World. At the midterm 3 of 7 milestones were proven on hardware: boot and core pinning, secure CAN ownership, and the ID, replay and timestamp checks. HMAC authentication inside the Core 1 loop was blocked by a Secure World runtime issue (HMAC itself had worked in a Trusted App). Flood detection, the tamper-evident log and the final demo had not started.");
 
   await pres.writeFile({ fileName: OUT });
   await applyTheme(OUT, THEME);
