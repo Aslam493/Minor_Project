@@ -3,6 +3,7 @@
 changing speed/rpm value in every packet, so no two normal packets are the same). You can slip an attack in at any time with a key.
 
     python3 stream.py                 10 packets per second until you press q; an attack every 2 to 3 s by itself (all six types in turn; change with --every 5-8)
+    python3 stream.py --label         the sender also marks and colours its own attacks (testing)
     python3 stream.py --quiet         only valid (green) packets until you press an attack key
     python3 stream.py --rate 20       faster
     python3 stream.py --auto          also injects an attack every 5 to 8 seconds by itself (all six types in turn)
@@ -48,6 +49,7 @@ def describe(data):
 
 def main():
     rate = 10.0; auto = "--quiet" not in sys.argv
+    show = "--label" in sys.argv                         # --label: the sender also marks its own attacks (for testing)
     lo, hi = (float(x) for x in sys.argv[sys.argv.index("--every") + 1].split("-")) if "--every" in sys.argv else (2.0, 3.0)      # seconds between automatic attacks          # automatic attacks are ON by default (--quiet = only valid packets until you press a key)
     duration = float(sys.argv[sys.argv.index("--duration") + 1]) if "--duration" in sys.argv else None            # for tests
     inject = sorted((float(a.split(":")[1]), a.split(":")[0]) for a in sys.argv[sys.argv.index("--inject") + 1].split(",")) if "--inject" in sys.argv else []   # e.g. t:5,r:9
@@ -67,7 +69,8 @@ def main():
     print("STREAM to the receiver: new packet every %.0f ms.  Keys: t r d c w j a p + - q   (auto-attacks %s)" % (1000.0 / rate, "ON" if auto else "off"))
     print(("AUTO-ATTACKS ARE ON: one attack every %.0f to %.0f seconds, all six types in turn (press a to switch off). " % (lo, hi) if auto else "No attack is sent until you press a key. ") +
           "To attack yourself: click THIS window first, then press t r d c w j.")
-    print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
+    if show: print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
+    else: print("This window looks like a normal sender: every packet is green. Which ones are attacks is shown only by the RECEIVER (the Secure World).")
     nxt = time.monotonic(); t0 = nxt
     try:
         while True:
@@ -103,7 +106,7 @@ def main():
                 s.send(L.pack_frame(cid, data)); sent += 1
                 if kind: attacks += 1; last_attack = now
                 line = "t+%7.1f #%-6d id 0x%03X  %s" % (now - t0, sent, cid, describe(data))
-                print((col(line + "   <-- " + label) if label else GREEN(line)))
+                print((col(line + "   <-- " + label) if (label and show) else GREEN(line)))      # default: the sender does NOT reveal its attacks, every line looks normal
                 if sent % 20 == 0:
                     json.dump({"next": c}, open(STATE, "w"))
             r, _, _ = select.select([fd] if old else [], [], [], max(0.0, min(0.05, nxt - time.monotonic())))

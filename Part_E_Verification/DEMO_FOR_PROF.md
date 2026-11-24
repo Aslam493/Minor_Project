@@ -136,7 +136,7 @@ One command on the sender sends a **new** packet again and again (counter +1, sp
 | 2 | RECEIVER | `/tmp/packet_view` | a header with the colour legend, then packets appear one per line; the last line is a status bar with the Secure World totals |
 | 3 | SENDER | `cd /tmp/demo` then `python3 stream.py` | a new line every 0.1 s: `ctr 43 speed 98.3 km/h rpm 1450 ...` |
 
-**Colours (the SAME on the sender and on the receiver):**
+**Colours (shown on the RECEIVER; the sender window stays green on purpose, add --label to see its own colours):**
 
 | Colour | Packet | Key in the sender window |
 |---|---|---|
