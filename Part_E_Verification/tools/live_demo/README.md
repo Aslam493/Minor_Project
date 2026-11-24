@@ -1,7 +1,7 @@
 # Live stream demo (infinite packets, coloured on the receiver)
 
 Idea: the sender sends a NEW signed packet again and again (counter +1, changing speed/rpm, never the same packet twice); the receiver prints every packet and
-colours it by what the Secure World decided: valid green, tampered red, replay orange, duplicate light blue, conflict purple, wrong id pink, counter gap yellow, bus events grey (the sender window uses the same colours). Attacks are slipped in by key press (or `--auto`), never continuously: at least 1.5 s apart.
+colours it by what the Secure World decided: valid green, tampered red, replay orange, duplicate light blue, conflict purple, wrong id pink, counter gap yellow, bus events grey (the sender window uses the same colours). Attacks are slipped in by key press (or `--auto` (the launcher turns it on by default; `--quiet` turns it off)), never continuously: at least 1.5 s apart.
 
 | Piece | Where | File |
 |---|---|---|

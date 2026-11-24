@@ -4,7 +4,7 @@ changing speed/rpm value in every packet, so no two normal packets are the same)
 
     python3 stream.py                 10 packets per second until you press q (or Ctrl+C)
     python3 stream.py --rate 20       faster
-    python3 stream.py --auto          also injects a random attack every 6 to 10 seconds by itself
+    python3 stream.py --auto          also injects an attack every 5 to 8 seconds by itself (all six types in turn)
 
 Keys while it runs:   t tamper    r replay (old packet again)   d duplicate (last packet again)   c conflict (same counter, other data)
                       w wrong id  j counter jump (skip 4)       a auto-attacks on/off             p pause    + - speed    q quit
@@ -58,10 +58,12 @@ def main():
         except Exception: pass
     s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW); s.setsockopt(L.SOL_CAN_RAW, L.CAN_RAW_FD_FRAMES, 1); s.bind(("can0",))
     hist = deque(maxlen=80); last = None; sent = attacks = 0; paused = False; pending = None; last_attack = 0.0
-    next_auto = time.monotonic() + random.uniform(6, 10); jump_next = False
+    next_auto = time.monotonic() + random.uniform(4, 6); deck = []
     fd = sys.stdin.fileno(); old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
     if old: tty.setcbreak(fd)
     print("STREAM to the receiver: new packet every %.0f ms.  Keys: t r d c w j a p + - q   (auto-attacks %s)" % (1000.0 / rate, "ON" if auto else "off"))
+    print(("AUTO-ATTACKS ARE ON: one attack every 5 to 8 seconds, all six types in turn (press a to switch off). " if auto else "No attack is sent until you press a key. ") +
+          "To attack yourself: click THIS window first, then press t r d c w j.")
     print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
     nxt = time.monotonic(); t0 = nxt
     try:
@@ -74,7 +76,9 @@ def main():
                 nxt += 1.0 / rate
                 kind = None
                 if pending and now - last_attack >= COOLDOWN: kind, pending = pending, None
-                elif auto and now >= next_auto and now - last_attack >= COOLDOWN: kind = random.choice("trdcwj"); next_auto = now + random.uniform(6, 10)
+                elif auto and now >= next_auto and now - last_attack >= COOLDOWN:
+                    if not deck: deck = list("trdcwj"); random.shuffle(deck)          # every attack type once before any repeats
+                    kind = deck.pop(); next_auto = now + random.uniform(5, 8)
                 label, col = None, GREEN
                 if kind == "t":
                     d = bytearray(packet(key, ID_OK, c, signal(c))); d[4] ^= 1                # one data bit changed, the old signature stays
@@ -104,10 +108,10 @@ def main():
                 k = os.read(fd, 1).decode(errors="ignore").lower()
                 if k == "q": break
                 elif k == "p": paused = not paused; print(DIM("-- paused --" if paused else "-- running --")); nxt = time.monotonic()
-                elif k == "a": auto = not auto; print(DIM("-- auto attacks %s --" % ("ON" if auto else "off"))); next_auto = time.monotonic() + 6
+                elif k == "a": auto = not auto; print(DIM("-- auto attacks %s --" % ("ON" if auto else "off"))); next_auto = time.monotonic() + 4
                 elif k == "+": rate = min(100.0, rate * 1.5); print(DIM("-- %.1f packets per second --" % rate))
                 elif k == "-": rate = max(1.0, rate / 1.5); print(DIM("-- %.1f packets per second --" % rate))
-                elif k in "trdcwj":
+                elif k and k in "trdcwj":
                     if pending or time.monotonic() - last_attack < COOLDOWN: print(DIM("-- wait: attacks are spaced at least %.1f s apart; queued --" % COOLDOWN))
                     pending = k
     except KeyboardInterrupt:
