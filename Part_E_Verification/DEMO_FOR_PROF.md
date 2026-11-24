@@ -119,6 +119,25 @@ Numbers below are for a clean start. TIMEOUT usually goes +1 after each file. It
 
 **The first file after a reboot** also makes one `COUNTER_RESYNC` (the Secure World learns the starting counter). It is not in `alarms`. To show it, type in the RECEIVER window: `/tmp/mon_client --retries 20 status 1 | grep RESYNC`. Say: "That is the start-up. It is by design."
 
+## 4b. THE LIVE STREAM (the professor's request): packets that never stop, coloured
+
+One command on the sender sends a **new** packet again and again (counter +1, speed and rpm change in every packet). The receiver shows every packet and its colour. **Repeats are never continuous:** you press a key, and attacks are at least 1.5 seconds apart.
+
+| # | Window | Type | You see |
+|---|---|---|---|
+| 1 | LAPTOP | `python3 scripts/demo_stream_setup.py` | `READY ... the stream will start at N` (run it again after any reboot, and after you used the numbered files) |
+| 2 | RECEIVER | `/tmp/packet_view` | a header with the colour legend, then packets appear one per line; the last line is a status bar with the Secure World totals |
+| 3 | SENDER | `cd /tmp/demo` then `python3 stream.py` | a new line every 0.1 s: `ctr 43 speed 98.3 km/h rpm 1450 ...` |
+
+**Colours on the receiver:** green = accepted, red = tampered / replay / duplicate / conflict, magenta = wrong id, yellow = counter gap, cyan = bus and heartbeat events (silence, traffic back).
+
+**Keys in the SENDER window** (press the key, no Enter): `t` tamper, `r` replay, `d` duplicate, `c` conflict, `w` wrong id, `j` counter jump, `a` automatic attacks every 6 to 10 s on/off, `p` pause, `+` `-` speed, `q` quit.
+After a key press the sender line is red and says what it did; about 0.7 s later the **same packet** turns red on the receiver with the Secure World's reason, for example `[ !! ] TAMPERED: the signature does not fit the data (AUTH_FAIL)`.
+
+**Say:** "Every packet is different. The sender never repeats a packet by itself. I press a key to attack. The receiver shows each packet and the colour is the Secure World's decision."
+**Stop:** `q` in the sender window, Ctrl+C in the receiver window. To remove the demo key from the sender: `python3 scripts/demo_stream_setup.py --remove-key` (LAPTOP).
+Honest points: the sender plays the car's trusted ECU, so its RAM holds the key for this demo (the receiver's postman never has it). The colour comes from the Secure World's event log (one event per second per attack type), which is why attacks are spaced 1.5 s apart. Details: `tools/live_demo/README.md`.
+
 ## 5. The time and the timeout (RECEIVER window, 2 minutes, send nothing)
 
 | Type this | You see | Say |
