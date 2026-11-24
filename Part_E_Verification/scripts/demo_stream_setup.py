@@ -16,6 +16,8 @@ if "--remove-key" in sys.argv:
     B.ssh("sender", SN, "rm -f /tmp/demo/stream_cfg.json /tmp/demo/stream_state.json"); print("key removed from the sender's RAM"); sys.exit(0)
 if not B.ssh("root", RX, "cat /sys/class/net/eth0/address").strip(): print("The receiver does not answer at %s." % RX); sys.exit(2)
 if B.ssh("sender", SN, "echo ok").strip() != "ok": print("The sender does not answer at %s." % SN); sys.exit(2)
+# a leftover stream or viewer from an earlier run would overlap with the new one (two streams with the same counters look like replays): stop them first
+B.ssh("sender", SN, "pkill -f '[s]tream.py' 2>/dev/null; true"); B.ssh("root", RX, "kill $(ps | grep '[p]acket_view' | awk '{print $1}') 2>/dev/null; true")
 pv = os.path.join(PV, "build_scratch/live_demo/packet_view")
 if not os.path.exists(pv): print("packet_view is not built: see tools/live_demo/README (cross compile)"); sys.exit(2)
 B.scp([pv, os.path.join(PV, "tools/monitor_client/mon_client")], "root", RX, "/tmp/"); B.ssh("root", RX, "chmod +x /tmp/packet_view /tmp/mon_client")

@@ -121,6 +121,13 @@ Numbers below are for a clean start. TIMEOUT usually goes +1 after each file. It
 
 ## 4b. THE LIVE STREAM (the professor's request): packets that never stop, coloured
 
+**THE EASY WAY: ONE command opens both windows at the same time** (LAPTOP window, in the project folder):
+```
+bash scripts/demo_live_stream.sh
+```
+Two big windows open: **SENDER on top** (a new packet every 0.1 s) and **RECEIVER below** (every packet with its colour, and the Secure World totals in the bottom bar). The receiver starts first, the sender 3 seconds later, and both run forever. Press the attack keys in the **SENDER (top) window**. Add `--auto` (`bash scripts/demo_live_stream.sh --auto`) and the sender attacks by itself every 6 to 10 seconds. Stop: `q` in the sender window, Ctrl+C in the receiver window. Never start two streams at once (two streams with the same counters look like replays); the command stops any leftover one for you.
+The three steps below are the same thing done by hand.
+
 One command on the sender sends a **new** packet again and again (counter +1, speed and rpm change in every packet). The receiver shows every packet and its colour. **Repeats are never continuous:** you press a key, and attacks are at least 1.5 seconds apart.
 
 | # | Window | Type | You see |
