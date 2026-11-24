@@ -42,7 +42,8 @@ def signal(c):                                      # a changing "speed" and "rp
 
 def describe(data):
     c, p = struct.unpack("<II", data[:8])
-    return "ctr %-6d speed %5.1f km/h  rpm %-5d tag %s.." % (c, (p >> 16) / 10.0, (p & 0xFFFF) * 50, data[8:12].hex())
+    kmh = (p >> 16) / 10.0; f = max(0, min(12, int(kmh / 10.0 + 0.5)))
+    return "ctr %-6d speed %5.1f km/h %s rpm %-5d tag %s.." % (c, kmh, "\u2588" * f + "\u2591" * (12 - f), (p & 0xFFFF) * 50, data[8:12].hex())
 
 
 def main():

@@ -107,13 +107,22 @@ static void handle(const struct mon_event *e)
 	else if (is(nm, "LATE_ANSWER")) msg(e->ticks, CGREY, e->detail ? ">>> a packet answer was late (LATE_ANSWER)" : ">>> a heartbeat answer was late (LATE_ANSWER)");
 }
 
+static const char *speed_bar(double kmh)                      /* speed bar: 12 cells = 0..120 km/h */
+{
+	static char b[64]; int k, f = (int)(kmh / 10.0 + 0.5); b[0] = 0;
+	if (f < 0) f = 0;
+	if (f > 12) f = 12;
+	for (k = 0; k < 12; k++) strcat(b, k < f ? "\xe2\x96\x88" : "\xe2\x96\x91");
+	return b;
+}
+
 static void print_item(const struct item *it)
 {
 	double t = (double)(it->ticks - t0_ticks) / 19200000.0; char line[300];
 	if (it->kind == MSG) { printf("%st+%7.2f  %s%s\n", it->col, t, it->why, CEND); return; }
 	if (it->decode)
-		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  ctr %-6u speed %5.1f km/h  rpm %-5u  tag %02x%02x%02x%02x..",
-			 t, it->n, it->id & 0x1FFFFFFF, it->ctr, (double)(it->payload >> 16) / 10.0, (it->payload & 0xFFFF) * 50, it->tag[0], it->tag[1], it->tag[2], it->tag[3]);
+		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  ctr %-6u speed %5.1f km/h %s rpm %-5u  tag %02x%02x%02x%02x..",
+			 t, it->n, it->id & 0x1FFFFFFF, it->ctr, (double)(it->payload >> 16) / 10.0, speed_bar((double)(it->payload >> 16) / 10.0), (it->payload & 0xFFFF) * 50, it->tag[0], it->tag[1], it->tag[2], it->tag[3]);
 	else
 		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  (not a monitor packet)", t, it->n, it->id & 0x1FFFFFFF);
 	if (it->col == CGREEN) printf("%s%s   [ OK ] accepted%s%s\n", it->col, line, it->why[0] ? ": " : "", it->why);
