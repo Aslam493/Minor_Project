@@ -2,7 +2,8 @@
 """stream.py - runs on the SENDER Pi. ONE command that never stops: it sends a new signed CAN packet again and again (counter 1, 2, 3 ... and a
 changing speed/rpm value in every packet, so no two normal packets are the same). You can slip an attack in at any time with a key.
 
-    python3 stream.py                 10 packets per second until you press q (or Ctrl+C)
+    python3 stream.py                 10 packets per second until you press q; an attack every 5 to 8 s by itself (all six types in turn)
+    python3 stream.py --quiet         only valid (green) packets until you press an attack key
     python3 stream.py --rate 20       faster
     python3 stream.py --auto          also injects an attack every 5 to 8 seconds by itself (all six types in turn)
 
@@ -45,7 +46,7 @@ def describe(data):
 
 
 def main():
-    rate = 10.0; auto = "--auto" in sys.argv
+    rate = 10.0; auto = "--quiet" not in sys.argv          # automatic attacks are ON by default (--quiet = only valid packets until you press a key)
     duration = float(sys.argv[sys.argv.index("--duration") + 1]) if "--duration" in sys.argv else None            # for tests
     inject = sorted((float(a.split(":")[1]), a.split(":")[0]) for a in sys.argv[sys.argv.index("--inject") + 1].split(",")) if "--inject" in sys.argv else []   # e.g. t:5,r:9
     if "--rate" in sys.argv: rate = float(sys.argv[sys.argv.index("--rate") + 1])

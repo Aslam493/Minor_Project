@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.." || exit 1
 export RX=${RX:-10.237.27.212} SN=${SN:-10.237.27.144}
 COLS=${COLS:-170}; ROWS=${ROWS:-22}
 python3 scripts/demo_stream_setup.py || { echo "setup failed: both Pis must be on (see the message above)"; exit 1; }
-ARGS="$*"; case "$ARGS" in *--quiet*) ARGS="${ARGS//--quiet/}";; *) ARGS="--auto $ARGS";; esac
+ARGS="$*"; case "$ARGS" in *--quiet*) ARGS="${ARGS//--quiet/}";; *) ;; esac
 if [ -n "$TESTSEC" ]; then
   RXCMD="ssh -t -o BatchMode=yes root@$RX '/tmp/packet_view' 2>&1 | tee /tmp/live_rx.log"
   TXCMD="ssh -t -o BatchMode=yes sender@$SN 'cd /tmp/demo && python3 stream.py --duration $TESTSEC --inject t:4,r:8,d:12,c:16,w:20 $ARGS' 2>&1 | tee /tmp/live_tx.log"

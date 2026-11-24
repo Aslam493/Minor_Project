@@ -30,4 +30,4 @@ if int((B.ssh("root", RX, "ps | grep -c '[u]sr/bin/can_forwarder'").strip() or "
     print("note: the forwarder service is not running: start it with  /etc/init.d/S95can_forwarder start >/dev/null 2>&1 </dev/null (receiver)")
 print("READY. The Secure World's last counter is %d, the stream will start at %d." % (L, L + 1))
 print("  RECEIVER window:  /tmp/packet_view")
-print("  SENDER window:    cd /tmp/demo && python3 stream.py      (keys: t r d c w j, a = auto attacks, p pause, + - speed, q quit)")
+print("  SENDER window:    cd /tmp/demo && python3 stream.py      (attacks start by themselves; keys: t r d c w j, a = auto on/off, p pause, + - speed, q quit)")
