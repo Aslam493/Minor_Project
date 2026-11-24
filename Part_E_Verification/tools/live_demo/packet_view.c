@@ -125,8 +125,8 @@ static void print_item(const struct item *it)
 			 t, it->n, it->id & 0x1FFFFFFF, it->ctr, (double)(it->payload >> 16) / 10.0, speed_bar((double)(it->payload >> 16) / 10.0), (it->payload & 0xFFFF) * 50, it->tag[0], it->tag[1], it->tag[2], it->tag[3]);
 	else
 		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  (not a monitor packet)", t, it->n, it->id & 0x1FFFFFFF);
-	if (it->col == CGREEN) printf("%s%s   [ OK ] accepted%s%s\n", it->col, line, it->why[0] ? ": " : "", it->why);
-	else printf("%s%s   [ !! ] %s%s\n", it->col, line, it->why, CEND);
+	if (it->col == CGREEN) printf("%s%s   \xe2\x9c\x94 accepted%s%s\n", it->col, line, it->why[0] ? ": " : "", it->why);
+	else printf("%s%s   \xe2\x9c\x96 %s%s\n", it->col, line, it->why, CEND);
 }
 
 static void flush(uint64_t now)
@@ -146,17 +146,17 @@ static void flush(uint64_t now)
 
 static void draw_bar(const struct mon_status0 *s0, const struct mon_status1 *s1)
 {
-	unsigned i, au = 0, rp = 0, mf = 0, gp = 0, to = 0, tr = 0; char b[260];
+	unsigned i, au = 0, rp = 0, mf = 0, gp = 0, to = 0, tr = 0; char b[700];
 	if (!bar) return;
 	for (i = 0; i < MON_EVENT_TYPES; i++) {
 		const char *n = mon_event_name(i);
 		if (is(n, "AUTH_FAIL")) au = s1->ev_count[i]; else if (is(n, "REPLAY")) rp = s1->ev_count[i]; else if (is(n, "MALFORMED")) mf = s1->ev_count[i];
 		else if (is(n, "COUNTER_GAP")) gp = s1->ev_count[i]; else if (is(n, "TIMEOUT")) to = s1->ev_count[i]; else if (is(n, "TRAFFIC_RECOVERED")) tr = s1->ev_count[i];
 	}
-	snprintf(b, sizeof b, " SECURE WORLD: judged %u | AUTH_FAIL %u | REPLAY %u | MALFORMED %u | GAP %u | TIMEOUT %u | heartbeat %s | core 1 loop %" PRIu64 " ",
+	snprintf(b, sizeof b, "\033[48;5;236;97m SECURE WORLD \033[48;5;236;32m judged %u \033[38;5;245m\xe2\x94\x82\033[1;31m tampered %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;208m replay %u \033[38;5;245m\xe2\x94\x82\033[38;5;213m wrong id %u \033[38;5;245m\xe2\x94\x82\033[1;33m gaps %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;245m timeouts %u \xe2\x94\x82 heartbeat %s \xe2\x94\x82 core 1 loop %" PRIu64 " ",
 		 s1->v_frame_total, au, rp, mf, gp, to, mon_hbstate_name(s0->hb_state), (uint64_t)s0->poll_count);
 	(void)tr;
-	printf("\0337\033[%d;1H\033[2K\033[7m%s\033[0m\0338", rows, b); fflush(stdout);
+	printf("\0337\033[%d;1H\033[2K%s\033[K\033[0m\0338", rows, b); fflush(stdout);
 }
 
 int main(int argc, char **argv)
@@ -179,9 +179,11 @@ int main(int argc, char **argv)
 	fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK);
 	t0_ticks = cntvct();
 	if (bar) printf("\033[2J\033[1;1H\033[1;%dr", rows - 1);
-	printf("RECEIVER LIVE VIEW  every packet on %s and what the Secure World decided (Ctrl+C to stop)\n", ifn);
-	printf("%svalid = green%s   %stampered = red%s   %sreplay = orange%s   %sduplicate = light blue%s   %sconflict = purple%s   %swrong id = pink%s   %scounter gap = yellow%s   %sbus events = grey%s\n\n",
+	printf("\033[1;38;5;75m\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80 RECEIVER \xc2\xb7 SECURE WORLD VIEW \xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\033[0m\n");
+	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m every packet on %s, judged by the Secure World (Ctrl+C to stop)\n", ifn);
+	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m %s\xe2\x97\x8f valid%s  %s\xe2\x97\x8f tampered%s  %s\xe2\x97\x8f replay%s  %s\xe2\x97\x8f duplicate%s  %s\xe2\x97\x8f conflict%s  %s\xe2\x97\x8f wrong id%s  %s\xe2\x97\x8f counter gap%s  %s\xe2\x97\x8f bus events%s\n",
 	       CGREEN, CEND, CRED, CEND, CORANGE, CEND, CBLUE, CEND, CPURPLE, CEND, CPINK, CEND, CYEL, CEND, CGREY, CEND);
+	printf("\033[1;38;5;75m\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\033[0m\n\n");
 	while (!stop) {
 		struct pollfd pf = { s, POLLIN, 0 }; uint64_t now;
 		poll(&pf, 1, 50);

@@ -150,7 +150,7 @@ One command on the sender sends a **new** packet again and again (counter +1, sp
 | grey | bus events (silence, traffic back) | |
 
 **Keys in the SENDER window** (press the key, no Enter): `t` tamper, `r` replay, `d` duplicate, `c` conflict, `w` wrong id, `j` counter jump, `a` automatic attacks every 6 to 10 s on/off, `p` pause, `+` `-` speed, `q` quit.
-After a key press the sender line is red and says what it did; about 0.7 s later the **same packet** turns red on the receiver with the Secure World's reason, for example `[ !! ] TAMPERED: the signature does not fit the data (AUTH_FAIL)`.
+After a key press the sender line is red and says what it did; about 0.7 s later the **same packet** turns red on the receiver with the Secure World's reason, for example `✖ TAMPERED: the signature does not fit the data (AUTH_FAIL)`.
 
 **Say:** "Every packet is different. The sender never repeats a packet by itself. I press a key to attack. The receiver shows each packet and the colour is the Secure World's decision."
 **Stop:** `q` in the sender window, Ctrl+C in the receiver window. To remove the demo key from the sender: `python3 scripts/demo_stream_setup.py --remove-key` (LAPTOP).

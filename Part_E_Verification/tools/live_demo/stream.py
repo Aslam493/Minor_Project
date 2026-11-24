@@ -66,11 +66,14 @@ def main():
     next_auto = time.monotonic() + 2.0; deck = []
     fd = sys.stdin.fileno(); old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
     if old: tty.setcbreak(fd)
-    print("STREAM to the receiver: new packet every %.0f ms.  Keys: t r d c w j a p + - q   (auto-attacks %s)" % (1000.0 / rate, "ON" if auto else "off"))
-    print(("AUTO-ATTACKS ARE ON: one attack every %.0f to %.0f seconds, all six types in turn (press a to switch off). " % (lo, hi) if auto else "No attack is sent until you press a key. ") +
-          "To attack yourself: click THIS window first, then press t r d c w j.")
-    if show: print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
-    else: print("This window looks like a normal sender: every packet is green. Which ones are attacks is shown only by the RECEIVER (the Secure World).")
+    B = lambda t: C("1;38;5;75", t)
+    print(B("\u256d\u2500\u2500\u2500 SENDER \u00b7 CAR ECU " + "\u2500" * 28))
+    print(B("\u2502") + " a new signed packet every %.0f ms.  Keys: t r d c w j (attacks)  a auto on/off  p pause  + - speed  q quit" % (1000.0 / rate))
+    if show:
+        print(B("\u2502") + " " + "   ".join([GREEN("\u25cf valid"), RED("\u25cf t tampered"), ORANGE("\u25cf r replay"), BLUE("\u25cf d duplicate"), PURPLE("\u25cf c conflict"), PINK("\u25cf w wrong id"), YEL("\u25cf j gap")]))
+    else:
+        print(B("\u2502") + " " + DIM("this window looks like a normal sender: every packet is green. Only the RECEIVER shows which ones are attacks."))
+    print(B("\u2570" + "\u2500" * 60) + "\n")
     nxt = time.monotonic(); t0 = nxt
     try:
         while True:
@@ -106,7 +109,7 @@ def main():
                 s.send(L.pack_frame(cid, data)); sent += 1
                 if kind: attacks += 1; last_attack = now
                 line = "t+%7.1f #%-6d id 0x%03X  %s" % (now - t0, sent, cid, describe(data))
-                print((col(line + "   <-- " + label) if (label and show) else GREEN(line)))      # default: the sender does NOT reveal its attacks, every line looks normal
+                print((col(line + "   <-- " + label) if (label and show) else GREEN(line + "   \u2714 sent")))      # default: the sender does NOT reveal its attacks, every line looks normal
                 if sent % 20 == 0:
                     json.dump({"next": c}, open(STATE, "w"))
             r, _, _ = select.select([fd] if old else [], [], [], max(0.0, min(0.05, nxt - time.monotonic())))
