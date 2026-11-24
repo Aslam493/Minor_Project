@@ -49,6 +49,9 @@ struct item {
 static struct item q[MAXI]; static int nq;
 static volatile sig_atomic_t stop;
 static uint64_t t0_ticks; static int bar = 1, rows = 24;
+static unsigned pkts_total, run_ok, run_bad;                          /* packets shown in this run */
+static char alert_txt[200]; static const char *alert_col; static uint64_t alert_ticks;      /* the last detection, shown in the banner */
+static struct mon_status0 cs0; static struct mon_status1 cs1; static int have_stats; static unsigned base[5]; static int have_base;
 
 static uint64_t cntvct(void) { uint64_t v; __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(v)); return v; }
 static void on_sig(int s) { (void)s; stop = 1; }
@@ -120,6 +123,9 @@ static void print_item(const struct item *it)
 {
 	double t = (double)(it->ticks - t0_ticks) / 19200000.0; char line[300];
 	if (it->kind == MSG) { printf("%st+%7.2f  %s%s\n", it->col, t, it->why, CEND); return; }
+	pkts_total++;
+	if (it->col == CGREEN) run_ok++;
+	else { run_bad++; snprintf(alert_txt, sizeof alert_txt, "%s", it->why); alert_col = it->col; alert_ticks = cntvct(); }
 	if (it->decode)
 		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  ctr %-6u speed %5.1f km/h %s rpm %-5u  tag %02x%02x%02x%02x..",
 			 t, it->n, it->id & 0x1FFFFFFF, it->ctr, (double)(it->payload >> 16) / 10.0, speed_bar((double)(it->payload >> 16) / 10.0), (it->payload & 0xFFFF) * 50, it->tag[0], it->tag[1], it->tag[2], it->tag[3]);
@@ -144,19 +150,32 @@ static void flush(uint64_t now)
 	fflush(stdout);
 }
 
-static void draw_bar(const struct mon_status0 *s0, const struct mon_status1 *s1)
+static void paint(void)
 {
-	unsigned i, au = 0, rp = 0, mf = 0, gp = 0, to = 0, tr = 0; char b[700];
-	if (!bar) return;
+	unsigned i, v[5] = {0, 0, 0, 0, 0}, run[5]; char l1[500], l2[700]; static uint64_t t_start, t_last; static unsigned n_last; static double rate;
+	uint64_t now = cntvct(); double age;
+	if (!bar || !have_stats) return;
 	for (i = 0; i < MON_EVENT_TYPES; i++) {
 		const char *n = mon_event_name(i);
-		if (is(n, "AUTH_FAIL")) au = s1->ev_count[i]; else if (is(n, "REPLAY")) rp = s1->ev_count[i]; else if (is(n, "MALFORMED")) mf = s1->ev_count[i];
-		else if (is(n, "COUNTER_GAP")) gp = s1->ev_count[i]; else if (is(n, "TIMEOUT")) to = s1->ev_count[i]; else if (is(n, "TRAFFIC_RECOVERED")) tr = s1->ev_count[i];
+		if (is(n, "AUTH_FAIL")) v[0] = cs1.ev_count[i]; else if (is(n, "REPLAY")) v[1] = cs1.ev_count[i]; else if (is(n, "MALFORMED")) v[2] = cs1.ev_count[i];
+		else if (is(n, "COUNTER_GAP")) v[3] = cs1.ev_count[i]; else if (is(n, "TIMEOUT")) v[4] = cs1.ev_count[i];
 	}
-	snprintf(b, sizeof b, "\033[48;5;236;97m SECURE WORLD \033[48;5;236;32m judged %u \033[38;5;245m\xe2\x94\x82\033[1;31m tampered %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;208m replay %u \033[38;5;245m\xe2\x94\x82\033[38;5;213m wrong id %u \033[38;5;245m\xe2\x94\x82\033[1;33m gaps %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;245m timeouts %u \xe2\x94\x82 heartbeat %s \xe2\x94\x82 core 1 loop %" PRIu64 " ",
-		 s1->v_frame_total, au, rp, mf, gp, to, mon_hbstate_name(s0->hb_state), (uint64_t)s0->poll_count);
-	(void)tr;
-	printf("\0337\033[%d;1H\033[2K%s\033[K\033[0m\0338", rows, b); fflush(stdout);
+	if (!have_base) { memcpy(base, v, sizeof base); have_base = 1; t_start = now; t_last = now; }
+	for (i = 0; i < 5; i++) run[i] = v[i] - base[i];
+	if (now - t_last >= 19200000ULL) { rate = (double)(pkts_total - n_last) * 19200000.0 / (double)(now - t_last); n_last = pkts_total; t_last = now; }
+	age = (double)(now - alert_ticks) / 19200000.0;
+	if (alert_col && age < 4.0)
+		snprintf(l1, sizeof l1, "%s\033[7m  \xe2\x9a\xa0 DETECTED  %s \033[0m", alert_col, alert_txt);
+	else
+		snprintf(l1, sizeof l1, "\033[38;5;245m  \xe2\x97\x8f watching: no alert in the last 4 seconds\033[0m");
+	snprintf(l2, sizeof l2, "\033[48;5;236;97m THIS RUN \033[48;5;236;32m %u packets \xe2\x9c\x94 %u ok \033[38;5;245m\xe2\x94\x82\033[1;31m tampered %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;208m replay %u \033[38;5;245m\xe2\x94\x82\033[38;5;213m wrong id %u \033[38;5;245m\xe2\x94\x82\033[1;33m gaps %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;245m %.0f pkt/s \xe2\x94\x82 %.0f s \xe2\x94\x82 heartbeat %s \xe2\x94\x82 core 1 loop %" PRIu64 " ",
+		 pkts_total, run_ok, run[0], run[1], run[2], run[3], rate, (double)(now - t_start) / 19200000.0, mon_hbstate_name(cs0.hb_state), (uint64_t)cs0.poll_count);
+	printf("\0337\033[%d;1H\033[2K%s\033[0m\033[%d;1H\033[2K%s\033[K\033[0m\0338", rows - 1, l1, rows, l2); fflush(stdout);
+}
+
+static void draw_bar(const struct mon_status0 *s0, const struct mon_status1 *s1)
+{
+	cs0 = *s0; cs1 = *s1; have_stats = 1; paint();
 }
 
 int main(int argc, char **argv)
@@ -178,7 +197,7 @@ int main(int argc, char **argv)
 	if (bind(s, (struct sockaddr *)&ad, sizeof ad)) { perror("bind"); return 1; }
 	fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK);
 	t0_ticks = cntvct();
-	if (bar) printf("\033[2J\033[1;1H\033[1;%dr", rows - 1);
+	if (bar) printf("\033[2J\033[1;1H\033[1;%dr", rows - 2);
 	printf("\033[1;38;5;75m\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80 RECEIVER \xc2\xb7 SECURE WORLD VIEW \xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\033[0m\n");
 	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m every packet on %s, judged by the Secure World (Ctrl+C to stop)\n", ifn);
 	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m %s\xe2\x97\x8f valid%s  %s\xe2\x97\x8f tampered%s  %s\xe2\x97\x8f replay%s  %s\xe2\x97\x8f duplicate%s  %s\xe2\x97\x8f conflict%s  %s\xe2\x97\x8f wrong id%s  %s\xe2\x97\x8f counter gap%s  %s\xe2\x97\x8f bus events%s\n",
@@ -209,6 +228,7 @@ int main(int argc, char **argv)
 			} while (more && ++guard < 50);
 		}
 		flush(cntvct());
+		{ static uint64_t lp; if (now - lp >= 4800000ULL) { lp = now; paint(); } }
 		if (now - last_bar >= 19200000ULL) {
 			last_bar = now; RETRY(mon_get_status0(&c, &s0, &h), r); RETRY(mon_get_status1(&c, &s1, &h), r); draw_bar(&s0, &s1);
 		}

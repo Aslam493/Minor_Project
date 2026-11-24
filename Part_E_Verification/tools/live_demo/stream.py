@@ -66,6 +66,10 @@ def main():
     next_auto = time.monotonic() + 2.0; deck = []
     fd = sys.stdin.fileno(); old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
     if old: tty.setcbreak(fd)
+    try: rows = os.get_terminal_size().lines if sys.stdout.isatty() else 0
+    except OSError: rows = 0
+    if rows > 8: sys.stdout.write("\033[2J\033[1;1H"); sys.stdout.flush()
+    if rows > 8: sys.stdout.write("\033[1;%dr" % (rows - 1)); sys.stdout.flush()
     B = lambda t: C("1;38;5;75", t)
     print(B("\u256d\u2500\u2500\u2500 SENDER \u00b7 CAR ECU " + "\u2500" * 28))
     print(B("\u2502") + " a new signed packet every %.0f ms.  Keys: t r d c w j (attacks)  a auto on/off  p pause  + - speed  q quit" % (1000.0 / rate))
@@ -110,6 +114,11 @@ def main():
                 if kind: attacks += 1; last_attack = now
                 line = "t+%7.1f #%-6d id 0x%03X  %s" % (now - t0, sent, cid, describe(data))
                 print((col(line + "   <-- " + label) if (label and show) else GREEN(line + "   \u2714 sent")))      # default: the sender does NOT reveal its attacks, every line looks normal
+                if rows > 8 and sent % 3 == 0:
+                    p_ = struct.unpack("<II", data[:8])[1]; kmh = (p_ >> 16) / 10.0; rpm = (p_ & 0xFFFF) * 50
+                    g = lambda v, m: "\u2588" * max(0, min(16, int(16 * v / m))) + "\u2591" * (16 - max(0, min(16, int(16 * v / m))))
+                    sys.stdout.write("\0337\033[%d;1H\033[2K\033[48;5;236;97m SENDER \033[48;5;236;32m %d packets sent \033[38;5;245m\u2502\033[38;5;75m speed %5.1f %s \033[38;5;245m\u2502\033[38;5;213m rpm %5d %s \033[38;5;245m\u2502 %.0f pkt/s \033[K\033[0m\0338" % (rows, sent, kmh, g(kmh, 120.0), rpm, g(rpm, 3500.0), rate))
+                    sys.stdout.flush()
                 if sent % 20 == 0:
                     json.dump({"next": c}, open(STATE, "w"))
             r, _, _ = select.select([fd] if old else [], [], [], max(0.0, min(0.05, nxt - time.monotonic())))
@@ -127,6 +136,7 @@ def main():
         pass
     finally:
         if old: termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        if rows > 8: sys.stdout.write("\033[r\033[%d;1H" % rows)
         json.dump({"next": c}, open(STATE, "w"))
         print("\nstopped. packets sent: %d, attacks injected: %d, next counter: %d" % (sent, attacks, c))
     return 0
