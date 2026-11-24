@@ -35,7 +35,9 @@
 #define RETRY(call, r) do { int t_; for (t_ = 0; ; t_++) { (r) = (call); if ((r) != TEEC_ERROR_BUSY || t_ >= 40) break; \
 			     { struct timespec ts_ = {0, 2000000}; nanosleep(&ts_, NULL); } } } while (0)
 
-static const char *CGREEN = "\033[32m", *CRED = "\033[1;31m", *CMAG = "\033[1;35m", *CYEL = "\033[1;33m", *CCYAN = "\033[36m", *CDIM = "\033[2m", *CEND = "\033[0m";
+/* one colour per packet type (the sender window uses the same): valid green, tampered red, replay orange, duplicate light blue, conflict purple, wrong id pink, gap yellow, bus events grey */
+static const char *CGREEN = "\033[32m", *CRED = "\033[1;31m", *CORANGE = "\033[38;5;208m", *CBLUE = "\033[38;5;75m", *CPURPLE = "\033[38;5;135m", *CPINK = "\033[38;5;213m",
+		  *CYEL = "\033[1;33m", *CGREY = "\033[38;5;245m", *CEND = "\033[0m";
 
 enum { PKT, MSG };
 struct item {
@@ -81,7 +83,7 @@ static void mark(const struct mon_event *e, const char *col, const char *text, i
 			if (!latest) break;
 		}
 	if (pick >= 0) { q[pick].col = col; snprintf(q[pick].why, sizeof q[pick].why, "%s", text); q[pick].state = 1; return; }
-	{ char b[200]; snprintf(b, sizeof b, "alarm for counter %u seen late: %s", e->counter, text); msg(e->ticks, CDIM, b); }
+	{ char b[200]; snprintf(b, sizeof b, "alarm for counter %u seen late: %s", e->counter, text); msg(e->ticks, CGREY, b); }
 }
 
 static void handle(const struct mon_event *e)
@@ -89,20 +91,20 @@ static void handle(const struct mon_event *e)
 	const char *nm = mon_event_name(e->type); char b[140];
 	if (is(nm, "AUTH_FAIL")) mark(e, CRED, "TAMPERED: the signature does not fit the data (AUTH_FAIL)", 0);
 	else if (is(nm, "REPLAY")) {
-		if (e->detail == 1) mark(e, CRED, "REPLAY: counter too old (REPLAY detail 1)", 1);
-		else if (e->detail == 2) mark(e, CRED, "DUPLICATE: the same packet again (REPLAY detail 2)", 1);
-		else mark(e, CRED, "CONFLICT: same counter, other data (REPLAY detail 3)", 1);
-	} else if (is(nm, "MALFORMED")) mark(e, CMAG, "WRONG ID / format not allowed (MALFORMED)", 0);
+		if (e->detail == 1) mark(e, CORANGE, "REPLAY: counter too old (REPLAY detail 1)", 1);
+		else if (e->detail == 2) mark(e, CBLUE, "DUPLICATE: the same packet again (REPLAY detail 2)", 1);
+		else mark(e, CPURPLE, "CONFLICT: same counter, other data (REPLAY detail 3)", 1);
+	} else if (is(nm, "MALFORMED")) mark(e, CPINK, "WRONG ID / format not allowed (MALFORMED)", 0);
 	else if (is(nm, "COUNTER_GAP")) { snprintf(b, sizeof b, "GAP: %u counter(s) missing (COUNTER_GAP)", e->detail); mark(e, CYEL, b, 0); }
-	else if (is(nm, "COUNTER_RESYNC")) mark(e, CCYAN, "ACCEPTED: first packet after a boot, counter synchronised (normal)", 0);
+	else if (is(nm, "COUNTER_RESYNC")) mark(e, CGREEN, "first packet after a boot, counter synchronised (normal)", 0);
 	else if (is(nm, "TIMEOUT")) {
-		if (e->detail == 1) msg(e->ticks, CCYAN, ">>> BUS SILENT for more than 0.3 s (TIMEOUT detail 1)");
+		if (e->detail == 1) msg(e->ticks, CGREY, ">>> BUS SILENT for more than 0.3 s (TIMEOUT detail 1)");
 		else if (e->detail == 2) msg(e->ticks, CRED, ">>> LINUX FORWARDER NOT ANSWERING the heartbeat (TIMEOUT detail 2)");
 		else if (e->detail == 4) msg(e->ticks, CRED, ">>> packet requests not answered (TIMEOUT detail 4)");
-		else msg(e->ticks, CCYAN, ">>> TIMEOUT");
-	} else if (is(nm, "TRAFFIC_RECOVERED")) msg(e->ticks, CCYAN, ">>> traffic is back (TRAFFIC_RECOVERED)");
-	else if (is(nm, "HEARTBEAT_RECOVERED")) msg(e->ticks, CCYAN, ">>> heartbeat answered again (HEARTBEAT_RECOVERED)");
-	else if (is(nm, "LATE_ANSWER")) msg(e->ticks, CDIM, e->detail ? ">>> a packet answer was late (LATE_ANSWER)" : ">>> a heartbeat answer was late (LATE_ANSWER)");
+		else msg(e->ticks, CGREY, ">>> TIMEOUT");
+	} else if (is(nm, "TRAFFIC_RECOVERED")) msg(e->ticks, CGREY, ">>> traffic is back (TRAFFIC_RECOVERED)");
+	else if (is(nm, "HEARTBEAT_RECOVERED")) msg(e->ticks, CGREY, ">>> heartbeat answered again (HEARTBEAT_RECOVERED)");
+	else if (is(nm, "LATE_ANSWER")) msg(e->ticks, CGREY, e->detail ? ">>> a packet answer was late (LATE_ANSWER)" : ">>> a heartbeat answer was late (LATE_ANSWER)");
 }
 
 static void print_item(const struct item *it)
@@ -114,7 +116,7 @@ static void print_item(const struct item *it)
 			 t, it->n, it->id & 0x1FFFFFFF, it->ctr, (double)(it->payload >> 16) / 10.0, (it->payload & 0xFFFF) * 50, it->tag[0], it->tag[1], it->tag[2], it->tag[3]);
 	else
 		snprintf(line, sizeof line, "t+%7.2f  #%-5u id 0x%03X  (not a monitor packet)", t, it->n, it->id & 0x1FFFFFFF);
-	if (it->col == CGREEN) printf("%s%s   [ OK ] accepted%s\n", it->col, line, CEND);
+	if (it->col == CGREEN) printf("%s%s   [ OK ] accepted%s%s\n", it->col, line, it->why[0] ? ": " : "", it->why);
 	else printf("%s%s   [ !! ] %s%s\n", it->col, line, it->why, CEND);
 }
 
@@ -169,8 +171,8 @@ int main(int argc, char **argv)
 	t0_ticks = cntvct();
 	if (bar) printf("\033[2J\033[1;1H\033[1;%dr", rows - 1);
 	printf("RECEIVER LIVE VIEW  every packet on %s and what the Secure World decided (Ctrl+C to stop)\n", ifn);
-	printf("%sgreen = accepted%s   %sred = tampered / replay / duplicate / conflict%s   %smagenta = wrong id%s   %syellow = counter gap%s   %scyan = bus and heartbeat events%s\n\n",
-	       CGREEN, CEND, CRED, CEND, CMAG, CEND, CYEL, CEND, CCYAN, CEND);
+	printf("%svalid = green%s   %stampered = red%s   %sreplay = orange%s   %sduplicate = light blue%s   %sconflict = purple%s   %swrong id = pink%s   %scounter gap = yellow%s   %sbus events = grey%s\n\n",
+	       CGREEN, CEND, CRED, CEND, CORANGE, CEND, CBLUE, CEND, CPURPLE, CEND, CPINK, CEND, CYEL, CEND, CGREY, CEND);
 	while (!stop) {
 		struct pollfd pf = { s, POLLIN, 0 }; uint64_t now;
 		poll(&pf, 1, 50);

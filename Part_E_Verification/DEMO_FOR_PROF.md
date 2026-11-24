@@ -136,7 +136,18 @@ One command on the sender sends a **new** packet again and again (counter +1, sp
 | 2 | RECEIVER | `/tmp/packet_view` | a header with the colour legend, then packets appear one per line; the last line is a status bar with the Secure World totals |
 | 3 | SENDER | `cd /tmp/demo` then `python3 stream.py` | a new line every 0.1 s: `ctr 43 speed 98.3 km/h rpm 1450 ...` |
 
-**Colours on the receiver:** green = accepted, red = tampered / replay / duplicate / conflict, magenta = wrong id, yellow = counter gap, cyan = bus and heartbeat events (silence, traffic back).
+**Colours (the SAME on the sender and on the receiver):**
+
+| Colour | Packet | Key in the sender window |
+|---|---|---|
+| **green** | valid, accepted | (normal packets) |
+| **red** | tampered | `t` |
+| **orange** | replay (old packet again) | `r` |
+| **light blue** | duplicate (last packet again) | `d` |
+| **purple** | conflict (same counter, other data) | `c` |
+| **pink** | wrong id | `w` |
+| **yellow** | counter gap | `j` |
+| grey | bus events (silence, traffic back) | |
 
 **Keys in the SENDER window** (press the key, no Enter): `t` tamper, `r` replay, `d` duplicate, `c` conflict, `w` wrong id, `j` counter jump, `a` automatic attacks every 6 to 10 s on/off, `p` pause, `+` `-` speed, `q` quit.
 After a key press the sender line is red and says what it did; about 0.7 s later the **same packet** turns red on the receiver with the Secure World's reason, for example `[ !! ] TAMPERED: the signature does not fit the data (AUTH_FAIL)`.

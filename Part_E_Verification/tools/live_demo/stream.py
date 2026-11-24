@@ -23,7 +23,9 @@ CFG = os.path.join(HERE, "stream_cfg.json"); STATE = os.path.join(HERE, "stream_
 ID_OK, ID_BAD = 0x123, 0x124
 COOLDOWN = 1.5
 C = (lambda code, s: "\033[%sm%s\033[0m" % (code, s)) if sys.stdout.isatty() else (lambda code, s: s)
-GREEN, RED, MAG, YEL, CYAN, DIM = (lambda s: C("32", s)), (lambda s: C("1;31", s)), (lambda s: C("1;35", s)), (lambda s: C("1;33", s)), (lambda s: C("36", s)), (lambda s: C("2", s))
+# one colour per packet type (the receiver uses the same colours): valid green, tampered red, replay orange, duplicate light blue, conflict purple, wrong id pink, gap yellow
+GREEN, RED, ORANGE, BLUE, PURPLE, PINK, YEL, DIM = (lambda s: C("32", s)), (lambda s: C("1;31", s)), (lambda s: C("38;5;208", s)), (lambda s: C("38;5;75", s)), \
+    (lambda s: C("38;5;135", s)), (lambda s: C("38;5;213", s)), (lambda s: C("1;33", s)), (lambda s: C("38;5;245", s))
 
 
 def packet(key, can_id, counter, payload):
@@ -60,6 +62,7 @@ def main():
     fd = sys.stdin.fileno(); old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
     if old: tty.setcbreak(fd)
     print("STREAM to the receiver: new packet every %.0f ms.  Keys: t r d c w j a p + - q   (auto-attacks %s)" % (1000.0 / rate, "ON" if auto else "off"))
+    print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
     nxt = time.monotonic(); t0 = nxt
     try:
         while True:
@@ -78,13 +81,13 @@ def main():
                     data, cid, label, col = bytes(d), ID_OK, "TAMPERED: one data bit changed, old signature", RED
                 elif kind == "r" and len(hist) > 12:
                     old_c = random.choice(list(hist)[:-8])[0]; data, cid = [h for h in hist if h[0] == old_c][0][1], ID_OK
-                    label, col = "REPLAY: old packet (counter %d) sent again" % old_c, RED
+                    label, col = "REPLAY: old packet (counter %d) sent again" % old_c, ORANGE
                 elif kind == "d" and last:
-                    data, cid, label, col = last, ID_OK, "DUPLICATE: the last packet sent a second time", RED
+                    data, cid, label, col = last, ID_OK, "DUPLICATE: the last packet sent a second time", BLUE
                 elif kind == "c" and last:
-                    data, cid, label, col = packet(key, ID_OK, c - 1, signal(c - 1) ^ 0x00FF0000), ID_OK, "CONFLICT: same counter as before, other data", RED
+                    data, cid, label, col = packet(key, ID_OK, c - 1, signal(c - 1) ^ 0x00FF0000), ID_OK, "CONFLICT: same counter as before, other data", PURPLE
                 elif kind == "w":
-                    data, cid, label, col = packet(key, ID_BAD, c, signal(c)), ID_BAD, "WRONG ID 0x124 (not allowed on this link)", MAG
+                    data, cid, label, col = packet(key, ID_BAD, c, signal(c)), ID_BAD, "WRONG ID 0x124 (not allowed on this link)", PINK
                 elif kind == "j":
                     c += 4; data, cid, label, col = packet(key, ID_OK, c, signal(c)), ID_OK, "JUMP: 4 counters skipped (then normal again)", YEL
                     hist.append((c, data)); last = data; c += 1
