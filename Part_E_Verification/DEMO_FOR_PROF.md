@@ -88,6 +88,12 @@ Type one line, read the answer, say the sentence.
 | `ps \| grep can_forwarder` | the forwarder line | "This is the postman. It started by itself at boot." |
 | `/tmp/mon_client --retries 20 status 0 \| grep poll_count` (type it twice, 2 seconds apart) | the number grows by tens of millions | "Core 1 runs its own loop by itself, without Linux." |
 
+**Which core does what: one table (LAPTOP window).** It reads the receiver and prints one table: each of the 4 cores, who owns it, what runs on it, and the proof:
+```
+python3 scripts/demo_cores.py
+```
+You see cores 0, 2 and 3 as `Linux` (with the postman `can_forwarder` and the normal programs) and core 1 as `SECURE WORLD`, with the line "its own loop counter grew by 38,xxx,xxx in 1 s". Say: "Linux was refused core 1 at boot (the boot log line). Core 1 belongs to the Secure World. The growing number is read from the Secure World itself, so Linux cannot fake it." If you send a file and run it again, the "CAN-chip interrupts" number on a Linux core goes up.
+
 Then in the **LAPTOP** window:
 ```
 python3 scripts/demo_prove_no_key.py
