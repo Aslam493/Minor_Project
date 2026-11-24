@@ -2,7 +2,7 @@
 """stream.py - runs on the SENDER Pi. ONE command that never stops: it sends a new signed CAN packet again and again (counter 1, 2, 3 ... and a
 changing speed/rpm value in every packet, so no two normal packets are the same). You can slip an attack in at any time with a key.
 
-    python3 stream.py                 10 packets per second until you press q; an attack every 5 to 8 s by itself (all six types in turn)
+    python3 stream.py                 10 packets per second until you press q; an attack every 2 to 3 s by itself (all six types in turn; change with --every 5-8)
     python3 stream.py --quiet         only valid (green) packets until you press an attack key
     python3 stream.py --rate 20       faster
     python3 stream.py --auto          also injects an attack every 5 to 8 seconds by itself (all six types in turn)
@@ -46,7 +46,8 @@ def describe(data):
 
 
 def main():
-    rate = 10.0; auto = "--quiet" not in sys.argv          # automatic attacks are ON by default (--quiet = only valid packets until you press a key)
+    rate = 10.0; auto = "--quiet" not in sys.argv
+    lo, hi = (float(x) for x in sys.argv[sys.argv.index("--every") + 1].split("-")) if "--every" in sys.argv else (2.0, 3.0)      # seconds between automatic attacks          # automatic attacks are ON by default (--quiet = only valid packets until you press a key)
     duration = float(sys.argv[sys.argv.index("--duration") + 1]) if "--duration" in sys.argv else None            # for tests
     inject = sorted((float(a.split(":")[1]), a.split(":")[0]) for a in sys.argv[sys.argv.index("--inject") + 1].split(",")) if "--inject" in sys.argv else []   # e.g. t:5,r:9
     if "--rate" in sys.argv: rate = float(sys.argv[sys.argv.index("--rate") + 1])
@@ -59,11 +60,11 @@ def main():
         except Exception: pass
     s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW); s.setsockopt(L.SOL_CAN_RAW, L.CAN_RAW_FD_FRAMES, 1); s.bind(("can0",))
     hist = deque(maxlen=80); last = None; sent = attacks = 0; paused = False; pending = None; last_attack = 0.0
-    next_auto = time.monotonic() + random.uniform(4, 6); deck = []
+    next_auto = time.monotonic() + 2.0; deck = []
     fd = sys.stdin.fileno(); old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
     if old: tty.setcbreak(fd)
     print("STREAM to the receiver: new packet every %.0f ms.  Keys: t r d c w j a p + - q   (auto-attacks %s)" % (1000.0 / rate, "ON" if auto else "off"))
-    print(("AUTO-ATTACKS ARE ON: one attack every 5 to 8 seconds, all six types in turn (press a to switch off). " if auto else "No attack is sent until you press a key. ") +
+    print(("AUTO-ATTACKS ARE ON: one attack every %.0f to %.0f seconds, all six types in turn (press a to switch off). " % (lo, hi) if auto else "No attack is sent until you press a key. ") +
           "To attack yourself: click THIS window first, then press t r d c w j.")
     print("colours: %s  %s  %s  %s  %s  %s  %s" % (GREEN("valid"), RED("t tampered"), ORANGE("r replay"), BLUE("d duplicate"), PURPLE("c conflict"), PINK("w wrong id"), YEL("j gap")))
     nxt = time.monotonic(); t0 = nxt
@@ -79,7 +80,7 @@ def main():
                 if pending and now - last_attack >= COOLDOWN: kind, pending = pending, None
                 elif auto and now >= next_auto and now - last_attack >= COOLDOWN:
                     if not deck: deck = list("trdcwj"); random.shuffle(deck)          # every attack type once before any repeats
-                    kind = deck.pop(); next_auto = now + random.uniform(5, 8)
+                    kind = deck.pop(); next_auto = now + random.uniform(lo, hi)
                 label, col = None, GREEN
                 if kind == "t":
                     d = bytearray(packet(key, ID_OK, c, signal(c))); d[4] ^= 1                # one data bit changed, the old signature stays
@@ -109,7 +110,7 @@ def main():
                 k = os.read(fd, 1).decode(errors="ignore").lower()
                 if k == "q": break
                 elif k == "p": paused = not paused; print(DIM("-- paused --" if paused else "-- running --")); nxt = time.monotonic()
-                elif k == "a": auto = not auto; print(DIM("-- auto attacks %s --" % ("ON" if auto else "off"))); next_auto = time.monotonic() + 4
+                elif k == "a": auto = not auto; print(DIM("-- auto attacks %s --" % ("ON" if auto else "off"))); next_auto = time.monotonic() + 2
                 elif k == "+": rate = min(100.0, rate * 1.5); print(DIM("-- %.1f packets per second --" % rate))
                 elif k == "-": rate = max(1.0, rate / 1.5); print(DIM("-- %.1f packets per second --" % rate))
                 elif k and k in "trdcwj":
