@@ -1,0 +1,23 @@
+<section id="sota" class="big3">
+<div class="head"><p class="eyebrow">STATE OF THE ART AND OUR PROMISE</p><h2>What exists today, and what we promised for end-sem</h2></div>
+<div class="row" style="align-items:flex-start;gap:56px">
+<div class="sota" style="width:780px;flex:none;gap:0">
+<p class="colhead" style="margin-bottom:6px">RELATED WORK</p>
+<div class="rel"><p class="a">AUTOSAR SecOC</p><p class="b">Counter-based replay protection for CAN</p></div>
+<div class="rel"><p class="a">TEECheck (2020)</p><p class="b">A TEE vets outgoing CAN frames: prevention</p></div>
+<div class="rel"><p class="a">iCORE (2019)</p><p class="b">A core diverted into the Secure World at boot, as our core 1</p></div>
+<div class="rel" style="border-bottom:none"><p class="a">EmLog (2017)</p><p class="b">Tamper-resistant logging on OP-TEE</p></div>
+<div class="sota-c ours gap"><p class="t">The gap we address</p><p class="s">We found no work that pairs OP-TEE with CAN attack detection when Linux is compromised.</p></div>
+</div>
+<div style="display:flex;flex-direction:column;flex:1">
+<p class="colhead" style="margin-bottom:6px">PROMISED AT MIDTERM → STATUS NOW</p>
+<div class="prom"><p class="num">1</p><div class="txt"><p class="a">HMAC authentication</p><p class="b">54.6 µs per frame</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">2</p><div class="txt"><p class="a">Reduce validation latency</p><p class="b">4.95 ms → 54.6 µs</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">3</p><div class="txt"><p class="a">Store validated packets in flash memory</p><p class="b">Designed as a forward-secure log</p></div><p class="sp no">Not built</p></div>
+<div class="prom"><p class="num">4</p><div class="txt"><p class="a">Rate &amp; flood detection</p><p class="b">Every drop counted; no alarm</p></div><p class="sp wip">Partly</p></div>
+<div class="prom" style="border-bottom:none"><p class="num">5</p><div class="txt"><p class="a">End-to-end demo with real measurements</p><p class="b">31 of 32 cases on the first run</p></div><p class="sp ok">Done</p></div>
+</div>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Left: related work, taken from my design notes. AUTOSAR SecOC adds counter-based freshness against replay on CAN. TEECheck, from RTNS 2020, uses a trusted execution environment to vet outgoing CAN frames at the source: that is prevention, on a Cortex-M. iCORE, from SAC 2019, diverts a core into the Secure World at boot so it runs without waiting for Linux to call it; my core 1 uses the same mechanism. EmLog, from 2017, is tamper-resistant logging on OP-TEE; it is the model for the secure log I want to build next. Schneier and Kelsey, 1998, describe HMAC hash chains for logs. The gap: I found no work that pairs OP-TEE with detecting CAN attacks when Linux itself is compromised, and that is what this project addresses. Right: the five items promised at midterm, in the midterm's own words. HMAC authentication and lower validation latency are done. Rate and flood detection is partly done: every dropped frame is counted exactly, but there is no separate flood alarm. Storing validated packets in flash is not built; it is designed, and it is the first item of future work. The end-to-end demo with real measurements is done: all 32 test cases pass, 31 the first time and one, the forwarder starting at boot (E2b), after a fix; one new limit was found after the fix (E2c).</aside>
+</section>
