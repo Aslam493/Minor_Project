@@ -127,3 +127,8 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 21. Update 2026-11-25 (slide 2, motivation told as a story)
 - Slide 2: a picture of a CAN bus with Brakes, Engine and Steering nodes and a red Attacker node ("sends a forged frame", "CAN bus: no proof of who sent a frame"), three numbered problems (1 Anyone can send a frame; 2 The check runs in Linux; 3 The record can be rewritten, future work) and the goal ("detect these attacks in the Secure World, where Linux cannot hide them"). The four attack types (spoofed ID, tampered data, replay, silence) are in problem 1 and in the notes. Previous version (four attack cards and three trust questions): `slide_backups/problem_v1_cards_20261125.html`.
+
+## 22. 2026-11-25 (merge of slides 2 and 3 NOT done)
+- The user asked to put the motivation and the state of the art on one slide. Before publishing, the live artifact (version cae3) turned out to contain a DIFFERENT slide 3 and a changed stylesheet, published by someone else: a "state of the art and our promise" slide with "what exists, how we go further", EmLog WISTP 2018, the five promises, and a gap box, using new `.sb` styles. The user then chose: keep THEIR slide 3 as it is; do not merge.
+- Nothing was published. The live deck is unchanged (11 or 12 slides as live: 12). Saved for reference: `slide_backups/sota_v4_LIVE_edited_by_someone_else_20261125.html`, `slide_backups/deck_css_LIVE_version_cae3_20261125.css`, and the unpublished merged slide in `pending_merge_20261125/` (it needs its own `.ms` style rules from `deck_css_mine_with_ms_rules.css`).
+- `final_deck_20261125/` now mirrors the live deck (version cae3).
