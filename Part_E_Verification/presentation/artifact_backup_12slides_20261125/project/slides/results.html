@@ -1,0 +1,25 @@
+<section id="results" style="gap:32px">
+<div class="head"><p class="eyebrow">WORK DONE · 4 · RESULTS</p><h2>32 of 32 tests pass; every frame is judged or counted</h2></div>
+<div class="row" style="align-items:flex-start;gap:56px">
+<div style="display:flex;flex-direction:column;gap:18px;width:640px;flex:none">
+<p class="huge" style="font-size:128px">32 / 32</p>
+<p class="small">test cases on the real CAN-FD bus</p>
+<div class="brow"><p class="blabel" style="width:250px">Boot and setup</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval" style="white-space:nowrap">4 of 4</p></div>
+<div class="brow"><p class="blabel" style="width:250px">Normal traffic</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval" style="white-space:nowrap">3 of 3</p></div>
+<div class="brow"><p class="blabel" style="width:250px">Attacks</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval" style="white-space:nowrap">10 of 10</p></div>
+<div class="brow"><p class="blabel" style="width:250px">Load and loss</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval" style="white-space:nowrap">12 of 12</p></div>
+<div class="brow"><p class="blabel" style="width:250px">Restart and reboot</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval" style="white-space:nowrap">3 of 3</p></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:18px;flex:1">
+<p class="colhead">PACKET LOSS UNDER LOAD</p>
+<div class="legend"><div class="key"><div class="sw-blue"></div><p>Judged</p></div><div class="key"><div class="sw-orange"></div><p>Dropped, counted</p></div></div>
+<div class="brow"><p class="blabel" style="width:270px">1,004-frame burst</p><div class="btrack" style="width:400px"><div class="bj" style="width:400px"></div></div><p class="bval" style="white-space:nowrap">0 dropped</p></div>
+<div class="brow"><p class="blabel" style="width:270px">Steady 943/s</p><div class="btrack" style="width:400px"><div class="bj" style="width:312px"></div><div class="bd" style="width:88px"></div></div><p class="bval" style="white-space:nowrap">9,203</p></div>
+<div class="brow"><p class="blabel" style="width:270px">Flood 3,587/s</p><div class="btrack" style="width:400px"><div class="bj" style="width:95px"></div><div class="bd" style="width:305px"></div></div><p class="bval" style="white-space:nowrap">80,040</p></div>
+<div class="fact"><p class="bignum" style="font-size:44px">0 lost</p><p class="body">up to 640 frames/s and bursts up to ~2,490 frames</p></div>
+<div class="fact"><p class="bignum" style="font-size:44px">18 / 18</p><p class="body">overload runs: drops, all in the 2,048-frame forwarder queue, equal Secure World’s counter gap</p></div>
+</div>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>All 32 test cases pass on the real bus, including the reboot test after the boot-service fix. On the right, packet loss under load. Secure World judges 640 frames per second, 32 every 50 ms. Below that, and for bursts up to about 2,490 frames, nothing is lost. Above it, frames are dropped at one known place, the forwarder’s 2,048-frame queue, oldest first, and every drop is counted. In 18 of 18 overload runs the counted drops matched exactly the gap Secure World saw in the counters, so no frame disappears silently. Over 270,000 frames were accounted for.</aside>
+</section>

@@ -1,0 +1,13 @@
+<section id="problem">
+<div class="head"><p class="eyebrow">MOTIVATION AND PROBLEM</p><h2>CAN trusts every frame, and Linux can lie about it</h2></div>
+<p class="lead">CAN connects a vehicle’s brakes, engine and steering, but nothing checks who sent a frame. Can we trust the frame, the decision made on it, and the record kept later?</p>
+<div class="cards c4">
+<div class="card icard warn in" style="--i:0"><x-icon name="Users"></x-icon><h3>Spoofed ID</h3><p>Any node can send any ID</p></div>
+<div class="card icard warn in" style="--i:1"><x-icon name="Wrench"></x-icon><h3>Tampered data</h3><p>Payload changed on the way</p></div>
+<div class="card icard warn in" style="--i:2"><x-icon name="Play"></x-icon><h3>Replayed frame</h3><p>An old valid frame sent again</p></div>
+<div class="card icard warn in" style="--i:3"><x-icon name="Clock"></x-icon><h3>Silence</h3><p>Frames or checks quietly stopped</p></div>
+</div>
+<div class="goal in" style="--i:4"><p><b>Goal:</b> detect all four from OP-TEE Secure World, a part of the processor kept apart from Linux, so the verdict stays trustworthy even if Linux is compromised.</p></div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Four ways a CAN stream can be attacked. A checker running in Linux cannot be trusted if Linux itself is compromised: it could hide any of these. So the goal is to judge frames from Secure World, a place Linux cannot change.</aside>
+</section>

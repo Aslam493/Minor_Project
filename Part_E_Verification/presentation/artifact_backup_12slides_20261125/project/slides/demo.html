@@ -1,0 +1,23 @@
+<section id="demo">
+<div class="head"><p class="eyebrow">DEMO</p><h2>Proving it live on two Raspberry Pis</h2></div>
+<div class="row" style="align-items:flex-start;gap:48px">
+<div style="display:flex;flex-direction:column;gap:18px;width:560px;flex:none">
+<div class="term"><p class="tt">TERMINAL 1</p><p class="tn">Sender Pi</p><p class="tc">ECU and attacker · sends packet files</p></div>
+<div class="wire"></div>
+<p class="small" style="text-align:center">CAN-FD wire · 500 kbit/s · 2 Mbit/s</p>
+<div class="term"><p class="tt">TERMINAL 2</p><p class="tn">Receiver Pi</p><p class="tc">Secure World verdicts, live</p></div>
+<div class="slot"><p>Video: [add recording link here if a recording is shown]</p></div>
+</div>
+<table style="flex:1">
+<tr class="hd"><th style="width:8%">#</th><th style="width:42%">Sender does</th><th>Secure World shows</th></tr>
+<tr><td>1</td><td>600 healthy frames</td><td>ACCEPTED, last_counter rises</td></tr>
+<tr><td>2</td><td>Goes silent for 2 s</td><td>TIMEOUT, then TRAFFIC_RECOVERED</td></tr>
+<tr><td>3</td><td>Tampered tag</td><td>AUTH_FAIL</td></tr>
+<tr><td>4</td><td>Old frame again</td><td>REPLAY</td></tr>
+<tr><td>5</td><td>Counter jumps by 6</td><td>COUNTER_GAP, 5 missing</td></tr>
+<tr><td>6</td><td>Stop Linux’s forwarder</td><td>TIMEOUT (heartbeat), then recovery</td></tr>
+</table>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Two terminals. Terminal 1 is the sender Pi, which plays the ECU and the attacker. Terminal 2 is the receiver, showing what Secure World decides. First the receiver proves it is running: Linux sees 3 cores, OP-TEE 4.10 answers, and the monitor status shows Mode P. Then six steps: healthy traffic, silence, a tampered tag, a replay, a counter jump, and finally stopping Linux’s forwarder. Each time Secure World records the right verdict. The full commands are in the live demo guide.</aside>
+</section>

@@ -1,0 +1,26 @@
+<section id="sept1" style="gap:32px">
+<div class="head"><p class="eyebrow">WORK DONE BY SEPTEMBER · 1 OF 2</p><h2>A secure boot chain that gives core 1 to Secure World</h2></div>
+<div class="chain">
+<div class="cbox"><p class="t">Boot ROM</p><p class="s">power on</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">GPU firmware</p><p class="s">bootcode.bin, start.elf</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">TF-A BL1, BL2</p><p class="s">armstub + FIP</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox sec"><p class="t">BL31 · EL3</p><p class="s">secure monitor</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox sec"><p class="t">OP-TEE (BL32)</p><p class="s">Secure World</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">U-Boot → Linux</p><p class="s">Normal World</p></div>
+</div>
+<p class="body">When Linux asks to start CPU1, BL31 at EL3 intercepts it and sends the core into Secure World for good:</p>
+<div class="cards c4" style="gap:24px">
+<div class="cpu"><p class="t">CPU0</p><p class="s">Linux</p></div>
+<div class="cpu sec"><p class="t">CPU1</p><p class="s">Secure World · rpi3_can_server_loop()</p></div>
+<div class="cpu"><p class="t">CPU2</p><p class="s">Linux</p></div>
+<div class="cpu"><p class="t">CPU3</p><p class="s">Linux</p></div>
+</div>
+<p class="small">Proven on hardware: Linux reports CPU1 offline and sees 3 processors; OP-TEE answers on core 1 (opteed_enter_secure_server_if_core1 in TF-A).</p>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>By September the foundation was in place. The Raspberry Pi boot chain was extended with TF-A and OP-TEE. The key change is in BL31, the secure monitor at EL3: when Linux brings up CPU1, the request is intercepted and the core is sent into Secure World, where it runs the monitor loop forever. Linux keeps CPU0, 2 and 3. This was proven on hardware and is still how the final system works.</aside>
+</section>

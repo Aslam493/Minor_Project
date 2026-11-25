@@ -1,0 +1,21 @@
+<section id="perf" style="gap:30px">
+<div class="head"><p class="eyebrow">WORK DONE · 3 · SPEED</p><h2>The HMAC blocker, solved</h2></div>
+<div class="row" style="gap:72px;align-items:center">
+<div style="display:flex;flex-direction:column;gap:8px;flex:none;width:520px">
+<p class="mega pop">90×</p>
+<p class="mega-sub">faster check per frame</p>
+</div>
+<div class="race" style="flex:1">
+<div class="lane2 slow in" style="--i:1"><div class="lt"><p>Midterm build: one frame</p><p class="lv">4.95 ms</p></div><div class="rtrack"><div class="rbar slow"></div></div></div>
+<div class="lane2 fast in" style="--i:2"><div class="lt"><p>Final build: one frame</p><p class="lv">0.055 ms</p></div><div class="rtrack"><div class="rbar fast"></div></div></div>
+</div>
+</div>
+<div class="vs">
+<div class="vtile in" style="--i:3"><p class="now">1.56 s</p><p class="lbl">1,004-frame burst</p><p class="was">was about 8 s</p></div>
+<div class="vtile in" style="--i:4"><p class="now">640/s</p><p class="lbl">frames checked per second</p><p class="was">was about 130/s</p></div>
+<div class="vtile in" style="--i:5"><p class="now">32</p><p class="lbl">frames per 50 ms request</p><p class="was">was about 7</p></div>
+</div>
+<p class="cause-dark"><b>Cause:</b> a debug option (CFG_CORE_DEBUG_CHECK_STACKS) checked the stack on every call in Secure World. Removed. CPU speed made no difference. Midterm figures except 4.95 ms are estimates; final figures are measured.</p>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>At midterm HMAC was listed as blocked. Measuring showed the whole Secure World was slow: 4.95 ms per frame, so only about 7 frames fit in one 40 ms answer window, roughly 130 frames per second, and a 1,004-frame burst would take about 8 seconds. Those three midterm figures are estimates from the per-frame cost. The cause was a debug option, CFG_CORE_DEBUG_CHECK_STACKS. Without it a frame costs 54.6 microseconds, 32 frames use under 2 ms of each 50 ms period, and the measured burst takes 1.56 seconds. The two bars are drawn to scale.</aside>
+</section>
