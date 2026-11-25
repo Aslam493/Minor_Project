@@ -1,7 +1,7 @@
 <section id="video" style="gap:20px">
-<div class="head"><p class="eyebrow">VIDEO · THE LIVE DEMO</p><h2>Every verdict in color, live</h2></div>
+<div class="head"><p class="eyebrow">VIDEO · THE LIVE DEMO</p><h2>How it works: every verdict in color, live</h2></div>
 <div class="vid">
-<img src="/_blob/74e63ea53187684bbe3493ac83239411" alt="Two terminal windows from a real run on two Raspberry Pis: the sender (top) shows only green sent packets, the receiver (bottom) shows each packet judged by the Secure World, with a colored line and an alert banner for a wrong-ID attack">
+<img src="/_blob/306e181e4568c651b93b99999517ff87" data-video="/_blob/214e8437c09582c342bc01526d77f2b7" alt="One-minute recording of a real run on two Raspberry Pis: the sender window (top) shows only green sent packets; the receiver window (bottom) shows each packet judged by the Secure World, with a colored line and a caption for each attack">
 <div style="display:flex;flex-direction:column;gap:16px;flex:1">
 <p class="colhead">COLOR CODE</p>
 <div class="lg">
@@ -21,7 +21,7 @@
 </div>
 </div>
 </div>
-<p class="note">Still from a real run on two Raspberry Pis, 25 Nov 2026.</p>
+<p class="note">One-minute recording of a real run on two Raspberry Pis, 25 Nov 2026. It plays when this slide is presented; downloads show the still.</p>
 <div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
-<aside>Video slide. Play the 30-second recording of the two windows here; until it is added, the still image shows a real run. One command starts both windows: bash scripts/demo_live_stream.sh. The top window is the sender, the car: every packet looks normal and green, and it does not mark its attacks. The bottom window is the receiver: every packet is judged by the Secure World and colored by its verdict. Green is valid. Red is a tampered packet, orange a replay, light blue a duplicate, purple a conflict (same counter, other data), pink a wrong CAN ID, yellow a counter gap. An attack comes every 2 to 3 seconds, and all six types appear in about 15 seconds. The banner at the top of the receiver flashes in the color of the last detection, and the counters show how many of each were seen. The bottom line shows the Secure World's own counters since the board booted. The picture is a still from a real run on the two Pis on 25 November 2026.</aside>
+<aside>Video slide, one minute, recorded from a real run on the two Pis on 25 November 2026. It plays in a loop while this slide is presented; in a PowerPoint or PDF download only the still picture shows, so keep the deck link for the video. Captions explain it as it runs. The top window is the sender, the car: every packet looks normal and green, and it does not mark its attacks. The bottom window is the receiver: Linux only carries the frames, and the Secure World on core 1 judges every one and colors it by its verdict. Green is valid. Red is a tampered packet (the signature no longer matches), orange a replay (an old packet again), light blue a duplicate, purple a conflict (same counter, other data), pink a wrong CAN id, yellow a counter gap. An attack comes every 2 to 3 seconds, and all six types appear. The banner at the top of the receiver shows the last detection, the counters show how many of each, and the bottom line shows the Secure World's own counters since boot. One command starts the demo live: bash scripts/demo_live_stream.sh. To use your own recording, drop an .mp4 of 20 MB or less onto the picture in the editor.</aside>
 </section>
