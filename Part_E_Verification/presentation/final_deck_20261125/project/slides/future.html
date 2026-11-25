@@ -1,5 +1,5 @@
 <section id="future" class="lg">
-<div class="head"><p class="eyebrow">FUTURE WORK · MIDTERM PROMISE 3</p><h2>Next: a secure log in flash</h2></div>
+<div class="head"><p class="eyebrow">SECURE LOG IN FLASH · MIDTERM PROMISE 3 · DESIGNED, NOT BUILT</p><h2>Future work</h2></div>
 <div class="lgp">
 <div class="lgn sw in" style="--i:0"><x-icon name="Trust"></x-icon><p class="t">Secure World</p><p class="s">judges every frame</p></div>
 <p class="lga">▶</p>
@@ -19,11 +19,10 @@
 <div class="ch cut"><p class="id">E5</p><p class="st">chain broken</p></div>
 </div>
 <div class="lgf"><p class="k">SEAL</p><p class="m">tag(i) = HMAC( K_log , tag(i-1) + record(i) )</p></div>
-<div class="lgv">
-<div class="lv plan"><p class="k">LEVEL 1 · THE PLAN</p><p class="v">Sealed and chained, plus the UART copy</p></div>
-<div class="lv"><p class="k">LEVEL 2 · NEEDS A CHIP</p><p class="v">A flash Linux cannot reach</p></div>
-<div class="lv"><p class="k">LEVEL 3 · OTHER BOARD</p><p class="v">A memory firewall</p></div>
-</div>
-<div class="lgs"><p>Edits are detected. Deleting the end needs the UART copy.</p><p class="pill">Designed, not built</p></div>
+<ul class="pts">
+<li><b>Build the log:</b> seal every record in the Secure World and store it in flash (the SD card).</li>
+<li><b>Close the gap:</b> copy the newest tag to the UART, so cutting off the end is caught too.</li>
+<li><b>After that:</b> a memory guard at EL2, real keys and a flood alarm.</li>
+</ul>
 <aside>Future work, and the one I want to do next: a secure log in flash. It is the unfinished midterm promise 3, storing validated records in flash memory. Honest scope first: on the Pi 3 the Secure World cannot write the SD card, which is the only flash and is owned by Linux. So the path is: the Secure World keeps a ring of 24-byte records, one per check; each record is sealed inside the Secure World with a chain tag, tag i = HMAC(K_log, tag i-1 plus record i), using a log key that never leaves the Secure World; a Linux logger reads the sealed records every 250 ms and appends them to a file on the SD card; and the newest chain tag is also printed on the UART as a copy outside Linux. What it proves: any edit to a record, or a deletion in the middle, breaks the chain from that point on, as the animation shows: E3 is edited, so E3, E4 and E5 no longer match, while E1 and E2 stay valid. What it cannot prove: Linux can still delete the file or cut off its end, which is why the UART copy of the newest tag is part of the plan; a rolled-back SD card cannot be detected without an outside anchor, because the Pi 3 has no secure counter and no secure storage. Three levels: level 1 is software only and is the plan; level 2 would be a small SPI flash chip on a bus Linux does not use, which needs extra hardware; level 3 is a board with a real memory firewall, such as the STM32MP1 or i.MX8. A stronger idea beyond the plain chain is forward secrecy, where the key moves on after every entry so old entries cannot be forged even if the key leaks later. Status: designed in monitor/AUDIT_LOG_DESIGN.md and AUDIT_LOG_PLAN.md, nothing built yet. After that: the memory guard at EL2, real key provisioning, a flood alarm, and more throughput. Known limits today: the monitor detects but does not block because the Pi 3 has no TZASC; the keys are prototype keys built into the image; controlling the forwarder service over ssh does not return (E2c, workaround documented, fix queued).</aside>
 </section>

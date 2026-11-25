@@ -83,3 +83,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 - Animation: the chain builds E1 to E5, then E3 turns red ("edited by Linux") and E4, E5 show "chain broken".
 - Honest limits on the slide and in the notes: edits and middle deletions are detected; deleting the end needs the UART copy; a rolled-back SD card cannot be detected without an outside anchor; status "Designed, not built".
 - OPEN WORDING POINT: slide 3 (as dictated) says "designed as a forward-secure log", but the design documents describe a plain HMAC chain (K_log, UART anchor). Forward secrecy (key moves on after each entry) is a stronger option beyond the design and is mentioned that way in the notes. Decide whether slide 3 should say "tamper-evident HMAC-chained log" instead.
+
+## 10. Update 2026-11-25 (slide 11 title and bullets)
+- Slide 11 title is "Future work" (small label above: secure log in flash, midterm promise 3, designed not built). The three level boxes were removed (the levels are in the speaker notes); three plain bullets were added: build the log (seal in Secure World, store in flash), close the gap (UART copy of the newest tag), after that (EL2 memory guard, real keys, flood alarm).
