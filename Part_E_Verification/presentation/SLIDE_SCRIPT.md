@@ -1,8 +1,8 @@
 # Final presentation: slide script (TEMPORARY, for review before the slides are built)
 
-Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: short and congested, 8 slides, about 8 to 10 minutes plus the live demo.
+Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: short and congested, 9 slides, about 10 minutes plus the live demo.
 
-Structure you asked for: slide 1 intro, slide 2 the earlier work ("reference work" = the MINOR WORK you implemented in August and September), slides 3 to 7 the current work, slide 8 thanks.
+Structure you asked for: slide 1 intro, slides 2 and 3 the previous work (MAXIMUM 2 slides, only the important work: the MINOR WORK implemented in August and September), slides 4 to 8 the current work, slide 9 thanks.
 
 ## 1. What I reviewed
 | Source | What it contains | What I take from it |
@@ -41,50 +41,54 @@ Style: dark title and closing slides, light content slides, one accent color; at
 - Name, supervisor, IIT Delhi logo, "Minor Project, Final Evaluation, November 2026".
 - One-line claim: "Every frame is judged in the Secure World. Every lost frame is counted."
 
-### Slide 2. Earlier work: the minor project (August to September)
-- Top strip, the problem in one line each: 4 attacks (spoofed ID, tampered data, replay, silence); 3 trust questions (the message, the decision, the record); today's options (checks in Linux, external HSM) versus TrustZone on the same chip.
-- Main part, a timeline of what YOU built:
-  - 23 Aug to 6 Sep: Steps 1 to 7, built OP-TEE, TF-A, U-Boot, kernel, root file system; SD image verified.
-  - 8 Sep: Steps 8 to 10, booted on the real Pi, OP-TEE 4.10 answers, xtest 114 cases 0 failed, own Trusted App round trip.
-  - 14 to 17 Sep: CAN shield (MCP2518FD), simulated then real CAN pipeline, Secure World checks and classification, chip interrupt reaches the Secure World, core 1 reserved for the Secure World.
-  - 24 Sep (midterm): 3 of 7 milestones proven; HMAC blocked.
-- Bottom: the 5 promises for the final (HMAC, latency, flood, real demo, secure log). They return as the scorecard on slide 7.
-- Dead ends are shown as strength, one line: failed boot-flow attempts and a secure-timer experiment were rolled back to a known-good image.
+### Slide 2. Previous work 1: the secure platform (Aug to early Sep) - the important part only
+- Message: "I built the whole secure platform by hand, and proved it on the real board."
+- Left, the problem in one line each: 4 attacks (spoofed ID, tampered data, replay, silence); 3 trust questions (the message, the decision, the record); options today (checks in Linux, external HSM) versus TrustZone on the same chip.
+- Main, one flow diagram: Boot ROM, GPU firmware, TF-A (BL1, BL2, BL31 at EL3), OP-TEE (Secure World), U-Boot, Linux. Highlight: when Linux asks to start CPU1, BL31 sends core 1 into the Secure World for good; Linux keeps cores 0, 2, 3.
+- Evidence strip (3 numbers): Steps 1 to 10 complete; xtest 114 cases, 0 failed; own Trusted App round trip passed.
+- Dates: 23 Aug to 8 Sep.
 
-### Slide 3. Current work 1: the design
+### Slide 3. Previous work 2: CAN in the Secure World, and where midterm ended (14 Sep to 24 Sep)
+- Message: "The first CAN frames were checked in the Secure World; HMAC was the open problem."
+- Chain of boxes with a "proven" mark: MCP2518FD CAN chip (Seeed shield) to GPIO25 interrupt to secure FIQ on core 1 to capture into secure memory to checks (ID, counter, timestamp continuity).
+- Left card: 3 of 7 milestones proven at midterm; HMAC blocked (Secure World slow).
+- Right card: the 5 promises for the final (HMAC, latency, flood, real demo, secure log). They return as the scorecard on slide 8.
+- One line: dead ends were rolled back to a known-good image (failed boot-flow attempt, secure-timer experiment).
+
+### Slide 4. Current work 1: the design
 - Message: "Linux carries frames, the Secure World judges them."
 - Diagram: Sender ECU, CAN chip, kernel socket, forwarder (queue 2,048), Monitor in the Secure World on core 1; loop arrow "request every 50 ms, up to 32 frames, answer in 40 ms".
 - Three-box evolution: midterm (Secure World reads the chip; dropped, no TZPC on the Pi 3), push (Linux decides the timing), pull (now).
 - Note: the forwarder holds no key (a key search on its binary found nothing).
 
-### Slide 4. Current work 2: checks and attacks
+### Slide 5. Current work 2: checks and attacks
 - Message: "9 attacks sent on a real bus, 9 caught, each at the right check."
 - Table: attack, the check that catches it, the verdict (MALFORMED, AUTH_FAIL, REPLAY x3, GAP, TIMEOUT x2, LATE).
 - Footer: order of checks, cheapest first (ID 6.7 microseconds, then HMAC and counter, 54.6 microseconds per valid frame).
 
-### Slide 5. Current work 3: speed, loss and tests
+### Slide 6. Current work 3: speed, loss and tests
 - Big number left: 90 times faster (4.95 ms to 0.055 ms); the cause in one line (debug stack check).
 - Middle: 640 frames/s; 0 lost up to bursts of about 2,490 frames; above that the drops are counted and equal the gap (18 of 18 runs).
 - Right: test result with the CORRECTED wording from section 3.
 
-### Slide 6. Current work 4: live demo
+### Slide 7. Current work 4: live demo
 - Message: "Two Pis, one command, every verdict in color."
 - Picture: the two terminal windows (sender looks normal and all green; receiver colors each packet: red tampered, orange replay, light blue duplicate, purple conflict, pink wrong ID, yellow gap).
 - Right: what the professor sees (an attack every 2 to 3 s; the receiver finds it, not the sender).
 - The picture comes from a real captured run and is labeled as such.
 
-### Slide 7. Scorecard, limits and future work
+### Slide 8. Scorecard, limits and future work
 - Table of the 5 midterm promises with status: HMAC done; latency done; flood partly (counted, no alarm); real demo done; secure log not built (designed).
 - Limits in one line: detects but does not block (no TZASC); keys are built into the image.
 - Future: forward-secure audit log, EL2 memory guard, more throughput, key provisioning plus flood alarm.
 
-### Slide 8. Thanks
+### Slide 9. Thanks
 - "Thank you", the one-line claim again, name, supervisor, "Questions welcome".
 
-## 5. If even shorter is needed (6 slides)
-Merge slide 3 and slide 4 into one "design and checks" slide, and merge slide 7 into slide 5. Slides 1, 2, 6, 8 stay.
+## 5. If even shorter is needed (7 slides)
+Merge slides 4 and 5 into one "design and checks" slide, and merge slide 8 into slide 6. Slides 1, 2, 3, 7, 9 stay.
 
 ## 6. Decisions for you
-1. Is slide 2 (the minor work, August to September, plus the problem and the 5 promises) what you meant by "reference work"?
+1. Are slides 2 and 3 (the minor work: first the secure platform, then CAN in the Secure World with the midterm position) the right 2 slides of previous work?
 2. Use the corrected test wording from section 3? (My recommendation: yes. The professor can check the report.)
 3. Edit the existing artifact (12 slides to 8) or create a new one? (My recommendation: edit it.)
