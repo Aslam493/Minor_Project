@@ -1,8 +1,8 @@
 # Final presentation: slide script (TEMPORARY, for review before the slides are built)
 
-Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: short and congested, 6 slides, about 6 to 8 minutes plus the live demo.
+Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: short and congested, 8 slides, about 8 to 10 minutes plus the live demo.
 
-Structure you asked for: slide 1 intro, slides 2 and 3 previous work (maximum 2, only the important work: the MINOR WORK of August and September), slides 4 and 5 current work (1 to 2 slides, with the mandatory values), slide 6 thanks.
+Structure you asked for: slide 1 intro, slides 2 and 3 previous work (maximum 2, only the important work: the MINOR WORK of August and September), slides 4 to 7 current work (4 slides, with the mandatory values), slide 8 thanks.
 
 ## 1. What I reviewed
 | Source | What it contains | What I take from it |
@@ -55,30 +55,38 @@ Style: dark title and closing slides, light content slides, one accent color; at
 - Right card: the 5 promises for the final (HMAC, latency, flood, real demo, secure log). They return as the scorecard on slide 8.
 - One line: dead ends were rolled back to a known-good image (failed boot-flow attempt, secure-timer experiment).
 
-### Slide 4. Current work 1: how it works (design and checks)
-- Message: "Linux carries frames, the Secure World judges every one, and 9 of 9 attacks were caught."
-- Top, one diagram: Sender ECU, CAN chip, kernel socket, forwarder (queue 2,048), Monitor in the Secure World on core 1; loop arrow "request every 50 ms, up to 32 frames, answer within 40 ms". The forwarder holds no key.
-- Below, a compact table of the 9 attacks sent on the real two-Pi CAN-FD bus: attack, the check that catches it, the verdict (wrong ID: MALFORMED; tampered data: AUTH_FAIL; old, duplicate, conflicting counter: REPLAY x3; counter jump: GAP; silence 300 ms and killed forwarder: TIMEOUT x2; late answers: LATE).
-- One line: checks run cheapest first (ID 6.7 microseconds, then HMAC-SHA256 and counter, 54.6 microseconds per valid frame); heartbeat every 1 s, 3 misses.
-- Why this design: the Pi 3 has no TZPC, so the Secure World cannot own the chip; making it ask for frames means Linux cannot control the timing.
+### Slide 4. Current work 1: the design
+- Message: "Linux carries frames, the Secure World judges every one."
+- Diagram: Sender ECU, CAN chip, kernel socket, forwarder (queue 2,048), Monitor in the Secure World on core 1; loop arrow "request every 50 ms, up to 32 frames, answer within 40 ms". The forwarder holds no key.
+- Three-box evolution: midterm (Secure World reads the chip; dropped because the Pi 3 has no TZPC to lock the chip), push (Linux decides the timing; not enough), pull (now: Linux cannot pick the timing, a late or missing answer is evidence).
+- Big fact: heartbeat every 1 s, 3 misses raise TIMEOUT; boot grace 60 s.
 
-### Slide 5. Current work 2: results (the mandatory values), status and limits
+### Slide 5. Current work 2: checks and attacks
+- Message: "9 attacks sent on the real two-Pi CAN-FD bus, 9 caught, each at the right check."
+- Table: attack, the check that catches it, the verdict (wrong ID: MALFORMED; tampered data: AUTH_FAIL; old, duplicate, conflicting counter: REPLAY x3; counter jump: GAP; silence 300 ms and killed forwarder: TIMEOUT x2; late answers: LATE).
+- Footer: checks run cheapest first (ID 6.7 microseconds, then HMAC-SHA256 and counter, 54.6 microseconds per valid frame).
+
+### Slide 6. Current work 3: results (the mandatory values), scorecard and limits
 - Message: "Fast enough, no frame lost silently, and every claim is backed by a test report."
-- Big numbers (the mandatory values):
+- Big numbers:
   1. **90 times faster**: 4.95 ms to 0.055 ms per frame (cause: a debug stack check, removed).
   2. **640 frames/s** judged, 32 frames per 50 ms request.
   3. **0 lost** up to 640 frames/s and bursts of about 2,490 frames.
   4. **18 of 18** overload runs: counted drops equal the Secure World's gap (over 270,000 frames accounted).
-  5. **31 of 32** cases on the first run (corrected wording), the one failure fixed and re-tested; 12 limits documented.
-- Middle, scorecard of the 5 midterm promises: HMAC done; latency done; flood partly (counted, no alarm); real demo done; secure log designed, not built.
-- Bottom: limits (detects but does not block, no TZASC; keys built into the image) and future work (forward-secure log, EL2 memory guard, key provisioning, flood alarm).
-- Pointer: "Live demo follows": the two windows with colors are shown in person, not as a slide.
+  5. **31 of 32** cases on the first run (corrected wording); the one failure fixed and re-tested; 12 limits documented.
+- Small strip: the 5 midterm promises with status (HMAC done; latency done; flood partly, counted but no alarm; real demo done; secure log designed, not built).
+- Bottom line: limits (detects but does not block, no TZASC; keys built into the image) and future work (forward-secure log, EL2 memory guard, key provisioning, flood alarm).
 
-### Slide 6. Thanks
+### Slide 7. Current work 4: live demo
+- Message: "Two Pis, one command, every verdict in color."
+- Picture: the two terminal windows (sender looks normal and all green; receiver colors each packet: red tampered, orange replay, light blue duplicate, purple conflict, pink wrong ID, yellow gap), taken from a real captured run and labeled as such.
+- Right: what the professor sees (an attack every 2 to 3 s; the receiver finds it, not the sender); the one command.
+
+### Slide 8. Thanks
 - "Thank you", the one-line claim again ("Every frame judged in the Secure World. Every lost frame counted."), name, supervisor, "Questions welcome".
 
 ## 5. Where the cut material goes
-The live demo, the speed story, the loss study and the live stream are NOT lost: they go into the speaker notes of slides 4 and 5 and into the live demo itself. If the professor asks for more, the full 12-slide artifact deck can be kept as a backup copy.
+The loss study details and the speed story go into the speaker notes of slides 4 to 6; the live stream is slide 7 and the live demo itself. If the professor asks for more, the full 12-slide artifact deck can be kept as a backup copy.
 
 ## 6. Decisions for you
 1. Are slides 2 and 3 (the secure platform; then CAN in the Secure World with the midterm position) the right 2 slides of previous work, and are the 5 values on slide 5 the ones you want shown?
