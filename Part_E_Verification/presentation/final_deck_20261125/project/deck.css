@@ -437,3 +437,4 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .who .s { color: var(--soft); }
 .who .cell { border-left-color: #CFCAbd; }
 .logo-wm { opacity: 0.08; }
+.logo-bg { position: absolute; left: 1130px; top: 170px; width: 740px; height: 740px; object-fit: contain; }

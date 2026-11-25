@@ -74,3 +74,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 ## 7. Update 2026-11-25 (one color)
 - All 12 slides now use the same light background. The cover, closing and video slides were dark; they are light now (cover name and institute text recolored for contrast).
 - The small IIT Delhi logo is removed from the first and last slides. The big faint logo copy was near-white (made for the dark background), invisible on light, so it was removed too.
+
+## 8. Update 2026-11-25 (background logo)
+- The first and last slides each carry ONE large IIT Delhi seal as a background (blue, 14 percent opacity baked into the picture, behind the text, right side). The old logo file is near-white (made for the dark theme) and is invisible on light, so a blue copy was made: `logo_background_blue.png`.
