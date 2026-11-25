@@ -111,3 +111,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 17. Update 2026-11-25 (slide 7 diagram wider and taller)
 - Slide 7 (attacks): the wall diagram was rebuilt wider and taller: lines 12 px thick (were 8), wider walls (36 px), rows 50 px (were 42), the diagram uses the full 1664 px width (lines start at x 400, walls at 620, 840, 1060, 1280, verdict column at 1380), larger labels (28 px) and verdicts (26 px). Content ends at about y 875. The previous narrow version is saved as `slide_backups/attacks_v1_narrow_20261125.html`.
+
+## 18. Update 2026-11-25 (slide 7 less text)
+- Slide 7: label above the title shortened to "WORK DONE · CHECKS AND ATTACKS"; the "Measured" line now has two values (heartbeat 321 on time, 0 late; 6,361 requests on time). The "8 late answers counted by both sides" is in the diagram (LATE 8 counted) and in the notes.
