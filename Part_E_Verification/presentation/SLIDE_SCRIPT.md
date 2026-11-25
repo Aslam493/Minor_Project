@@ -108,3 +108,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 ## 16. Update 2026-11-25 (slide 9 fourth design: ring of 32 and five claims)
 - Slide 9: a ring of 32 segments (31 blue, 1 orange = E2b, at the top) with "32/32 tests pass" in the middle, and five plain-language claims with counts: 4/4 starts and runs on its own; 3/3 accepts normal traffic; 10/10 catches every attack we sent; 12/12 never loses a frame silently; 3/3 survives restarts and reboots. Legend: 31 passed the first time; 1 passed after a fix (E2b, forwarder start at boot). Reason for the change: test ids (C5b, D5f) mean nothing to the audience; the claims say what was proven.
 - Backups of all earlier versions of slide 9 are in `slide_backups/`: v1 bars, v2 grid 31 of 32, v3 map of 32 test ids.
+
+## 17. Update 2026-11-25 (slide 7 diagram wider and taller)
+- Slide 7 (attacks): the wall diagram was rebuilt wider and taller: lines 12 px thick (were 8), wider walls (36 px), rows 50 px (were 42), the diagram uses the full 1664 px width (lines start at x 400, walls at 620, 840, 1060, 1280, verdict column at 1380), larger labels (28 px) and verdicts (26 px). Content ends at about y 875. The previous narrow version is saved as `slide_backups/attacks_v1_narrow_20261125.html`.

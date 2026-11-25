@@ -549,3 +549,15 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .r4 .lg3 .k2 { display: flex; gap: 12px; align-items: center; }
 .r4 .lg3 .dt { width: 26px; height: 26px; border-radius: 7px; flex: none; }
 .r4 .lg3 p { font-size: 28px; color: var(--soft); }
+
+/* attacks diagram, wide version */
+.wrow.wide { height: 50px; width: 1664px; }
+.wrow.wide .wall { width: 36px; height: 50px; }
+.wrow.wide .wl { top: 9px; font-size: 28px; width: 380px; }
+.wrow.wide .wv { top: 9px; left: 1380px; width: 284px; font-size: 26px; }
+.wrow.wide .clip { top: 19px; height: 12px; }
+.wrow.wide .shot { height: 12px; border-radius: 6px; }
+.wrow.wide .shot.none { height: 0; border-top: 6px dashed #8A93A0; margin-top: 3px; border-radius: 0; }
+.wrow.wide .hitmark { top: 10px; width: 30px; height: 30px; }
+.wrow.wh.wide { height: 64px; }
+.wrow.wh.wide .whd { font-size: 28px; top: 8px; }
