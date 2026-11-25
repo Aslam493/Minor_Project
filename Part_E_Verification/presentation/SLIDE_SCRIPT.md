@@ -1,63 +1,62 @@
-# Final presentation: slide script (TEMPORARY; decisions made, facts verified, not yet built)
+# Final presentation: slide script (BUILT and published 2026-11-25; 12 slides, one numbering)
 
-Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Deck: **12 slides**, built by editing the existing artifact (a copy of the current version is kept first). Every slide is rendered and checked before the next one.
+Artifact: https://claude.ai/artifact/Up8TZUmsA46W8itm982hzX (edited in place). Backup of the old 12-slide version: `artifact_backup_12slides_20261125/`. Final files: `final_deck_20261125/`. Still image: `video_still_real_run_20261125.png`.
+Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: title, motivation and problem, state of the art plus promises, work done, video.
 
-## 1. The 12 slides (one numbering)
-Required course structure: 1 title, 2 motivation and problem, 3 state of the art and promises, 4 work done, 5 video.
-
-| # | Slide | Message | Content (what is folded in) |
+## 1. The 12 slides (id, content, one-line check)
+| # | id | Slide | One-line check (rendered with headless Chrome, content ends above y 920) |
 |---|---|---|---|
-| 1 | Title | Secure CAN Monitor on Raspberry Pi 3 | Name, supervisor, IIT Delhi, "Final Evaluation, November 2026", one-line claim |
-| 2 | Motivation and problem | CAN trusts every frame, and Linux can lie about it | 4 attacks; the 3 trust questions (message, decision, record); goal |
-| 3 | State of the art and promises | What exists, what we promised, how far we got | 3 approaches on 3 criteria; the 5 midterm promises in the midterm's own words, with status |
-| 4 | Work done, previous 1: the secure platform (23 Aug to 8 Sep) | Built by hand, proven on the board | Boot flow, core 1; Steps 1 to 10; xtest "114 test cases, 36,114 subtests, 0 failed"; own Trusted App |
-| 5 | Work done, previous 2: CAN in the Secure World (14 to 24 Sep) | First CAN frames checked in the Secure World; HMAC open | CAN chip, GPIO25, secure FIQ on core 1, capture, first checks; 3 of 7 milestones |
-| 6 | Work done, current 1: design | Linux carries frames, the Secure World judges them | Diagram; request every 50 ms, 32 frames, 40 ms; how the design changed |
-| 7 | Work done, current 2: checks, attacks and timing | 9 attacks, 9 caught, each at the right check | Attack table; **timing values folded in**: 5 timers; B2 321 answers on time over 320 s, 0 late; B3 6,361 requests on time; 8 late answers counted (C9) |
-| 8 | Work done, current 3: the speed problem | The HMAC "blocker" was a debug option | **The 4-step search folded in**; 90 times faster; 640 frames/s; 32 frames per request |
-| 9 | Work done, current 4: results, loss accounting, trust proofs | Every frame judged or counted; claims backed by a report | **Loss formula and trust proofs folded in**; the 5 category bars (first run); 31 of 32; limits |
-| 10 | Video | The Secure World's verdict, live, in color | 30-second recording (you record with `scripts/demo_live_stream.sh`); real still image with the color legend until then; no placeholder text |
-| 11 | Future work and limits | What is left, stated openly | Forward-secure log, EL2 memory guard, more throughput, key provisioning plus flood alarm; limits |
-| 12 | Thanks | Every frame judged in the Secure World. Every lost frame counted. | Name, supervisor, "Questions welcome" |
+| 1 | cover | Title | Unchanged; claim and names present |
+| 2 | problem | Motivation and problem | 4 attacks plus the 3 trust questions (record = future work); fits, ends y 900 |
+| 3 | sota | State of the art and promises | 3 approaches; the 5 midterm promises in the midterm's words and order, statuses Done / Done / Not built / Partly / Done; "31 of 32" |
+| 4 | sept1 | Previous work 1 (23 Aug to 8 Sep) | Boot chain and cores; evidence strip: Steps 1 to 10, xtest "114 test cases, 36,114 subtests, 0 failed", own Trusted App; ends y 912 |
+| 5 | sept2 | Previous work 2 (14 to 24 Sep) | CAN chain, checks, 3 of 7 milestones; HMAC "blocked" points to slide 8; "changed later, see slide 6" |
+| 6 | arch | Design | Diagram, forwarder "holds no key", request label inside the lane; 3-box evolution |
+| 7 | attacks | Checks, attacks and timing | 9 attacks and verdicts; timing folded in (321 on time over 320 s, 6,361 requests on time, 8 late answers counted by both sides); ends y 912 |
+| 8 | perf | The speed problem | 4-step search; "Before the fix (debug build)"; measured 9.9 s and 101/s; ends y 920 |
+| 9 | results | Results, loss accounting, trust proofs | First-run bars A 4/4, B 3/3, C 10/10, D 12/12, E 2/3 = 31/32 with the E note; loss totals labeled "over 3 runs"; formula; 18 of 18 load runs, 12 dropped frames; 278,204; three trust proofs; ends y 878 |
+| 10 | video | Video | Real still image (25 Nov), color code, what to watch; no placeholder text; replace the still by the 30-second recording |
+| 11 | future | Future work and limits | 4 cards (card 1 = midterm promise 3); limits incl. E2c; ends y 910 |
+| 12 | close | Thanks | Unchanged |
 
-## 2. Verified facts (checked on 2026-11-25 against the files; these are the only values the slides may use)
+## 2. Verified facts (checked 2026-11-25; these are the only values the slides use)
 | Claim | Result | Source |
 |---|---|---|
-| Constant-time tag compare | CONFIRMED: ORs the XOR of all 32 bytes, no early exit | `optee_full/.../plat-rpi3/rpi3_can_monitor.c:53` (function), `:621` (use, 32 bytes) |
-| xtest wording | CONFIRMED: "114 test cases, 36,114 subtests, 0 failed" | `README.md:170` |
-| 32 original cases, categories A4 / B3 / C10 / D12 / E3 | CONFIRMED (32 cases) | `baseline/final_campaign/results.json` |
-| First-run result | 31 PASS, 1 FAIL (E2b). By category: A 4 of 4, B 3 of 3, C 10 of 10, D 12 of 12, **E 2 of 3** | results.json |
-| Post-flash | E2b fixed and passes (E2br); FAIL rows E2ar, A2r, B1r each have a passing rerun (E2ar2, A2r2, B1r2); E2c is a known limit (F12), fix queued | results.json, report lines 70 to 90 |
-| B2 heartbeat | 321 answers on time, 0 late, over 320 s (forwarder counters). The 311 is only the heartbeat log buffer (full at about 300 s). | `FINAL_TEST_REPORT.md` B2 row |
-| B3 | 6,361 requests, all on time | results.json |
-| C9 late answers | The forwarder saw 8 LATE and the Secure World counted +8 (this may include one heartbeat) | results.json |
-| 9,203 and 80,040 dropped | CONFIRMED as TOTALS over 3 runs: D5c 3 x 14,000 = 42,000 sent, 9,203 dropped; D5a 3 x 35,000 = 105,000 sent, 80,040 dropped | results.json D5c, D5a |
-| Frames accounted | 278,204 in D1 to D5e (sum of the series), so "over 270,000" is correct | results.json |
-| "18 of 18 runs" | The report's 18 are the load runs of D4 to D5e (6 series x 3). Only 12 of them dropped frames (D4, D5a, D5c, D5e). | report line 10 |
-| Lossless limit | 640 frames/s sustained; bursts up to about 2,490 frames at 3,587 frames/s | report PACKET_LOSS_VERDICT |
-| Speed | 54.6 microseconds per valid frame, 6.7 microseconds per wrong ID; 1,004-frame burst 1.56 s (median 1.57 at 600 MHz, 1.56 at 1200 MHz, so CPU speed made no difference) | C5b, D1a, D1b |
-| 4.95 ms per frame | Measured with instrumentation as "4.0 ms + 4.95 ms per packet" on the debug build (before the fix) | `REAL_BUS_RESULTS.md:200`, `baseline/BURST_STEPS_RESULTS_20261121.md:35` |
-| Root cause | CFG_CORE_DEBUG_CHECK_STACKS=y (5,060 hook calls) | `REAL_BUS_RESULTS.md:236` |
-| E1 restarts | 10 of 10 as designed | results.json |
+| Constant-time tag compare | CONFIRMED: ORs the XOR of all 32 bytes, no early exit | `optee_full/.../rpi3_can_monitor.c:53`, used at `:621` |
+| xtest wording | "114 test cases, 36,114 subtests, 0 failed" | `README.md:170` |
+| 32 original cases | A4 / B3 / C10 / D12 / E3. First run: 31 PASS, 1 FAIL (E2b); **E is 2 of 3** | `results.json` |
+| Post-flash | E2b fixed (E2br PASS); E2ar, A2r, B1r FAIL rows have passing reruns; E2c known limit (F12), fix queued | `results.json`, report |
+| B2 heartbeat | 321 answers on time, 0 late, over 320 s (the 311 is the log buffer size) | report B2 row |
+| B3 | 6,361 requests, all on time | `results.json` |
+| C9 late answers | forwarder LATE 8, Secure World +8 (may include one heartbeat) | `results.json` |
+| 9,203 and 80,040 | Totals over 3 runs (D5c 42,000 sent; D5a 105,000 sent) | `results.json` |
+| Frames accounted | 278,204 in D1 to D5e | `results.json` |
+| "18 of 18" | Load runs of D4 to D5e; 12 of them dropped frames (D4, D5a, D5c, D5e) | report line 10 |
+| Lossless limit | 640 frames/s; bursts up to about 2,490 frames at 3,587 frames/s | report verdict |
+| Speed after the fix | 54.6 microseconds per valid frame; 6.7 per wrong ID; 1,004-frame burst 1.56 s | C5b, D1a |
+| 4.95 ms | Before the fix, at 600 MHz: reply = 4.0 ms + 4.95 ms per packet | `REAL_BUS_RESULTS.md:200` |
+| **Before the fix, measured** | 1,004-frame drain 9.9 s (101 frames/s) at 600 MHz; reply p99 58 ms | `baseline/BURST_STEPS_RESULTS_20261121.md` Step 2d |
+| **CPU clock before the fix** | 1200 MHz was 4.6 times faster per packet (4.95 to 1.07 ms) and the drain 9.9 s to 2.0 s: a clue, not the cause | same file, Step 2d |
+| CPU clock after the fix | No difference: D1a 1.57 s (600 MHz) versus D1b 1.56 s (1200 MHz) | `results.json` |
+| Root cause | CFG_CORE_DEBUG_CHECK_STACKS=y, 5,060 hook calls, 45 to 100 times slower | `REAL_BUS_RESULTS.md:236` |
+| Option in the midterm build | The core built on 2026-09-20 contains the hook functions; the 2026-08-30 core does not. Likely reason HMAC looked too slow at midterm (inference; confirmed measurements are from November) | `nm` of the saved `tee.elf` files |
+| **No key in the forwarder (re-run 25 Nov)** | `can_forwarder` sha256 36ee2d58b8ff: keys inside NONE; `mon_client` 79d91eb32cd0: NONE; boot partition not mounted in Linux | `scripts/demo_prove_no_key.py` |
+| Core 1 hidden (25 Nov) | Linux online 0,2-3, offline 1; "CPU1: failed to come online"; core 1 loop counter +39,536,094 in 1 s | `scripts/demo_cores.py` |
+| Secure memory reserved (25 Nov) | `/proc/iomem`: 08000000-09ffffff and 10000000-10ffffff reserved | receiver |
 
-## 3. Corrections applied to the existing artifact
-1. "32 of 32 tests pass" (results and sota slides) becomes "31 of 32 on the first run; the failure (E2b) was fixed and re-tested; one new limit found after the fix (E2c)".
-2. The category bars show the FIRST RUN: A 4/4, B 3/3, C 10/10, D 12/12, **E 2/3**. (Your note says the bars are correct for the 32 cases; the sizes are, but E must show 2 of 3 on the first run, or the bar says 3 of 3 only after the fix and is labeled so.)
-3. "18 / 18 overload runs" becomes "18 of 18 load runs; 12 of them dropped frames, and in all 12 the counted drops equal the Secure World's gap".
-4. 9,203 and 80,040 are labeled "dropped, total over 3 runs".
-5. "Midterm build: 4.95 ms" becomes "Before the fix: 4.95 ms per frame (measured with instrumentation)". It was measured in November, not at the midterm; the other midterm figures (130/s, 8 s, 7 frames) stay labeled as estimates.
-6. B2 uses "321 on time, 0 late over 320 s".
-7. "8 of 8 late" becomes "8 late answers, counted by both sides".
-8. The 5 promises use the midterm's own words ("HMAC authentication", "Reduce validation latency", "Store validated packets in flash memory", "Rate & flood detection", "End-to-end demo with real measurements"); the artifact had paraphrased two of them.
-9. "Constant-time check" stays (verified).
-10. The demo slide's placeholder line is removed; the slide becomes the video slide.
+## 3. Corrections made to the previous artifact
+1. "32 of 32" removed everywhere; "31 of 32 on the first run".
+2. Category bars show the first run (E 2 of 3, with a note).
+3. "18 / 18 overload runs" became "18 of 18 load runs; in the 12 that dropped frames, counted drops = the gap; 278,204 frames accounted".
+4. Loss figures labeled as totals over 3 runs.
+5. "Midterm build" became "Before the fix (debug build)".
+6. "CPU speed made no difference" was WRONG as a step in the search (before the fix the clock helped 4.6 times); it is now step 2, "a clue, not the cause", and the "no difference" statement applies only after the fix.
+7. The estimates "about 8 s" and "about 130/s" became the measured 9.9 s and 101/s; "7 frames" is labeled calculated.
+8. "8 of 8 late" became "8 late answers, counted by both sides".
+9. Promises use the midterm's own words; promise 3 is "Not built; designed as a forward-secure log".
+10. The demo slide's placeholder is gone; it is the video slide.
 
-## 4. Build plan
-1. Copy the current artifact (12-slide version) as a backup first.
-2. Edit slide by slide in deck order; after each slide render it and check overlaps and text size before the next.
-3. The video slide uses a real still image from a captured run with the color legend; you replace it with your 30-second recording.
-4. Commit and push this script and the final deck notes.
-
-## 5. Decisions (all made by you; none open)
-12 slides; "31 of 32" wording; constant-time kept; xtest and B2 wording as above; loss totals labeled; edit the existing artifact after a backup; you record the video; this file cleaned first.
-Open for you only: the E category bar (2 of 3 on the first run, correction 2).
+## 4. Open items for the presenter
+- Record the 30-second video with `bash scripts/demo_live_stream.sh` and replace the still on slide 10.
+- The preview used fallback fonts (Arial-like); the deck uses Inter and Space Grotesk, which are slightly wider. Slides 3, 8 and 9 have the least slack; check them once in the real viewer.
+- Pictures (the IIT Delhi logo) do not show in my preview; they are in the published deck.

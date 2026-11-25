@@ -1,0 +1,12 @@
+<section id="future" class="fut">
+<div class="head"><p class="eyebrow">FUTURE WORK AND LIMITS</p><h2>Next: a record Linux can never touch</h2></div>
+<div class="cards c2" style="gap:20px">
+<div class="card fw2 blue"><x-icon name="Lock"></x-icon><p class="tag">NEXT · 1 · MIDTERM PROMISE 3</p><h3>Secure audit log</h3><p>Each entry sealed with a key that is then deleted, so past events cannot be rewritten.</p><p class="ref">Schneier and Kelsey; FssAgg; EmLog on OP-TEE</p></div>
+<div class="card fw2 blue"><x-icon name="Trust"></x-icon><p class="tag">NEXT · 2</p><h3>Memory guard at EL2</h3><p>A tiny hypervisor blocks Linux and DMA from secure memory, replacing the missing TZASC.</p><p class="ref">MyTEE, NDSS 2023</p></div>
+<div class="card fw2"><x-icon name="Lightning"></x-icon><p class="tag">NEXT · 3</p><h3>More throughput</h3><p>32 frames use under 2 ms of each 50 ms, so batches can grow past 640 frames/s.</p></div>
+<div class="card fw2"><x-icon name="Key"></x-icon><p class="tag">NEXT · 4</p><h3>Real keys and a flood alarm</h3><p>Key provisioning instead of built-in keys; an alarm when traffic exceeds the rate.</p></div>
+</div>
+<p class="small"><b>Known limits today:</b> the monitor detects but does not block, because the Pi 3 has no TZASC; the keys are prototype keys built into the image; controlling the forwarder service over ssh does not return (E2c, workaround documented, fix queued for the next image). 12 limits are documented in the test report.</p>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Future work in order of importance. First, a forward-secure audit log following Schneier and Kelsey, so that even a compromised Linux cannot alter past evidence: this answers the third trust question. Second, an EL2 stage-2 memory guard, as in MyTEE, to make up for the missing TZASC. Third, larger batches for more throughput, since the CPU is mostly idle. Fourth, proper key provisioning and a separate flood alarm, which completes the rate-and-flood promise.</aside>
+</section>

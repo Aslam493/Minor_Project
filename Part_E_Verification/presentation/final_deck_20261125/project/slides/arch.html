@@ -1,0 +1,33 @@
+<section id="arch">
+<div class="head"><p class="eyebrow">WORK DONE · CURRENT WORK 1 · DESIGN</p><h2>Linux carries frames, Secure World judges them</h2></div>
+<!-- host 1664x430. lanes A 0,0,300,430  B 330,0,1000,430  C 1360,0,304,430
+     nodes top 110 h 160 (bottom 270, mid 190): S 20  K 385  Q 700  F 1015  M 1382 ; width 260 -->
+<div class="host" style="height:430px">
+<div class="lane gray" style="left:0;top:0;width:300px;height:430px"></div>
+<div class="lane nw" style="left:330px;top:0;width:1000px;height:430px"></div>
+<div class="lane sw" style="left:1360px;top:0;width:304px;height:430px"></div>
+<p class="lane-label" style="left:24px;top:24px;width:252px">SENDER PI</p>
+<p class="lane-label nw" style="left:354px;top:24px;width:950px">RECEIVER PI · NORMAL WORLD · LINUX (CORES 0, 2, 3)</p>
+<p class="lane-label sw" style="left:1384px;top:24px;width:256px">SECURE WORLD · CORE 1</p>
+<div class="node" style="left:20px;top:110px;width:260px;height:160px"><p class="t">Sender ECU</p><p class="s">Adds counter and HMAC tag</p></div>
+<div class="node" style="left:385px;top:110px;width:260px;height:160px"><p class="t">CAN chip</p><p class="s">MCP2518FD, 500k / 2M</p></div>
+<div class="node" style="left:700px;top:110px;width:260px;height:160px"><p class="t">Kernel socket</p><p class="s">8 MiB buffer</p></div>
+<div class="node" style="left:1015px;top:110px;width:260px;height:160px"><p class="t">Forwarder</p><p class="s">Queue of 2,048 frames. Holds no key.</p></div>
+<div class="node good" style="left:1382px;top:110px;width:260px;height:160px"><p class="t">Monitor</p><p class="s">ID · HMAC · counter · timers</p></div>
+<x-connector x1="280" y1="190" x2="385" y2="190"></x-connector>
+<x-connector x1="645" y1="190" x2="700" y2="190"></x-connector>
+<x-connector x1="960" y1="190" x2="1015" y2="190"></x-connector>
+<x-connector x1="1275" y1="190" x2="1382" y2="190"></x-connector>
+<x-connector class="dash" x1="1512" y1="270" x2="1512" y2="350" head="none"></x-connector>
+<x-connector class="dash" x1="1512" y1="350" x2="1145" y2="350" head="none"></x-connector>
+<x-connector class="dash" x1="1145" y1="350" x2="1145" y2="270"></x-connector>
+<p class="edge dark" style="left:660px;top:362px;width:660px;text-align:right">Request every 50 ms, up to 32 frames.<br>Linux must answer within 40 ms.</p>
+</div>
+<div class="evo">
+<div class="evo-c"><p class="k">MIDTERM · SECURE WORLD READS THE CHIP</p><p class="v">Dropped: Pi 3 has no TZPC, so Linux can still reach SPI0</p></div>
+<div class="evo-c"><p class="k">STEP 2 · LINUX PUSHES FRAMES</p><p class="v">Not enough: Linux decides when, or whether, to call</p></div>
+<div class="evo-c now"><p class="k">NOW · SECURE WORLD PULLS EVERY 50 MS</p><p class="v">Linux cannot pick the timing; a late or missing answer is evidence</p></div>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Final design. Linux on cores 0, 2 and 3 owns the CAN chip and carries frames; the monitor in Secure World on core 1 judges them and keeps no frames. The design changed twice after midterm. Reading the chip from Secure World gave no real protection, because the Pi 3 has no TZPC to lock SPI0. Letting Linux push frames gave Linux control of the timing. Now Secure World opens a numbered request every 50 ms, the dashed loop, and Linux must answer within 40 ms with up to 32 frames, so a late or missing answer becomes evidence.</aside>
+</section>

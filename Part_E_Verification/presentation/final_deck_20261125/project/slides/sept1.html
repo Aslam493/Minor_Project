@@ -1,0 +1,31 @@
+<section id="sept1" style="gap:22px">
+<div class="head"><p class="eyebrow">WORK DONE · PREVIOUS WORK 1 OF 2 · 23 AUG TO 8 SEP</p><h2>A secure boot chain that gives core 1 to Secure World</h2></div>
+<div class="chain">
+<div class="cbox"><p class="t">Boot ROM</p><p class="s">power on</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">GPU firmware</p><p class="s">bootcode.bin, start.elf</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">TF-A BL1, BL2</p><p class="s">armstub + FIP</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox sec"><p class="t">BL31 · EL3</p><p class="s">secure monitor</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox sec"><p class="t">OP-TEE (BL32)</p><p class="s">Secure World</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="cbox"><p class="t">U-Boot → Linux</p><p class="s">Normal World</p></div>
+</div>
+<p class="body">When Linux asks to start CPU1, BL31 at EL3 intercepts it and sends the core into Secure World for good:</p>
+<div class="cards c4" style="gap:24px">
+<div class="cpu"><p class="t">CPU0</p><p class="s">Linux</p></div>
+<div class="cpu sec"><p class="t">CPU1</p><p class="s">Secure World · rpi3_can_server_loop()</p></div>
+<div class="cpu"><p class="t">CPU2</p><p class="s">Linux</p></div>
+<div class="cpu"><p class="t">CPU3</p><p class="s">Linux</p></div>
+</div>
+<p class="small">Proven on hardware: Linux reports CPU1 offline and sees 3 processors; OP-TEE answers on core 1 (opteed_enter_secure_server_if_core1 in TF-A).</p>
+<div class="cards c3" style="gap:24px">
+<div class="fact-card"><p class="tag">STEPS 1 TO 10 COMPLETE</p><p>Built by hand and booted on the real Pi</p></div>
+<div class="fact-card"><p class="tag">OP-TEE ANSWERS FROM LINUX</p><p>xtest: 114 test cases, 36,114 subtests, 0 failed</p></div>
+<div class="fact-card"><p class="tag">OWN TRUSTED APP</p><p>Challenge and response crossed TrustZone and passed</p></div>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Previous work, part 1, from 23 August to 8 September. I built the secure platform by hand: OP-TEE, TF-A, U-Boot, the Linux kernel and the root file system for the Raspberry Pi 3, in ten steps, and booted it on the real board. The key change is in BL31, the secure monitor at EL3: when Linux brings up CPU1, the request is intercepted and the core is sent into Secure World, where it runs the monitor loop forever. Linux keeps CPU0, 2 and 3. Evidence: OP-TEE answers from Linux, xtest ran 114 test cases and 36,114 subtests with 0 failed, and my own Trusted App completed a challenge and response round trip. This is still how the final system works.</aside>
+</section>

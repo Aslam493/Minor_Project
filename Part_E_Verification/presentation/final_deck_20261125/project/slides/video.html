@@ -1,0 +1,27 @@
+<section id="video" style="gap:20px">
+<div class="head"><p class="eyebrow">VIDEO · THE LIVE DEMO</p><h2>Every verdict in color, live</h2></div>
+<div class="vid">
+<img src="/_blob/74e63ea53187684bbe3493ac83239411" alt="Two terminal windows from a real run on two Raspberry Pis: the sender (top) shows only green sent packets, the receiver (bottom) shows each packet judged by the Secure World, with a colored line and an alert banner for a wrong-ID attack">
+<div style="display:flex;flex-direction:column;gap:16px;flex:1">
+<p class="colhead">COLOR CODE</p>
+<div class="lg">
+<div class="it"><div class="dot" style="background:#4ade80"></div><p>valid <span>accepted</span></p></div>
+<div class="it"><div class="dot" style="background:#ff6b6b"></div><p>tampered</p></div>
+<div class="it"><div class="dot" style="background:#ff8700"></div><p>replay <span>old frame</span></p></div>
+<div class="it"><div class="dot" style="background:#60a5fa"></div><p>duplicate</p></div>
+<div class="it"><div class="dot" style="background:#a855f7"></div><p>conflict <span>same counter</span></p></div>
+<div class="it"><div class="dot" style="background:#f472b6"></div><p>wrong id</p></div>
+<div class="it"><div class="dot" style="background:#facc15"></div><p>counter gap</p></div>
+</div>
+<p class="colhead" style="margin-top:6px">WHAT TO WATCH</p>
+<div class="watch">
+<p>The sender stays green: it does not mark its attacks.</p>
+<p>The receiver colors each one from the Secure World’s own verdict.</p>
+<p>An attack every 2 to 3 s; all six types in about 15 s.</p>
+</div>
+</div>
+</div>
+<p class="note">Still from a real run on two Raspberry Pis, 25 Nov 2026.</p>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Video slide. Play the 30-second recording of the two windows here; until it is added, the still image shows a real run. One command starts both windows: bash scripts/demo_live_stream.sh. The top window is the sender, the car: every packet looks normal and green, and it does not mark its attacks. The bottom window is the receiver: every packet is judged by the Secure World and colored by its verdict. Green is valid. Red is a tampered packet, orange a replay, light blue a duplicate, purple a conflict (same counter, other data), pink a wrong CAN ID, yellow a counter gap. An attack comes every 2 to 3 seconds, and all six types appear in about 15 seconds. The banner at the top of the receiver flashes in the color of the last detection, and the counters show how many of each were seen. The bottom line shows the Secure World's own counters since the board booted. The picture is a still from a real run on the two Pis on 25 November 2026.</aside>
+</section>
