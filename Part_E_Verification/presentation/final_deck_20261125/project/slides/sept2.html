@@ -17,15 +17,15 @@
 <div class="chk-row"><p>CAN ID check</p><p class="n">only ID 0x123</p><p class="sp ok">proven</p></div>
 <div class="chk-row"><p>Replay / counter</p><p class="n">real captured frames</p><p class="sp ok">proven</p></div>
 <div class="chk-row"><p>Timestamp</p><p class="n">continuity only</p><p class="sp ok">proven</p></div>
-<div class="chk-row" style="border-bottom:none"><p>HMAC-SHA256</p><p class="n">too slow, cause on slide 8</p><p class="sp wip">blocked</p></div>
+<div class="chk-row" style="border-bottom:none"><p>HMAC-SHA256</p><p class="n">too slow: see slide 8</p><p class="sp wip">blocked</p></div>
 </div>
 <div class="card" style="width:520px;flex:none;padding:24px 30px;gap:12px">
 <p class="colhead">MILESTONES AT MIDTERM</p>
 <p class="bignum" style="font-size:80px">3 / 7</p>
-<p class="body">proven on hardware, 1 in progress (HMAC), 3 not started (flood, log, final demo)</p>
+<p class="body">proven; HMAC open; flood, log, demo not started</p>
 </div>
 </div>
-<p class="small">Changed later, see slide 6: the Pi 3 has no TZPC to lock the chip, so Linux now drives it and Secure World pulls frames.</p>
+<p class="small">Changed later: see slide 6.</p>
 <div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
 <aside>The second half of the September work: a CAN frame travelled from the MCP2518FD chip on SPI0, through the GPIO25 interrupt routed as a secure FIQ, to core 1, which copied it into a secure buffer and checked it. ID, replay and timestamp checks were proven on real frames. HMAC was blocked because Secure World was unexpectedly slow. Three of seven milestones were proven. After midterm we changed how frames reach Secure World, because on the Pi 3 the SPI controller cannot be locked to Secure World; the next slides show the final design.</aside>
 </section>

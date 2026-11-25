@@ -60,3 +60,9 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 - Record the 30-second video with `bash scripts/demo_live_stream.sh` and replace the still on slide 10.
 - The preview used fallback fonts (Arial-like); the deck uses Inter and Space Grotesk, which are slightly wider. Slides 3, 8 and 9 have the least slack; check them once in the real viewer.
 - Pictures (the IIT Delhi logo) do not show in my preview; they are in the published deck.
+
+## 5. Update 2026-11-25 (second pass: less content, bigger video)
+- Every content slide was trimmed to fewer words; detail moved into the speaker notes. Text sizes were raised where space was freed (slides 2, 3, 6, 8, 9, 11).
+- Slide 10 now shows the video full width (1664 px), re-rendered from the same real recording with 1.4 times larger text and cropped to the useful rows; the closing caption now shows; the spinner glyph was replaced because the font had no braille glyphs.
+- The user had widened the video by hand in the editor (939 px). That edit lived only on the old layout; the new layout replaces it.
+- A page save from the editor happened between two of my publishes; the publish replaced 10 slide files with my local copies. If other hand edits were made in those files, they need to be redone.

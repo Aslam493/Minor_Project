@@ -403,3 +403,27 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .watch p { font-size: 24px; line-height: 1.3; color: var(--soft); }
 .fut { gap: 20px; }
 .fut .fw2 { padding: 14px 28px; }
+.big3 .sota-c .t { font-size: 34px; }
+.big3 .sota-c .s { font-size: 28px; }
+.big3 .prom { padding: 18px 0; }
+.big3 .prom .num { font-size: 36px; }
+.big3 .prom .txt .a { font-size: 32px; }
+.big3 .prom .txt .b { font-size: 28px; }
+.big3 .sp { font-size: 26px; }
+.big3 .colhead { font-size: 26px; }
+.big6 .evo-c .k { font-size: 26px; }
+.big6 .evo-c .v { font-size: 30px; }
+.big8 .steps4 .st .n { font-size: 26px; }
+.big8 .steps4 .st .t { font-size: 32px; line-height: 1.25; }
+.res .proofs .pf .k { font-size: 26px; }
+.res .proofs .pf .v { font-size: 30px; }
+.res .bignum { font-size: 52px; }
+.res .fact .small { font-size: 26px; }
+.res .formula p { font-size: 26px; }
+.res .blabel, .res .bval { font-size: 26px; }
+.fut2 .fw2 { padding: 28px 34px; gap: 12px; }
+.fut2 .fw2 h3 { font-size: 46px; }
+.fut2 .fw2 p { font-size: 32px; }
+.fut2 .fw2 .tag { font-size: 26px; }
+.vid2 { gap: 20px; }
+.vid2 img { width: 1664px; height: 652px; object-fit: contain; border-radius: 12px; }

@@ -1,4 +1,4 @@
-<section id="perf" class="compact" style="gap:20px">
+<section id="perf" class="compact big8" style="gap:24px">
 <div class="head"><p class="eyebrow">WORK DONE · CURRENT WORK 3 · THE SPEED PROBLEM</p><h2>The HMAC blocker was a debug option</h2></div>
 <div class="row" style="gap:64px;align-items:center">
 <div style="display:flex;flex-direction:column;gap:4px;flex:none;width:480px">
@@ -16,12 +16,12 @@
 <div class="vtile in" style="--i:5"><p class="now">32</p><p class="lbl">frames per 50 ms request</p><p class="was">was 7 (calculated)</p></div>
 </div>
 <div class="steps4">
-<div class="st"><p class="n">1 · MEASURE</p><p class="t">4.0 ms + 4.95 ms per frame: only 7 frames fit in 40 ms</p></div>
-<div class="st clue"><p class="n">2 · TRY THE CLOCK</p><p class="t">1200 MHz gave 4.6× per frame: a clue, not the cause (one HMAC still about 1 ms)</p></div>
-<div class="st"><p class="n">3 · FIND THE CAUSE</p><p class="t">CFG_CORE_DEBUG_CHECK_STACKS: 5,060 hook calls, every core call 45 to 100× slower</p></div>
-<div class="st fix"><p class="n">4 · REMOVE IT</p><p class="t">One flag, same source: 54.6 µs per frame; the clock no longer matters</p></div>
+<div class="st"><p class="n">1 · MEASURE</p><p class="t">4.95 ms per frame</p></div>
+<div class="st clue"><p class="n">2 · TRY THE CLOCK</p><p class="t">A faster clock helps: a clue, not the cause</p></div>
+<div class="st"><p class="n">3 · FIND THE CAUSE</p><p class="t">A debug option slows every core call</p></div>
+<div class="st fix"><p class="n">4 · REMOVE IT</p><p class="t">One flag off: 54.6 µs per frame</p></div>
 </div>
-<p class="note">Before-fix values were measured at 600 MHz; 7 frames is calculated from 4.0 + 4.95 n ≤ 40 ms.</p>
+<p class="note">Before-fix values measured at 600 MHz.</p>
 <div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
 <aside>At midterm HMAC was listed as blocked. Measuring showed the whole Secure World was slow: 4.0 ms plus 4.95 ms per frame at 600 MHz, so only about 7 frames fit in one 40 ms answer, and a 1,004-frame burst took 9.9 seconds, about 101 frames per second. Step 2: doubling the clock to 1200 MHz made it 4.6 times faster per frame, which was a clue, but one HMAC still took about a millisecond, far too slow for the work, so the clock was not the cause. Step 3: the cause was a debug option, CFG_CORE_DEBUG_CHECK_STACKS, which compiles the whole core with instrumentation: 5,060 hook calls, so every call into the core was 45 to 100 times slower. Step 4: removing that one flag, with the same source, gives 54.6 microseconds per frame, 32 frames use under 2 ms of each 50 ms period, and the measured burst takes 1.56 seconds. After the fix the clock no longer matters: 1.57 seconds at 600 MHz and 1.56 seconds at 1200 MHz. The same debug option was in the core built on 20 September, the one in use at midterm: its binary contains the stack-check hook functions, while the 30 August core does not. That is the likely reason HMAC looked too slow at midterm; the confirmed measurements are from November. The before-fix figures 9.9 s and 101 frames per second were measured; the 7 frames is calculated from the 40 ms deadline.</aside>
 </section>
