@@ -1,0 +1,17 @@
+<section id="problem" class="tight2">
+<div class="head"><p class="eyebrow">MOTIVATION AND PROBLEM</p><h2>CAN trusts every frame, and Linux can lie about it</h2></div>
+<div class="q3">
+<div class="q"><p class="k">1 · THE MESSAGE</p><p class="v">Is the frame real?</p></div>
+<div class="q"><p class="k">2 · THE DECISION</p><p class="v">Is the check honest?</p></div>
+<div class="q later"><p class="k">3 · THE RECORD · FUTURE</p><p class="v">Is the log safe?</p></div>
+</div>
+<div class="cards c4">
+<div class="card icard warn in" style="--i:0"><x-icon name="Users"></x-icon><h3>Spoofed ID</h3><p>Any node can use any ID</p></div>
+<div class="card icard warn in" style="--i:1"><x-icon name="Wrench"></x-icon><h3>Tampered data</h3><p>Data changed on the way</p></div>
+<div class="card icard warn in" style="--i:2"><x-icon name="Play"></x-icon><h3>Replayed frame</h3><p>An old frame sent again</p></div>
+<div class="card icard warn in" style="--i:3"><x-icon name="Clock"></x-icon><h3>Silence</h3><p>Frames quietly stop</p></div>
+</div>
+<div class="goal in" style="--i:4"><p><b>Goal:</b> detect all four from the Secure World, where Linux cannot hide them.</p></div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Three trust questions, from the midterm: the message, the decision, and the record. This work answers the first two. The third, a log Linux cannot rewrite, is designed but not built, and is the first item of future work. Four ways a CAN stream can be attacked. A checker running in Linux cannot be trusted if Linux itself is compromised: it could hide any of these. So the goal is to judge frames from Secure World, a place Linux cannot change.</aside>
+</section>
