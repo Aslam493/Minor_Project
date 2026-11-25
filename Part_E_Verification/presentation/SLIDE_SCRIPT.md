@@ -77,3 +77,9 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 8. Update 2026-11-25 (background logo)
 - The first and last slides each carry ONE large IIT Delhi seal as a background (blue, 14 percent opacity baked into the picture, behind the text, right side). The old logo file is near-white (made for the dark theme) and is invisible on light, so a blue copy was made: `logo_background_blue.png`.
+
+## 9. Update 2026-11-25 (slide 11 redesigned: secure log in flash)
+- Slide 11 is now about the user's next work item: a secure log in flash (midterm promise 3). It follows `monitor/AUDIT_LOG_DESIGN.md` and `AUDIT_LOG_PLAN.md`: Secure World seals each record (chain tag = HMAC(K_log, previous tag + record)), a Linux logger carries it to the SD card (the only flash on a Pi 3), the newest tag is also copied to the UART as an outside anchor; three protection levels (software, an extra flash chip, a board with a memory firewall).
+- Animation: the chain builds E1 to E5, then E3 turns red ("edited by Linux") and E4, E5 show "chain broken".
+- Honest limits on the slide and in the notes: edits and middle deletions are detected; deleting the end needs the UART copy; a rolled-back SD card cannot be detected without an outside anchor; status "Designed, not built".
+- OPEN WORDING POINT: slide 3 (as dictated) says "designed as a forward-secure log", but the design documents describe a plain HMAC chain (K_log, UART anchor). Forward secrecy (key moves on after each entry) is a stronger option beyond the design and is mentioned that way in the notes. Decide whether slide 3 should say "tamper-evident HMAC-chained log" instead.
