@@ -431,3 +431,9 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .vid3 .head { padding: 0 64px; }
 .vid3 h2 { font-size: 44px; letter-spacing: 0; }
 .vid3 img { width: 1920px; height: 996px; object-fit: contain; }
+/* one color */
+.who .k { color: var(--blue-dark); }
+.who .n, .who .v { color: var(--ink); }
+.who .s { color: var(--soft); }
+.who .cell { border-left-color: #CFCAbd; }
+.logo-wm { opacity: 0.08; }

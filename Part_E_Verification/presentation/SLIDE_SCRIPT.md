@@ -70,3 +70,7 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 ## 6. Update 2026-11-25 (third pass: full-slide video)
 - Slide 10 is now a medium heading plus the video filling the rest of the slide (1920 x 994 frame, 60 s, 12.5 MB), dark background, no footer. The video was re-rendered taller from the same real recording: sender 5 dashboard rows + 4 packet lines, receiver 5 dashboard rows + 14 packet lines + the Secure World counters line, caption bar at the bottom.
 - Before this publish the live artifact had a newer version saved from the editor (the user had moved the heading and made the video 796 px high by hand). Only `video.html` and `deck.css` differed from my copies; the CSS had no user change; the new layout replaces the video-slide edit, which pointed in the same direction.
+
+## 7. Update 2026-11-25 (one color)
+- All 12 slides now use the same light background. The cover, closing and video slides were dark; they are light now (cover name and institute text recolored for contrast).
+- The small IIT Delhi logo is removed from the first and last slides. The big faint logo copy was near-white (made for the dark background), invisible on light, so it was removed too.
