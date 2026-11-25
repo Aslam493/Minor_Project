@@ -21,3 +21,8 @@ the Secure World would need a new Secure World image (not done).
 Honest note: for this demo the sender's RAM holds the key (it plays the car's trusted ECU); `demo_stream_setup.py --remove-key` takes it away again. The receiver's forwarder has none.
 Rehearsal 2026-11-24: 400 packets, 10 attacks (tamper, replay, duplicate, conflict, wrong id, jump, tamper, duplicate, conflict, replay) coloured on exactly the right packets;
 2 minutes with `--auto`: 1200 packets seen, 16 attacks coloured, heartbeat unchanged (LATE_ANSWER 1 -> 1, 0 misses).
+
+## Dashboard layout (both windows)
+Top 5 rows stay fixed: title with a spinner, the colour counters (they are also the legend), a live speed sparkline, and an alert strip on the receiver
+(flashes in the packet's colour for 2 s, then shows the last detection). The sender shows speed and rpm sparklines with gauges. The packets scroll
+below. The receiver's last line shows the Secure World's own counters since boot. Windows with 14 rows or fewer fall back to the plain scrolling view.

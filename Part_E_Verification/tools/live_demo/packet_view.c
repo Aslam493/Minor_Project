@@ -49,9 +49,11 @@ struct item {
 static struct item q[MAXI]; static int nq;
 static volatile sig_atomic_t stop;
 static uint64_t t0_ticks; static int bar = 1, rows = 24;
+#define TOP 5                                   /* rows of the dashboard at the top */
+static int cols = 120; static unsigned cnt[7], n_bus; static double spd[64]; static unsigned nspd;      /* cnt: ok, tampered, replay, duplicate, conflict, wrong id, gap */
 static unsigned pkts_total, run_ok, run_bad;                          /* packets shown in this run */
 static char alert_txt[200]; static const char *alert_col; static uint64_t alert_ticks;      /* the last detection, shown in the banner */
-static struct mon_status0 cs0; static struct mon_status1 cs1; static int have_stats; static unsigned base[5]; static int have_base;
+static struct mon_status0 cs0; static struct mon_status1 cs1; static int have_stats;
 
 static uint64_t cntvct(void) { uint64_t v; __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(v)); return v; }
 static void on_sig(int s) { (void)s; stop = 1; }
@@ -122,8 +124,11 @@ static const char *speed_bar(double kmh)                      /* speed bar: 12 c
 static void print_item(const struct item *it)
 {
 	double t = (double)(it->ticks - t0_ticks) / 19200000.0; char line[300];
-	if (it->kind == MSG) { printf("%st+%7.2f  %s%s\n", it->col, t, it->why, CEND); return; }
+	if (it->kind == MSG) { n_bus++; printf("%st+%7.2f  %s%s\n", it->col, t, it->why, CEND); return; }
 	pkts_total++;
+	if (it->decode) spd[nspd++ % 64] = (double)(it->payload >> 16) / 10.0;
+	if (it->col == CGREEN) cnt[0]++; else if (it->col == CRED) cnt[1]++; else if (it->col == CORANGE) cnt[2]++; else if (it->col == CBLUE) cnt[3]++;
+	else if (it->col == CPURPLE) cnt[4]++; else if (it->col == CPINK) cnt[5]++; else if (it->col == CYEL) cnt[6]++;
 	if (it->col == CGREEN) run_ok++;
 	else { run_bad++; snprintf(alert_txt, sizeof alert_txt, "%s", it->why); alert_col = it->col; alert_ticks = cntvct(); }
 	if (it->decode)
@@ -152,25 +157,52 @@ static void flush(uint64_t now)
 
 static void paint(void)
 {
-	unsigned i, v[5] = {0, 0, 0, 0, 0}, run[5]; char l1[500], l2[700]; static uint64_t t_start, t_last; static unsigned n_last; static double rate;
-	uint64_t now = cntvct(); double age;
+	static const char *spark[8] = {"\xe2\x96\x81", "\xe2\x96\x82", "\xe2\x96\x83", "\xe2\x96\x84", "\xe2\x96\x85", "\xe2\x96\x86", "\xe2\x96\x87", "\xe2\x96\x88"};
+	static const char *spin[10] = {"\xe2\xa0\x8b", "\xe2\xa0\x99", "\xe2\xa0\xb9", "\xe2\xa0\xb8", "\xe2\xa0\xbc", "\xe2\xa0\xb4", "\xe2\xa0\xa6", "\xe2\xa0\xa7", "\xe2\xa0\x87", "\xe2\xa0\x8f"};
+	char L1[400], L2[700], L3[900], L4[600], L5[600], sp[900] = ""; uint64_t now = cntvct(); double age; int k, nn, top;
+	static uint64_t t_start, t_last; static unsigned n_last; static double rate; unsigned hb_ok;
 	if (!bar || !have_stats) return;
-	for (i = 0; i < MON_EVENT_TYPES; i++) {
-		const char *n = mon_event_name(i);
-		if (is(n, "AUTH_FAIL")) v[0] = cs1.ev_count[i]; else if (is(n, "REPLAY")) v[1] = cs1.ev_count[i]; else if (is(n, "MALFORMED")) v[2] = cs1.ev_count[i];
-		else if (is(n, "COUNTER_GAP")) v[3] = cs1.ev_count[i]; else if (is(n, "TIMEOUT")) v[4] = cs1.ev_count[i];
-	}
-	if (!have_base) { memcpy(base, v, sizeof base); have_base = 1; t_start = now; t_last = now; }
-	for (i = 0; i < 5; i++) run[i] = v[i] - base[i];
+	if (!t_start) { t_start = now; t_last = now; }
 	if (now - t_last >= 19200000ULL) { rate = (double)(pkts_total - n_last) * 19200000.0 / (double)(now - t_last); n_last = pkts_total; t_last = now; }
+	hb_ok = !strcmp(mon_hbstate_name(cs0.hb_state), "ANSWERED");
 	age = (double)(now - alert_ticks) / 19200000.0;
-	if (alert_col && age < 4.0)
-		snprintf(l1, sizeof l1, "%s\033[7m  \xe2\x9a\xa0 DETECTED  %s \033[0m", alert_col, alert_txt);
-	else
-		snprintf(l1, sizeof l1, "\033[38;5;245m  \xe2\x97\x8f watching: no alert in the last 4 seconds\033[0m");
-	snprintf(l2, sizeof l2, "\033[48;5;236;97m THIS RUN \033[48;5;236;32m %u packets \xe2\x9c\x94 %u ok \033[38;5;245m\xe2\x94\x82\033[1;31m tampered %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;208m replay %u \033[38;5;245m\xe2\x94\x82\033[38;5;213m wrong id %u \033[38;5;245m\xe2\x94\x82\033[1;33m gaps %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;245m %.0f pkt/s \xe2\x94\x82 %.0f s \xe2\x94\x82 heartbeat %s \xe2\x94\x82 core 1 loop %" PRIu64 " ",
-		 pkts_total, run_ok, run[0], run[1], run[2], run[3], rate, (double)(now - t_start) / 19200000.0, mon_hbstate_name(cs0.hb_state), (uint64_t)cs0.poll_count);
-	printf("\0337\033[%d;1H\033[2K%s\033[0m\033[%d;1H\033[2K%s\033[K\033[0m\0338", rows - 1, l1, rows, l2); fflush(stdout);
+	/* row 1: title */
+	snprintf(L1, sizeof L1, "\033[1;38;5;75m\xe2\x95\xad\xe2\x94\x80\033[48;5;24;97m %s  RECEIVER \xc2\xb7 SECURE WORLD  LIVE \033[0m\033[38;5;75m\xe2\x94\x80\033[0m  %s\xe2\x99\xa5 heartbeat %s\033[0m   \033[38;5;245mcore 1 loop %" PRIu64 "   %.0f pkt/s   %.0f s\033[0m",
+		 spin[(now / 1920000ULL) % 10], hb_ok ? "\033[32m" : "\033[1;31m", mon_hbstate_name(cs0.hb_state), (uint64_t)cs0.poll_count, rate, (double)(now - t_start) / 19200000.0);
+	/* row 2: counters = legend */
+	snprintf(L2, sizeof L2, "\033[38;5;75m\xe2\x94\x82\033[0m %s\xe2\x97\x8f valid %u%s  %s\xe2\x97\x8f tampered %u%s  %s\xe2\x97\x8f replay %u%s  %s\xe2\x97\x8f duplicate %u%s  %s\xe2\x97\x8f conflict %u%s  %s\xe2\x97\x8f wrong id %u%s  %s\xe2\x97\x8f gap %u%s  %s\xe2\x97\x8f bus events %u%s",
+		 CGREEN, cnt[0], CEND, CRED, cnt[1], CEND, CORANGE, cnt[2], CEND, CBLUE, cnt[3], CEND, CPURPLE, cnt[4], CEND, CPINK, cnt[5], CEND, CYEL, cnt[6], CEND, CGREY, n_bus, CEND);
+	/* row 3: speed sparkline (last 48 packets) */
+	nn = nspd < 48 ? (int)nspd : 48;
+	{
+		double mn = 1e9, mx = -1e9, rg;
+		for (k = nn; k > 0; k--) { double v = spd[(nspd - k) % 64]; if (v < mn) mn = v; if (v > mx) mx = v; }
+		rg = mx - mn < 8.0 ? 8.0 : mx - mn;                                     /* scaled to the recent range so the movement is visible */
+		for (k = nn; k > 0; k--) { double v = spd[(nspd - k) % 64]; int l = (int)(7.99 * (v - mn) / rg); if (l < 0) l = 0; if (l > 7) l = 7; strcat(sp, spark[l]); }
+	}
+	snprintf(L3, sizeof L3, "\033[38;5;75m\xe2\x94\x82\033[0m \033[38;5;245mspeed\033[0m \033[1;38;5;81m%s\033[0m %5.1f km/h", sp, nn ? spd[(nspd - 1) % 64] : 0.0);
+	/* row 4: the alert strip */
+	if (alert_col && age < 1.8) snprintf(L4, sizeof L4, "\033[38;5;75m\xe2\x94\x82\033[0m %s\033[7m  \xe2\x96\xb6\xe2\x96\xb6 DETECTED  %s  \033[0m", alert_col, alert_txt);
+	else if (alert_col && age < 6.0) snprintf(L4, sizeof L4, "\033[38;5;75m\xe2\x94\x82\033[0m %s\xe2\x96\xb6 last detection: %s\033[0m", alert_col, alert_txt);
+	else snprintf(L4, sizeof L4, "\033[38;5;75m\xe2\x94\x82\033[0m \033[38;5;245m\xe2\x97\x8f watching the bus ... no alert in the last 6 seconds\033[0m");
+	/* row 5: rule */
+	top = 0; L5[0] = 0; strcat(L5, "\033[38;5;75m\xe2\x95\xb0");
+	for (k = 0; k < cols - 2 && k < 200; k++) strcat(L5, "\xe2\x94\x80");
+	strcat(L5, "\033[0m"); (void)top;
+	printf("\0337\033[1;1H\033[2K%s\033[2;1H\033[2K%s\033[3;1H\033[2K%s\033[4;1H\033[2K%s\033[5;1H\033[2K%s\033[0m", L1, L2, L3, L4, L5);
+	/* bottom line: the Secure World's own totals since it booted */
+	{
+		unsigned i, v[5] = {0, 0, 0, 0, 0}; char l6[600];
+		for (i = 0; i < MON_EVENT_TYPES; i++) {
+			const char *n = mon_event_name(i);
+			if (is(n, "AUTH_FAIL")) v[0] = cs1.ev_count[i]; else if (is(n, "REPLAY")) v[1] = cs1.ev_count[i]; else if (is(n, "MALFORMED")) v[2] = cs1.ev_count[i];
+			else if (is(n, "COUNTER_GAP")) v[3] = cs1.ev_count[i]; else if (is(n, "TIMEOUT")) v[4] = cs1.ev_count[i];
+		}
+		snprintf(l6, sizeof l6, "\033[48;5;236;97m SECURE WORLD OWN COUNTERS (since boot) \033[48;5;236;32m judged %u \033[38;5;245m\xe2\x94\x82\033[1;31m AUTH_FAIL %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;208m REPLAY %u \033[38;5;245m\xe2\x94\x82\033[38;5;213m MALFORMED %u \033[38;5;245m\xe2\x94\x82\033[1;33m GAP %u \033[38;5;245m\xe2\x94\x82\033[0;48;5;236;38;5;245m TIMEOUT %u ",
+			 cs1.v_frame_total, v[0], v[1], v[2], v[3], v[4]);
+		printf("\033[%d;1H\033[2K%s\033[K\033[0m\0338", rows, l6);
+	}
+	fflush(stdout);
 }
 
 static void draw_bar(const struct mon_status0 *s0, const struct mon_status1 *s1)
@@ -184,7 +216,7 @@ int main(int argc, char **argv)
 	uint32_t first_seq; uint64_t last_poll = 0, last_bar = 0; unsigned n = 0; struct winsize w;
 	for (i = 1; i < argc; i++) { if (!strcmp(argv[i], "--iface") && i + 1 < argc) ifn = argv[++i]; else if (!strcmp(argv[i], "--no-bar")) bar = 0; }
 	signal(SIGINT, on_sig); signal(SIGTERM, on_sig);
-	if (ioctl(1, TIOCGWINSZ, &w) == 0 && w.ws_row > 6) rows = w.ws_row; else bar = 0;
+	if (ioctl(1, TIOCGWINSZ, &w) == 0 && w.ws_row > 14) { rows = w.ws_row; if (w.ws_col > 40) cols = w.ws_col; } else bar = 0;
 	r = mon_open(&c); if (r) { fprintf(stderr, "cannot open the Secure World monitor: 0x%x\n", r); return 1; }
 	memset(&s0, 0, sizeof s0); memset(&s1, 0, sizeof s1);
 	RETRY(mon_get_status0(&c, &s0, &h), r); if (r) { fprintf(stderr, "status read failed: 0x%x\n", r); return 1; }
@@ -197,12 +229,14 @@ int main(int argc, char **argv)
 	if (bind(s, (struct sockaddr *)&ad, sizeof ad)) { perror("bind"); return 1; }
 	fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK);
 	t0_ticks = cntvct();
-	if (bar) printf("\033[2J\033[1;1H\033[1;%dr", rows - 2);
+	if (bar) printf("\033[2J\033[%d;%dr\033[%d;1H", TOP + 1, rows - 1, TOP + 1);
+	if (!bar) {
 	printf("\033[1;38;5;75m\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80 RECEIVER \xc2\xb7 SECURE WORLD VIEW \xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\033[0m\n");
 	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m every packet on %s, judged by the Secure World (Ctrl+C to stop)\n", ifn);
 	printf("\033[1;38;5;75m\xe2\x94\x82\033[0m %s\xe2\x97\x8f valid%s  %s\xe2\x97\x8f tampered%s  %s\xe2\x97\x8f replay%s  %s\xe2\x97\x8f duplicate%s  %s\xe2\x97\x8f conflict%s  %s\xe2\x97\x8f wrong id%s  %s\xe2\x97\x8f counter gap%s  %s\xe2\x97\x8f bus events%s\n",
 	       CGREEN, CEND, CRED, CEND, CORANGE, CEND, CBLUE, CEND, CPURPLE, CEND, CPINK, CEND, CYEL, CEND, CGREY, CEND);
 	printf("\033[1;38;5;75m\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\033[0m\n\n");
+	}
 	while (!stop) {
 		struct pollfd pf = { s, POLLIN, 0 }; uint64_t now;
 		poll(&pf, 1, 50);

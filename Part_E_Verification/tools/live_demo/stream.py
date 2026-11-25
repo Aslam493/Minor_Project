@@ -68,16 +68,27 @@ def main():
     if old: tty.setcbreak(fd)
     try: rows = os.get_terminal_size().lines if sys.stdout.isatty() else 0
     except OSError: rows = 0
-    if rows > 8: sys.stdout.write("\033[2J\033[1;1H"); sys.stdout.flush()
-    if rows > 8: sys.stdout.write("\033[1;%dr" % (rows - 1)); sys.stdout.flush()
-    B = lambda t: C("1;38;5;75", t)
-    print(B("\u256d\u2500\u2500\u2500 SENDER \u00b7 CAR ECU " + "\u2500" * 28))
-    print(B("\u2502") + " a new signed packet every %.0f ms.  Keys: t r d c w j (attacks)  a auto on/off  p pause  + - speed  q quit" % (1000.0 / rate))
-    if show:
-        print(B("\u2502") + " " + "   ".join([GREEN("\u25cf valid"), RED("\u25cf t tampered"), ORANGE("\u25cf r replay"), BLUE("\u25cf d duplicate"), PURPLE("\u25cf c conflict"), PINK("\u25cf w wrong id"), YEL("\u25cf j gap")]))
-    else:
-        print(B("\u2502") + " " + DIM("this window looks like a normal sender: every packet is green. Only the RECEIVER shows which ones are attacks."))
-    print(B("\u2570" + "\u2500" * 60) + "\n")
+    TOPR = 5; dash = rows > 14                                 # the dashboard uses the top 5 rows
+    hist_s, hist_r = deque(maxlen=48), deque(maxlen=48)
+    SPARK = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"; SPIN = "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
+    def spark(h, m):                                  # scaled to the recent range so the movement is visible
+        if not h: return ""
+        mn, mx = min(h), max(h); rg = max(mx - mn, m * 0.07)
+        return "".join(SPARK[max(0, min(7, int(7.99 * (v - mn) / rg)))] for v in h)
+    gauge = lambda v, m: "\u2588" * max(0, min(20, int(20 * v / m))) + "\u2591" * (20 - max(0, min(20, int(20 * v / m))))
+    CY = lambda t: C("1;38;5;75", t)
+    def paint(sent_n, now_t):
+        if not dash: return
+        sk = SPIN[int(now_t * 10) % 10]; kmh = hist_s[-1] if hist_s else 0.0; rpm = hist_r[-1] if hist_r else 0
+        mode = ("AUTO-ATTACKS ON (every %.0f-%.0f s)" % (lo, hi)) if auto else "auto-attacks off: press t r d c w j"
+        r1 = CY("\u256d\u2500") + C("48;5;24;97", " %s  SENDER \u00b7 CAR ECU  LIVE " % sk) + CY("\u2500") + "  " + C("32", "\u25cf %d packets sent" % sent_n) + "   " + C("38;5;245", "%.0f pkt/s   %.0f s" % (rate, now_t))
+        r2 = CY("\u2502") + " " + C("38;5;245", "speed") + " " + C("1;38;5;81", spark(hist_s, 120.0)) + " %5.1f km/h  " % kmh + C("38;5;81", gauge(kmh, 120.0))
+        r3 = CY("\u2502") + " " + C("38;5;245", "rpm  ") + " " + C("1;38;5;213", spark(hist_r, 3500.0)) + " %5d rpm   " % rpm + C("38;5;213", gauge(rpm, 3500.0))
+        r4 = CY("\u2502") + " " + C("38;5;245", mode + ("" if show else "   \u00b7   this window looks like a normal sender: the attacks are shown only by the RECEIVER"))
+        r5 = CY("\u2570" + "\u2500" * 70)
+        sys.stdout.write("\0337" + "".join("\033[%d;1H\033[2K%s" % (i + 1, t) for i, t in enumerate((r1, r2, r3, r4, r5))) + "\033[0m\0338"); sys.stdout.flush()
+    if dash: sys.stdout.write("\033[2J\033[%d;%dr\033[%d;1H" % (TOPR + 1, rows, TOPR + 1)); sys.stdout.flush()
+    else: sys.stdout.write(CY("SENDER") + " (small window: no dashboard)\n")
     nxt = time.monotonic(); t0 = nxt
     try:
         while True:
@@ -114,11 +125,8 @@ def main():
                 if kind: attacks += 1; last_attack = now
                 line = "t+%7.1f #%-6d id 0x%03X  %s" % (now - t0, sent, cid, describe(data))
                 print((col(line + "   <-- " + label) if (label and show) else GREEN(line + "   \u2714 sent")))      # default: the sender does NOT reveal its attacks, every line looks normal
-                if rows > 8 and sent % 3 == 0:
-                    p_ = struct.unpack("<II", data[:8])[1]; kmh = (p_ >> 16) / 10.0; rpm = (p_ & 0xFFFF) * 50
-                    g = lambda v, m: "\u2588" * max(0, min(16, int(16 * v / m))) + "\u2591" * (16 - max(0, min(16, int(16 * v / m))))
-                    sys.stdout.write("\0337\033[%d;1H\033[2K\033[48;5;236;97m SENDER \033[48;5;236;32m %d packets sent \033[38;5;245m\u2502\033[38;5;75m speed %5.1f %s \033[38;5;245m\u2502\033[38;5;213m rpm %5d %s \033[38;5;245m\u2502 %.0f pkt/s \033[K\033[0m\0338" % (rows, sent, kmh, g(kmh, 120.0), rpm, g(rpm, 3500.0), rate))
-                    sys.stdout.flush()
+                p_ = struct.unpack("<II", data[:8])[1]; hist_s.append((p_ >> 16) / 10.0); hist_r.append((p_ & 0xFFFF) * 50)
+                if sent % 2 == 0: paint(sent, now - t0)
                 if sent % 20 == 0:
                     json.dump({"next": c}, open(STATE, "w"))
             r, _, _ = select.select([fd] if old else [], [], [], max(0.0, min(0.05, nxt - time.monotonic())))
@@ -136,7 +144,7 @@ def main():
         pass
     finally:
         if old: termios.tcsetattr(fd, termios.TCSADRAIN, old)
-        if rows > 8: sys.stdout.write("\033[r\033[%d;1H" % rows)
+        if dash: sys.stdout.write("\033[r\033[%d;1H" % rows)
         json.dump({"next": c}, open(STATE, "w"))
         print("\nstopped. packets sent: %d, attacks injected: %d, next counter: %d" % (sent, attacks, c))
     return 0
