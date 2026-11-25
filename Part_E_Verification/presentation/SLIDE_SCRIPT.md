@@ -1,72 +1,63 @@
-# Final presentation: slide script (TEMPORARY, for review before the slides are built)
+# Final presentation: slide script (TEMPORARY; decisions made, facts verified, not yet built)
 
-Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam.
+Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Deck: **12 slides**, built by editing the existing artifact (a copy of the current version is kept first). Every slide is rendered and checked before the next one.
 
-## 0. The structure that must be followed (from the course)
-| # | Required part | Our slides |
-|---|---|---|
-| 1 | Title slide | Slide 1 |
-| 2 | Motivation, and the problem we want to solve | Slide 2 |
-| 3 | State of the art we want to beat, and what we promised for the end-sem | Slide 3 |
-| 4 | Work done | Slides 4 to 11 (previous work = 2 slides, current work = 6 slides) |
-| 5 | Video, if any | Slide 12 (the recording of the live stream) |
-| - | Closing | Slide 13 (thanks) |
+## 1. The 12 slides (one numbering)
+Required course structure: 1 title, 2 motivation and problem, 3 state of the art and promises, 4 work done, 5 video.
 
-## 1. The 13 slides
-| # | Slide | One message | Main content |
+| # | Slide | Message | Content (what is folded in) |
 |---|---|---|---|
 | 1 | Title | Secure CAN Monitor on Raspberry Pi 3 | Name, supervisor, IIT Delhi, "Final Evaluation, November 2026", one-line claim |
-| 2 | Motivation and problem | CAN trusts every frame, and Linux can lie about it | 4 attacks (spoofed ID, tampered data, replay, silence); the 3 trust questions (the message, the decision, the record); goal in one line |
-| 3 | State of the art and our promise | What exists, what we promised, how far we got | Left: 3 approaches today compared on 3 criteria. Right: the 5 midterm promises with status (HMAC done, latency done, flood partly, real demo done, secure log designed). |
-| 4 | Work done, previous 1: the secure platform (23 Aug to 8 Sep) | I built the secure platform by hand and proved it on the board | Boot flow, core 1 goes to the Secure World; Steps 1 to 10; xtest 114 cases 0 failed; own Trusted App |
-| 5 | Work done, previous 2: CAN in the Secure World (14 to 24 Sep) | The first CAN frames were checked in the Secure World; HMAC was open | CAN chip, GPIO25, secure FIQ on core 1, capture, first checks; 3 of 7 milestones at midterm |
-| 6 | Work done, current 1: design | Linux carries frames, the Secure World judges them | Design diagram (request every 50 ms, up to 32 frames, answer within 40 ms); how the design changed from midterm |
-| 7 | Work done, current 2: checks and attacks | 9 attacks on the real bus, 9 caught, each at the right check | Attack, check, verdict table; order of checks |
-| 8 | Work done, current 3: timing | The Secure World keeps the time, so silence and delay become evidence | The five timers; measured: 5 minutes of heartbeat 0 late, 6,361 requests on time, late answers 8 of 8 detected |
-| 9 | Work done, current 4: the speed problem | The HMAC "blocker" was a debug option | 4 steps of the search; 90 times faster; 640 frames/s; 32 frames per request |
-| 10 | Work done, current 5: loss accounting | Every frame is judged or counted | The accounting formula; 0 lost up to 640 frames/s and bursts of about 2,490 frames; 18 of 18 overload runs exact |
-| 11 | Work done, current 6: verification, limits, future | Claims are backed by a test report; limits are stated | 31 of 32 on the first run (corrected), 12 limits; what Linux cannot see; future work strip |
-| 12 | Video | The verdict of the Secure World, live, in color | The 30-second recording of the two windows, with a real still image and the color legend |
-| 13 | Thanks | Every frame judged in the Secure World. Every lost frame counted. | Name, supervisor, "Questions welcome" |
+| 2 | Motivation and problem | CAN trusts every frame, and Linux can lie about it | 4 attacks; the 3 trust questions (message, decision, record); goal |
+| 3 | State of the art and promises | What exists, what we promised, how far we got | 3 approaches on 3 criteria; the 5 midterm promises in the midterm's own words, with status |
+| 4 | Work done, previous 1: the secure platform (23 Aug to 8 Sep) | Built by hand, proven on the board | Boot flow, core 1; Steps 1 to 10; xtest "114 test cases, 36,114 subtests, 0 failed"; own Trusted App |
+| 5 | Work done, previous 2: CAN in the Secure World (14 to 24 Sep) | First CAN frames checked in the Secure World; HMAC open | CAN chip, GPIO25, secure FIQ on core 1, capture, first checks; 3 of 7 milestones |
+| 6 | Work done, current 1: design | Linux carries frames, the Secure World judges them | Diagram; request every 50 ms, 32 frames, 40 ms; how the design changed |
+| 7 | Work done, current 2: checks, attacks and timing | 9 attacks, 9 caught, each at the right check | Attack table; **timing values folded in**: 5 timers; B2 321 answers on time over 320 s, 0 late; B3 6,361 requests on time; 8 late answers counted (C9) |
+| 8 | Work done, current 3: the speed problem | The HMAC "blocker" was a debug option | **The 4-step search folded in**; 90 times faster; 640 frames/s; 32 frames per request |
+| 9 | Work done, current 4: results, loss accounting, trust proofs | Every frame judged or counted; claims backed by a report | **Loss formula and trust proofs folded in**; the 5 category bars (first run); 31 of 32; limits |
+| 10 | Video | The Secure World's verdict, live, in color | 30-second recording (you record with `scripts/demo_live_stream.sh`); real still image with the color legend until then; no placeholder text |
+| 11 | Future work and limits | What is left, stated openly | Forward-secure log, EL2 memory guard, more throughput, key provisioning plus flood alarm; limits |
+| 12 | Thanks | Every frame judged in the Secure World. Every lost frame counted. | Name, supervisor, "Questions welcome" |
 
-If 13 is too long: drop slide 8 first, merge slide 10 into slide 9, merge slide 11 into slide 3 (the scorecard already holds the status). That gives 10 slides.
-
-## 2. Review of the 12 slides now in the artifact (content read; layout NOT yet rendered)
-| Existing slide | What it holds | Problems found | Improvement |
-|---|---|---|---|
-| cover | Title, claim, name, supervisor | None | Keep |
-| problem | 4 attack cards, goal | The third trust question (the record) is missing, though the midterm asked all three | Add the 3 trust questions as a one-line strip; link the third to future work |
-| sota | 3 approaches; 5 promises with status | (a) "32 of 32 tests pass" is not what the report says (31 PASS, 1 FAIL, fixed later); (b) "constant-time check" is not backed by anything I verified; (c) "to beat" is vague | (a) use the corrected wording; (b) remove it or verify it first; (c) compare the 3 approaches on 3 clear criteria: works when Linux is compromised, needs extra hardware, counts what it lost |
-| sept1 | Boot chain, cores | Good; no dates; the xtest evidence is missing | Add dates (23 Aug to 8 Sep) and the evidence strip: Steps 1 to 10, xtest 114 cases 0 failed, own Trusted App |
-| sept2 | CAN chip to checks, 3 of 7 | Good | Add one arrow "changed later, see slide 6" so the story is continuous |
-| arch | Design diagram, 3-box evolution | Built with absolute positions; overlaps unchecked | Render and check each box; make sure the forwarder is labeled "no key" |
-| attacks | 9 attacks as a wall diagram | Dense (10 rows); small text risk | Render; keep only if every label is readable, else use a plain table |
-| perf | 90 times, bars, three tiles | Good; the midterm estimates are footnoted | Keep; add the 4-step search so the process shows |
-| results | 32 of 32, bars, loss bars | **Wrong test count**; category counts (4 of 4, 3 of 3, 10 of 10, 12 of 12, 3 of 3) must be recomputed; loss figures (9,203 and 80,040) must be checked against `results.json` | Recompute everything from `baseline/final_campaign/results.json` |
-| demo | Terminal sketch and 6-step table | A placeholder line is still on it ("add recording link here"); the steps are outdated (the live stream replaced them) | Replace with the Video slide: recording plus a real still |
-| future | 4 cards | Good | Shrink into a strip on slide 11 |
-| close | Thank you | Good | Keep |
-
-Layout check: I have not rendered the existing slides. Every slide I build is rendered and checked before the next one.
-
-## 3. Numbers to correct before the deck is final
-| Claim in the artifact | Fact in the report | Proposed wording |
+## 2. Verified facts (checked on 2026-11-25 against the files; these are the only values the slides may use)
+| Claim | Result | Source |
 |---|---|---|
-| "32 of 32 tests pass" (results and sota slides) | Campaign 31 PASS / 1 FAIL / 12 documented limits. E2b (forwarder at boot) failed, was fixed by the service image and now passes. E2c (service control over ssh) is a known limit. | "31 of 32 on the first run; the one failure was fixed and re-tested; 12 limits documented." |
-| Category bars | Counts must be recomputed from the report rows | Recompute from `results.json`. |
-| Loss figures | Check each against the result files | Verify when the slide is built. |
+| Constant-time tag compare | CONFIRMED: ORs the XOR of all 32 bytes, no early exit | `optee_full/.../plat-rpi3/rpi3_can_monitor.c:53` (function), `:621` (use, 32 bytes) |
+| xtest wording | CONFIRMED: "114 test cases, 36,114 subtests, 0 failed" | `README.md:170` |
+| 32 original cases, categories A4 / B3 / C10 / D12 / E3 | CONFIRMED (32 cases) | `baseline/final_campaign/results.json` |
+| First-run result | 31 PASS, 1 FAIL (E2b). By category: A 4 of 4, B 3 of 3, C 10 of 10, D 12 of 12, **E 2 of 3** | results.json |
+| Post-flash | E2b fixed and passes (E2br); FAIL rows E2ar, A2r, B1r each have a passing rerun (E2ar2, A2r2, B1r2); E2c is a known limit (F12), fix queued | results.json, report lines 70 to 90 |
+| B2 heartbeat | 321 answers on time, 0 late, over 320 s (forwarder counters). The 311 is only the heartbeat log buffer (full at about 300 s). | `FINAL_TEST_REPORT.md` B2 row |
+| B3 | 6,361 requests, all on time | results.json |
+| C9 late answers | The forwarder saw 8 LATE and the Secure World counted +8 (this may include one heartbeat) | results.json |
+| 9,203 and 80,040 dropped | CONFIRMED as TOTALS over 3 runs: D5c 3 x 14,000 = 42,000 sent, 9,203 dropped; D5a 3 x 35,000 = 105,000 sent, 80,040 dropped | results.json D5c, D5a |
+| Frames accounted | 278,204 in D1 to D5e (sum of the series), so "over 270,000" is correct | results.json |
+| "18 of 18 runs" | The report's 18 are the load runs of D4 to D5e (6 series x 3). Only 12 of them dropped frames (D4, D5a, D5c, D5e). | report line 10 |
+| Lossless limit | 640 frames/s sustained; bursts up to about 2,490 frames at 3,587 frames/s | report PACKET_LOSS_VERDICT |
+| Speed | 54.6 microseconds per valid frame, 6.7 microseconds per wrong ID; 1,004-frame burst 1.56 s (median 1.57 at 600 MHz, 1.56 at 1200 MHz, so CPU speed made no difference) | C5b, D1a, D1b |
+| 4.95 ms per frame | Measured with instrumentation as "4.0 ms + 4.95 ms per packet" on the debug build (before the fix) | `REAL_BUS_RESULTS.md:200`, `baseline/BURST_STEPS_RESULTS_20261121.md:35` |
+| Root cause | CFG_CORE_DEBUG_CHECK_STACKS=y (5,060 hook calls) | `REAL_BUS_RESULTS.md:236` |
+| E1 restarts | 10 of 10 as designed | results.json |
 
-## 4. The previous work in two slides (what is shown)
-- Slide 4 (23 Aug to 8 Sep): Steps 1 to 7 built OP-TEE, TF-A, U-Boot, kernel and root file system; SD image verified; Steps 8 to 10 booted on the real Pi, OP-TEE 4.10 answers, xtest 114 cases with 0 failures, own Trusted App round trip.
-- Slide 5 (14 to 24 Sep): CAN shield (MCP2518FD), simulated then real CAN pipeline, Secure World checks and classification, the chip interrupt reaching the Secure World, core 1 reserved for the Secure World; midterm: 3 of 7 milestones proven, HMAC blocked. Dead ends (a failed boot-flow attempt, a secure-timer experiment) are one line: rolled back to a known-good image.
+## 3. Corrections applied to the existing artifact
+1. "32 of 32 tests pass" (results and sota slides) becomes "31 of 32 on the first run; the failure (E2b) was fixed and re-tested; one new limit found after the fix (E2c)".
+2. The category bars show the FIRST RUN: A 4/4, B 3/3, C 10/10, D 12/12, **E 2/3**. (Your note says the bars are correct for the 32 cases; the sizes are, but E must show 2 of 3 on the first run, or the bar says 3 of 3 only after the fix and is labeled so.)
+3. "18 / 18 overload runs" becomes "18 of 18 load runs; 12 of them dropped frames, and in all 12 the counted drops equal the Secure World's gap".
+4. 9,203 and 80,040 are labeled "dropped, total over 3 runs".
+5. "Midterm build: 4.95 ms" becomes "Before the fix: 4.95 ms per frame (measured with instrumentation)". It was measured in November, not at the midterm; the other midterm figures (130/s, 8 s, 7 frames) stay labeled as estimates.
+6. B2 uses "321 on time, 0 late over 320 s".
+7. "8 of 8 late" becomes "8 late answers, counted by both sides".
+8. The 5 promises use the midterm's own words ("HMAC authentication", "Reduce validation latency", "Store validated packets in flash memory", "Rate & flood detection", "End-to-end demo with real measurements"); the artifact had paraphrased two of them.
+9. "Constant-time check" stays (verified).
+10. The demo slide's placeholder line is removed; the slide becomes the video slide.
 
-## 5. The video (slide 12)
-- You record about 30 seconds of the two windows (`bash scripts/demo_live_stream.sh`); I place the file on the slide.
-- Fallback if the video cannot play: a still image of the two windows made from a real captured run, labeled as such, plus the color legend.
-- The video must show: green packets, then one colored attack at a time on the receiver, and the sender staying green.
+## 4. Build plan
+1. Copy the current artifact (12-slide version) as a backup first.
+2. Edit slide by slide in deck order; after each slide render it and check overlaps and text size before the next.
+3. The video slide uses a real still image from a captured run with the color legend; you replace it with your 30-second recording.
+4. Commit and push this script and the final deck notes.
 
-## 6. Decisions for you
-1. Is the 13-slide structure above right, or do you want the 10-slide version?
-2. Do you accept "31 of 32" in place of "32 of 32"? (The report shows one FAIL; the professor can check.)
-3. Edit the existing artifact (keeping a copy of the 12-slide version first) or create a new one? I recommend editing it.
-4. The video: will you record it, or should I make the still image first?
+## 5. Decisions (all made by you; none open)
+12 slides; "31 of 32" wording; constant-time kept; xtest and B2 wording as above; loss totals labeled; edit the existing artifact after a backup; you record the video; this file cleaned first.
+Open for you only: the E category bar (2 of 3 on the first run, correction 2).
