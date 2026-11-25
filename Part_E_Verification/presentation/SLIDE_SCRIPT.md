@@ -86,3 +86,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 10. Update 2026-11-25 (slide 11 title and bullets)
 - Slide 11 title is "Future work" (small label above: secure log in flash, midterm promise 3, designed not built). The three level boxes were removed (the levels are in the speaker notes); three plain bullets were added: build the log (seal in Secure World, store in flash), close the gap (UART copy of the newest tag), after that (EL2 memory guard, real keys, flood alarm).
+
+## 11. Update 2026-11-25 (slide 11 is a pure bullet list, no boxes)
+- Slide 11 "Future work" is now plain bullet points with sub-bullets and no boxes: (1) secure log in flash (promise 3, designed, not built): seal in the Secure World with tag(i) = HMAC(K_log, tag(i-1) + record(i)), Linux only carries the records to the SD card, UART copy of the newest tag; (2) memory guard at EL2; (3) real keys; (4) flood alarm and more throughput; one line of limits at the bottom. The animated chain and the level boxes were removed; their detail stays in the speaker notes.
