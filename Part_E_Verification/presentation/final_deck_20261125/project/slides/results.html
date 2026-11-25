@@ -1,34 +1,23 @@
-<section id="results" class="res" style="gap:14px">
-<div class="head"><p class="eyebrow">WORK DONE · CURRENT WORK 4 · RESULTS, LOSS ACCOUNTING AND TRUST PROOFS</p><h2>31 of 32 on the first run; every frame accounted for</h2></div>
-<div class="row" style="align-items:flex-start;gap:48px">
-<div style="display:flex;flex-direction:column;gap:12px;width:640px;flex:none">
-<div class="row" style="gap:20px;align-items:baseline"><p class="huge" style="font-size:104px">31 / 32</p><p class="small">cases, first run</p></div>
-<div class="legend"><div class="key"><div class="sw-blue"></div><p>Passed</p></div><div class="key"><div class="sw-orange"></div><p>Failed on first run</p></div></div>
-<div class="brow"><p class="blabel" style="width:250px">A · Boot and setup</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval">4 of 4</p></div>
-<div class="brow"><p class="blabel" style="width:250px">B · Normal traffic</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval">3 of 3</p></div>
-<div class="brow"><p class="blabel" style="width:250px">C · Attacks</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval">10 of 10</p></div>
-<div class="brow"><p class="blabel" style="width:250px">D · Load and loss</p><div class="btrack" style="width:210px"><div class="bj" style="width:210px"></div></div><p class="bval">12 of 12</p></div>
-<div class="brow"><p class="blabel" style="width:250px">E · Restart, reboot</p><div class="btrack" style="width:210px"><div class="bj" style="width:140px"></div><div class="bd" style="width:70px"></div></div><p class="bval">2 of 3</p></div>
-<p class="note">E2b fixed, re-tested: 3 of 3. New limit: E2c.</p>
+<section id="results" class="r2">
+<div class="head"><p class="eyebrow">WORK DONE · RESULTS</p><h2>31 of 32 on the first run</h2></div>
+<div class="row" style="gap:120px;align-items:flex-start">
+<div style="width:640px;flex:none;display:flex;flex-direction:column;gap:22px">
+<div class="dots"><div class="d" style="--i:0"></div><div class="d" style="--i:1"></div><div class="d" style="--i:2"></div><div class="d" style="--i:3"></div><div class="d" style="--i:4"></div><div class="d" style="--i:5"></div><div class="d" style="--i:6"></div><div class="d" style="--i:7"></div><div class="d" style="--i:8"></div><div class="d" style="--i:9"></div><div class="d" style="--i:10"></div><div class="d" style="--i:11"></div><div class="d" style="--i:12"></div><div class="d" style="--i:13"></div><div class="d" style="--i:14"></div><div class="d" style="--i:15"></div><div class="d" style="--i:16"></div><div class="d" style="--i:17"></div><div class="d" style="--i:18"></div><div class="d" style="--i:19"></div><div class="d" style="--i:20"></div><div class="d" style="--i:21"></div><div class="d" style="--i:22"></div><div class="d" style="--i:23"></div><div class="d" style="--i:24"></div><div class="d" style="--i:25"></div><div class="d" style="--i:26"></div><div class="d" style="--i:27"></div><div class="d" style="--i:28"></div><div class="d" style="--i:29"></div><div class="d" style="--i:30"></div><div class="d f" style="--i:31"></div></div>
+<div class="legend"><div class="key"><div class="sw-blue"></div><p>31 passed</p></div><div class="key"><div class="sw-orange"></div><p>1 failed: E2b</p></div></div>
+<p class="why">Why not 32 of 32?</p>
+<ul class="whyl">
+<li><b>E2b failed:</b> forwarder not started at boot</li>
+<li>Fixed with a new image: passes now</li>
+<li>New limit after the fix: E2c</li>
+</ul>
 </div>
-<div style="display:flex;flex-direction:column;gap:12px;flex:1">
-<p class="colhead">PACKET LOSS (TOTAL OVER 3 RUNS)</p>
-<div class="legend"><div class="key"><div class="sw-blue"></div><p>Judged</p></div><div class="key"><div class="sw-orange"></div><p>Dropped, counted</p></div></div>
-<div class="brow"><p class="blabel" style="width:250px">1,004-frame burst</p><div class="btrack" style="width:330px"><div class="bj" style="width:330px"></div></div><p class="bval">0 dropped</p></div>
-<div class="brow"><p class="blabel" style="width:250px">Steady 943/s</p><div class="btrack" style="width:330px"><div class="bj" style="width:258px"></div><div class="bd" style="width:72px"></div></div><p class="bval">9,203 of 42,000</p></div>
-<div class="brow"><p class="blabel" style="width:250px">Flood 3,587/s</p><div class="btrack" style="width:330px"><div class="bj" style="width:79px"></div><div class="bd" style="width:251px"></div></div><p class="bval">80,040 of 105,000</p></div>
-<div class="formula"><p>sent = judged + counted losses. Counted drops = the Secure World’s gap.</p></div>
-<div class="row" style="gap:36px;align-items:flex-start">
-<div class="fact"><p class="bignum" style="font-size:44px">0 lost</p><p class="small">up to 640 frames/s</p></div>
-<div class="fact"><p class="bignum" style="font-size:44px">18 of 18</p><p class="small">load runs exact; 278,204 frames accounted</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:36px">
+<div class="stat"><p class="n">0 lost</p><p class="t">up to 640 frames/s; every drop above is counted</p></div>
+<div class="stat"><p class="n">18 of 18</p><p class="t">load runs exact; 278,204 frames accounted</p></div>
+<div class="stat"><p class="n">12</p><p class="t">limits documented, none hidden</p></div>
 </div>
 </div>
-</div>
-<div class="proofs">
-<div class="pf"><p class="k">CORE 1 IS HIDDEN FROM LINUX</p><p class="v">Linux sees 3 cores; core 1 keeps running</p></div>
-<div class="pf"><p class="k">SECURE MEMORY IS RESERVED</p><p class="v">Reserved in the Linux memory map</p></div>
-<div class="pf"><p class="k">THE FORWARDER HOLDS NO KEY</p><p class="v">No key inside (checked 25 Nov)</p></div>
-</div>
+<p class="line"><b>Checked on the board:</b> core 1 hidden from Linux · secure memory reserved · no key in the forwarder</p>
 <div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
 <aside>All 32 original cases ran on the real two-Pi CAN-FD bus: 31 passed the first time. The bars show the first run: boot and setup 4 of 4, normal traffic 3 of 3, attacks 10 of 10, load and loss 12 of 12, restart and reboot 2 of 3. The one failure, E2b, was that the forwarder did not start by itself at boot. It was fixed with a new image and re-tested, and now passes (3 of 3). After the fix, one new limit appeared, E2c: controlling the service over ssh does not return; the workaround is documented and the fix is queued for the next image. Twelve limits are documented, none hidden. Right: packet loss under load. The three bars are totals over 3 runs each: the 1,004-frame burst lost nothing; steady 943 frames per second dropped 9,203 of 42,000; a flood of 3,587 frames per second dropped 80,040 of 105,000. Every drop is counted: sent equals judged plus each counted loss, and the queue drops equal the gap the Secure World sees. Nothing is lost up to 640 frames per second and bursts of about 2,490 frames. All 18 load runs of the loss series matched exactly; 12 of them dropped frames, and in those 12 the counted drops equal the Secure World's gap; 278,204 frames were accounted. Bottom: trust proofs checked on the board on 25 November: Linux sees only cores 0, 2 and 3 while the Secure World loop counter on core 1 grows by about 39.5 million per second; the Secure World memory is reserved in the Linux memory map; and the forwarder binary and the monitor client contain none of the three keys. The keys are prototype keys built into the image, and the monitor detects but does not block, because the Pi 3 has no TZASC.</aside>
 </section>

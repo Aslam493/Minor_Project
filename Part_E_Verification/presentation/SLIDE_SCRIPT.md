@@ -95,3 +95,7 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 13. Update 2026-11-25
 - Slide 11: the words "promise 3" were removed from the first bullet; it now reads "Secure log in flash (designed, not built)".
+
+## 14. Update 2026-11-25 (slide 9 redesigned; future work slide kept as edited by the user)
+- Slide 9 (results): rebuilt with less content. A grid of 32 squares (31 blue, 1 orange = E2b), a short "Why not 32 of 32?" list (E2b failed: forwarder not started at boot; fixed with a new image, passes now; new limit after the fix: E2c), three big numbers (0 lost up to 640 frames/s with every drop counted; 18 of 18 load runs exact, 278,204 frames accounted; 12 limits documented) and one line of trust proofs checked on the board. The per-group bars (A 4/4, B 3/3, C 10/10, D 12/12, E 2/3), the loss bars and the formula are in the speaker notes.
+- Slide 11 (future work): the user edited it by hand in the editor (removed "(designed, not built)", blue lead words). It was NOT changed by this update; the saved copy in `final_deck_20261125/` now matches the user's version.
