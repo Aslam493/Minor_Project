@@ -532,3 +532,20 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .r3 .st { display: flex; flex-direction: column; gap: 0; }
 .r3 .st .n { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 80px; font-weight: 700; line-height: 1.05; color: var(--blue-dark); }
 .r3 .st .l { font-size: 28px; color: var(--soft); }
+
+/* results: ring and claims */
+.r4 { gap: 30px; }
+.r4 .main { display: flex; gap: 90px; align-items: center; }
+.r4 .ring { position: relative; width: 520px; height: 520px; flex: none; }
+.r4 .ring svg { position: absolute; left: 0; top: 0; }
+.r4 .ring .c1 { position: absolute; left: 0; top: 178px; width: 520px; text-align: center; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 104px; font-weight: 700; line-height: 1; color: var(--ink); }
+.r4 .ring .c2 { position: absolute; left: 0; top: 300px; width: 520px; text-align: center; font-size: 34px; color: var(--soft); }
+.r4 .claims { flex: 1; display: flex; flex-direction: column; }
+.r4 .rw { display: flex; align-items: center; gap: 30px; padding: 20px 0; border-bottom: 2px solid #E1DDD1; }
+.r4 .rw:last-child { border-bottom: none; }
+.r4 .rw .n { width: 190px; flex: none; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 50px; font-weight: 700; color: var(--blue-dark); }
+.r4 .rw .t { font-size: 38px; color: var(--ink); }
+.r4 .lg3 { display: flex; gap: 44px; align-items: center; }
+.r4 .lg3 .k2 { display: flex; gap: 12px; align-items: center; }
+.r4 .lg3 .dt { width: 26px; height: 26px; border-radius: 7px; flex: none; }
+.r4 .lg3 p { font-size: 28px; color: var(--soft); }
