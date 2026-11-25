@@ -427,3 +427,7 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .fut2 .fw2 .tag { font-size: 26px; }
 .vid2 { gap: 20px; }
 .vid2 img { width: 1664px; height: 652px; object-fit: contain; border-radius: 12px; }
+.vid3 { padding: 22px 0 0 !important; gap: 12px; }
+.vid3 .head { padding: 0 64px; }
+.vid3 h2 { font-size: 44px; letter-spacing: 0; }
+.vid3 img { width: 1920px; height: 996px; object-fit: contain; }

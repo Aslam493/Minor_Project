@@ -66,3 +66,7 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 - Slide 10 now shows the video full width (1664 px), re-rendered from the same real recording with 1.4 times larger text and cropped to the useful rows; the closing caption now shows; the spinner glyph was replaced because the font had no braille glyphs.
 - The user had widened the video by hand in the editor (939 px). That edit lived only on the old layout; the new layout replaces it.
 - A page save from the editor happened between two of my publishes; the publish replaced 10 slide files with my local copies. If other hand edits were made in those files, they need to be redone.
+
+## 6. Update 2026-11-25 (third pass: full-slide video)
+- Slide 10 is now a medium heading plus the video filling the rest of the slide (1920 x 994 frame, 60 s, 12.5 MB), dark background, no footer. The video was re-rendered taller from the same real recording: sender 5 dashboard rows + 4 packet lines, receiver 5 dashboard rows + 14 packet lines + the Secure World counters line, caption bar at the bottom.
+- Before this publish the live artifact had a newer version saved from the editor (the user had moved the heading and made the video 796 px high by hand). Only `video.html` and `deck.css` differed from my copies; the CSS had no user change; the new layout replaces the video-slide edit, which pointed in the same direction.

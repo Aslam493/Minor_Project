@@ -10,11 +10,11 @@ for w in ev:
         for k, v in MAP.items(): d = d.replace(k, v)
         out.append((t, d))
     ev[w] = out
-COLS = 150; CW, CH = 11, 22; W, H = 1710, 670; FPS = 15; T0 = 3.0; DUR = 60
-F = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 18.27)
-FB = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 18.27)
-FS = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 21)
-FC = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 27)
+COLS = 150; CW, CH = 12, 26; W, H = 1920, 994; FPS = 15; T0 = 3.0; DUR = 60
+F = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 19.93)
+FB = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 19.93)
+FS = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+FC = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 31)
 NAMES = {"black": "#2b303b", "red": "#ff6b6b", "green": "#4ade80", "brown": "#facc15", "yellow": "#facc15", "blue": "#60a5fa", "magenta": "#e879f9", "cyan": "#22d3ee", "white": "#e5e7eb"}
 def col(c, d):
     if c is None or c == "default": return d
@@ -29,7 +29,7 @@ def pick_rows(term, n_log, bar):
     body = [y for y in range(5, last) if term.scr.display[y].strip()]
     return top + body[-n_log:] + ([bar] if bar is not None else [])
 def draw_term(dr, term, x0, y0, rows):
-    dr.rectangle([x0, y0, x0 + COLS * CW + 20, y0 + len(rows) * CH + 12], fill="#0b1220")
+    dr.rectangle([x0, y0, W - 20, y0 + len(rows) * CH + 12], fill="#0b1220")
     for yi, y in enumerate(rows):
         row = term.scr.buffer[y]; x = 0
         while x < COLS:
@@ -44,7 +44,7 @@ def draw_term(dr, term, x0, y0, rows):
             x = j
 tx = Term(16, ev["tx"]); rx = Term(26, ev["rx"])
 ff = subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H), "-r", str(FPS), "-i", "-",
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", S + "/how_it_works3.mp4"], stdin=subprocess.PIPE)
+                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", S + "/how_it_works4.mp4"], stdin=subprocess.PIPE)
 KIND = [("DUPLICATE", "DUPLICATE (light blue): the same packet was sent twice"), ("CONFLICT", "CONFLICT (purple): same counter as before, but different data"),
         ("TAMPERED", "TAMPERED (red): one data bit changed, so the signature no longer matches"), ("REPLAY", "REPLAY (orange): an old packet was sent again, its counter is too old"),
         ("WRONG ID", "WRONG ID (pink): CAN id 0x124 is not allowed on this link"), ("GAP", "COUNTER GAP (yellow): 4 packets are missing")]
@@ -66,13 +66,13 @@ for n in range(DUR * FPS):
     elif t > 55: cap = "Every verdict is made in the Secure World. Linux can drop frames, but it cannot hide that it did."; hot = False
     else: cap = "Green = valid. A colored line = the Secure World found an attack. The sender does not mark its attacks."; hot = False
     im = Image.new("RGB", (W, H), "#0f1b2d"); dr = ImageDraw.Draw(im)
-    y = 14; trows = pick_rows(tx, 3, None); rrows = pick_rows(rx, 8, 25)
-    dr.rounded_rectangle([20, y, W - 20, y + 34], 8, fill="#1b5a99"); dr.text((36, y + 6), "SENDER Pi: the car (looks normal; attacks are not marked)", font=FS, fill="white"); y += 34
+    y = 12; trows = pick_rows(tx, 4, None); rrows = pick_rows(rx, 14, 25)
+    dr.rounded_rectangle([20, y, W - 20, y + 40], 8, fill="#1b5a99"); dr.text((38, y + 7), "SENDER Pi: the car (looks normal; attacks are not marked)", font=FS, fill="white"); y += 40
     draw_term(dr, tx, 20, y, trows); y += len(trows) * CH + 12 + 8
-    dr.rounded_rectangle([20, y, W - 20, y + 34], 8, fill="#9a4a0c"); dr.text((36, y + 6), "RECEIVER Pi: the Secure World's verdict, live", font=FS, fill="white"); y += 34
+    dr.rounded_rectangle([20, y, W - 20, y + 40], 8, fill="#9a4a0c"); dr.text((38, y + 7), "RECEIVER Pi: the Secure World's verdict, live", font=FS, fill="white"); y += 40
     draw_term(dr, rx, 20, y, rrows); y += len(rrows) * CH + 12 + 8
-    dr.rounded_rectangle([20, y, W - 20, y + 60], 10, fill="#f59e0b" if hot else "#162a47"); dr.text((40, y + 14), cap, font=FC, fill="#0f1b2d" if hot else "#e5eaf3")
+    dr.rounded_rectangle([20, y, W - 20, y + 72], 10, fill="#f59e0b" if hot else "#162a47"); dr.text((42, y + 17), cap, font=FC, fill="#0f1b2d" if hot else "#e5eaf3")
     ff.stdin.write(im.tobytes())
     if not poster_done and len(events) >= 4 and t - (cap_until - 3.4) > 0.9 and t < cap_until:
-        im.save(S + "/how_poster3.png"); poster_done = True
+        im.save(S + "/how_poster4.png"); poster_done = True
 ff.stdin.close(); ff.wait(); print("events", events, "poster", poster_done)
