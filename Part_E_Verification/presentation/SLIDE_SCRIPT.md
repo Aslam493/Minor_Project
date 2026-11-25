@@ -1,8 +1,8 @@
 # Final presentation: slide script (TEMPORARY, for review before the slides are built)
 
-Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: short and congested, 8 slides, about 8 to 10 minutes plus the live demo.
+Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Target: 12 slides (the earlier 9-slide plan plus 3 slides that show the values and the process of the current work), about 12 to 15 minutes plus the live demo. If it is too long, section 5 says which 3 to drop.
 
-Structure you asked for: slide 1 intro, slides 2 and 3 previous work (maximum 2, only the important work: the MINOR WORK of August and September), slides 4 to 7 current work (4 slides, with the mandatory values), slide 8 thanks.
+Structure you asked for: slide 1 intro, slides 2 and 3 previous work (maximum 2: the MINOR WORK of August and September), slides 4 to 11 current work (8 slides: design, checks, timing, speed process, loss accounting, verification, live demo, scorecard), slide 12 thanks.
 
 ## 1. What I reviewed
 | Source | What it contains | What I take from it |
@@ -58,37 +58,57 @@ Style: dark title and closing slides, light content slides, one accent color; at
 ### Slide 4. Current work 1: the design
 - Message: "Linux carries frames, the Secure World judges every one."
 - Diagram: Sender ECU, CAN chip, kernel socket, forwarder (queue 2,048), Monitor in the Secure World on core 1; loop arrow "request every 50 ms, up to 32 frames, answer within 40 ms". The forwarder holds no key.
-- Three-box evolution: midterm (Secure World reads the chip; dropped because the Pi 3 has no TZPC to lock the chip), push (Linux decides the timing; not enough), pull (now: Linux cannot pick the timing, a late or missing answer is evidence).
-- Big fact: heartbeat every 1 s, 3 misses raise TIMEOUT; boot grace 60 s.
+- Three-box evolution: midterm (Secure World reads the chip; dropped because the Pi 3 has no TZPC to lock the chip), push (Linux decides the timing; not enough), pull (now).
 
 ### Slide 5. Current work 2: checks and attacks
 - Message: "9 attacks sent on the real two-Pi CAN-FD bus, 9 caught, each at the right check."
 - Table: attack, the check that catches it, the verdict (wrong ID: MALFORMED; tampered data: AUTH_FAIL; old, duplicate, conflicting counter: REPLAY x3; counter jump: GAP; silence 300 ms and killed forwarder: TIMEOUT x2; late answers: LATE).
 - Footer: checks run cheapest first (ID 6.7 microseconds, then HMAC-SHA256 and counter, 54.6 microseconds per valid frame).
 
-### Slide 6. Current work 3: results (the mandatory values), scorecard and limits
-- Message: "Fast enough, no frame lost silently, and every claim is backed by a test report."
-- Big numbers:
-  1. **90 times faster**: 4.95 ms to 0.055 ms per frame (cause: a debug stack check, removed).
-  2. **640 frames/s** judged, 32 frames per 50 ms request.
-  3. **0 lost** up to 640 frames/s and bursts of about 2,490 frames.
-  4. **18 of 18** overload runs: counted drops equal the Secure World's gap (over 270,000 frames accounted).
-  5. **31 of 32** cases on the first run (corrected wording); the one failure fixed and re-tested; 12 limits documented.
-- Small strip: the 5 midterm promises with status (HMAC done; latency done; flood partly, counted but no alarm; real demo done; secure log designed, not built).
-- Bottom line: limits (detects but does not block, no TZASC; keys built into the image) and future work (forward-secure log, EL2 memory guard, key provisioning, flood alarm).
+### Slide 6. NEW. Current work 3: timing, the Secure World's own clock (process and values)
+- Message: "The Secure World keeps the time, so silence and delay become evidence."
+- Timeline picture with the five timers: frame request every 50 ms (answer within 40 ms), traffic timeout 300 ms, heartbeat every 1 s (answer within 500 ms, 3 misses raise TIMEOUT), boot grace 60 s.
+- Measured values from the campaign: heartbeat 5 minutes, 311 answers, 0 late, 0 missed (B2); 6,361 requests, all on time (B3); forwarder killed: miss count reaches 3 and TIMEOUT is raised (C8); late answers: 8 of 8 detected (C9); restart 10 of 10 as designed (E1).
+- Process line: the clock is the Secure World's own counter (19.2 MHz), checked against the user-space clock to within 0.1 ms.
 
-### Slide 7. Current work 4: live demo
+### Slide 7. NEW. Current work 4: the speed problem, found and solved (process and values)
+- Message: "The HMAC 'blocker' was a debug option, not the algorithm."
+- Process in 4 steps: (1) midterm: 4.95 ms per frame, so only about 7 frames per 40 ms answer; (2) hypothesis "the CPU is slow": a faster CPU speed made no difference; (3) found the cause: stack checking on every call (CFG_CORE_DEBUG_CHECK_STACKS); (4) removed it: 54.6 microseconds per frame.
+- Value bars drawn to scale: 4.95 ms versus 0.055 ms (90 times); 1,004-frame burst about 8 s (estimate) versus 1.56 s (measured); 130 versus 640 frames/s; 7 versus 32 frames per request.
+- Footnote: midterm figures other than 4.95 ms are estimates, final figures are measured.
+
+### Slide 8. NEW. Current work 5: no frame lost silently (method and values)
+- Message: "Every frame is judged or counted: the numbers add up exactly."
+- Method box: sent = judged + sender give-ups + chip loss + kernel socket drops + forwarder-rejected + queue drops; and the queue drops equal the Secure World's counter gap.
+- Graph: three bars (judged versus dropped and counted): 1,004-frame burst 0 dropped; steady 943 frames/s 9,203 dropped of 42,000 (3 runs); flood 3,587 frames/s about 80,000 dropped (3 runs). Lossless limit: 640 frames/s and bursts of about 2,490 frames.
+- Big number: 18 of 18 overload runs match exactly; over 270,000 frames accounted.
+- Honest line: above the limit frames ARE dropped, in one known place (the 2,048-frame queue, oldest first), and counted.
+- Values are checked against `baseline/final_campaign/results.json` when the slide is built.
+
+### Slide 9. Current work 6: verification and what Linux cannot see
+- Message: "The claims are backed by a test report, and the trust claims are proven on the board."
+- Left, the campaign: 31 of 32 cases on the first run (corrected wording), grouped: boot and setup, normal traffic, attacks, load and loss, restart and reboot; the failure (forwarder not starting at boot) was fixed and re-tested; 12 limits documented, none hidden.
+- Right, trust proofs: Linux sees only 3 cores and CPU1 is offline while the Secure World loop counter keeps growing; the Secure World memory is reserved in the device tree; the forwarder binary holds no key (search found nothing); the keys are in the Secure World image.
+- Honest line: keys are prototype keys built into the image; the monitor detects but does not block (no TZASC).
+
+### Slide 10. Current work 7: live demo
 - Message: "Two Pis, one command, every verdict in color."
 - Picture: the two terminal windows (sender looks normal and all green; receiver colors each packet: red tampered, orange replay, light blue duplicate, purple conflict, pink wrong ID, yellow gap), taken from a real captured run and labeled as such.
 - Right: what the professor sees (an attack every 2 to 3 s; the receiver finds it, not the sender); the one command.
 
-### Slide 8. Thanks
+### Slide 11. Scorecard, limits and future work
+- Table of the 5 midterm promises with status: HMAC done; latency done; flood partly (counted, no alarm); real demo done; secure log designed, not built.
+- Limits in one line: detects but does not block (no TZASC); keys are built into the image.
+- Future: forward-secure audit log, EL2 memory guard, more throughput, key provisioning plus a flood alarm.
+
+### Slide 12. Thanks
 - "Thank you", the one-line claim again ("Every frame judged in the Secure World. Every lost frame counted."), name, supervisor, "Questions welcome".
 
-## 5. Where the cut material goes
-The loss study details and the speed story go into the speaker notes of slides 4 to 6; the live stream is slide 7 and the live demo itself. If the professor asks for more, the full 12-slide artifact deck can be kept as a backup copy.
+## 5. If 12 is too long
+Drop slide 6 (timing) first, then merge slide 9 into slide 8, then merge slide 11 into slide 9. That gives 9 slides, the earlier plan. The cut material stays in the speaker notes.
 
 ## 6. Decisions for you
-1. Are slides 2 and 3 (the secure platform; then CAN in the Secure World with the midterm position) the right 2 slides of previous work, and are the 5 values on slide 5 the ones you want shown?
+1. Are slides 2 and 3 (the secure platform; then CAN in the Secure World with the midterm position) the right 2 slides of previous work?
+1b. The 3 new slides are 6 (timing), 7 (speed problem and process) and 8 (loss accounting). Verification and trust proofs are slide 9. Do you want these three, or a different three?
 2. Use the corrected test wording from section 3? (My recommendation: yes. The professor can check the report.)
 3. Edit the existing artifact (12 slides to 8) or create a new one? (My recommendation: edit it.)
