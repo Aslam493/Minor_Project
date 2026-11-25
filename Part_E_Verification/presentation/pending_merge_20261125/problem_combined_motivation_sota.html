@@ -1,0 +1,28 @@
+<section id="problem" class="ms">
+<div class="head"><p class="eyebrow">MOTIVATION AND STATE OF THE ART</p><h2>CAN trusts every frame, and Linux can lie about it</h2></div>
+<div class="cols2">
+<div style="width:760px;flex:none">
+<p class="colhead">THE PROBLEM</p>
+<div class="bus">
+<p class="tg">forged frame</p>
+<div class="bar"></div>
+<div class="stub" style="left:81px"></div><div class="stub" style="left:271px"></div><div class="stub" style="left:461px"></div><div class="stub bad" style="left:671px"></div>
+<p class="nd" style="left:0">Brakes</p><p class="nd" style="left:190px">Engine</p><p class="nd" style="left:380px">Steering</p><p class="nd bad" style="left:590px">Attacker</p>
+<p class="cp">CAN bus: no proof of who sent a frame</p>
+</div>
+<div class="pb"><p class="n">1</p><div><p class="t">Anyone can send a frame</p><p class="s">spoofing, tampering, replay, silence</p></div></div>
+<div class="pb"><p class="n">2</p><div><p class="t">The check runs in Linux</p><p class="s">a hacked Linux can hide attacks</p></div></div>
+<div class="pb later"><p class="n">3</p><div><p class="t">The record can be rewritten</p><p class="s">future work</p></div></div>
+</div>
+<div style="flex:1">
+<p class="colhead">WHAT EXISTS</p>
+<div class="rw2"><p class="a">AUTOSAR SecOC</p><p class="b">Counter-based freshness against CAN replay</p></div>
+<div class="rw2"><p class="a">TEECheck (2020)</p><p class="b">A TEE vets outgoing CAN frames: prevention</p></div>
+<div class="rw2"><p class="a">iCORE (2019)</p><p class="b">A core diverted into the Secure World at boot</p></div>
+<div class="rw2"><p class="a">EmLog (2017)</p><p class="b">Tamper-resistant logging on OP-TEE</p></div>
+</div>
+</div>
+<div class="gg"><p><b>The gap:</b> we found no work that pairs OP-TEE with CAN attack detection when Linux is compromised.</p><p><b>Goal:</b> detect these attacks in the Secure World, where Linux cannot hide them.</p></div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Motivation and state of the art on one slide. Left, the problem. Picture a car: the brakes, the engine and the steering are separate small computers, called ECUs, on one shared wire, the CAN bus. A CAN frame carries no proof of who sent it, so anyone who gets onto the bus, the attacker in red, can send a forged frame. Problem one: anyone can send a frame, which allows a spoofed ID, tampered data, a replay of an old frame, or silence. Problem two: the check on those frames runs in Linux, and a compromised Linux can accept forged frames or hide them. Problem three: the record of what happened can be rewritten afterwards; that one is future work. Right, what exists, from my design notes. AUTOSAR SecOC adds counter-based freshness against replay on CAN; I use the same counter idea in the Secure World. TEECheck, RTNS 2020, uses a trusted execution environment to vet outgoing CAN frames at the source on a Cortex-M: that is prevention, while my monitor only detects. iCORE, SAC 2019, diverts a core into the Secure World at boot, so it runs without waiting for Linux; my core 1 uses this mechanism. EmLog, 2017, is tamper-resistant logging on OP-TEE; it is the model for the secure log I want to build next. Also in my notes: Schneier and Kelsey 1998, HMAC hash chains for logs; and SPROBES and TZ-RKP, which are prevention-oriented and invasive to Linux. The gap: I found no work that pairs OP-TEE with detecting CAN attacks when Linux itself is compromised. The goal of this project is to detect these attacks from the Secure World, where Linux cannot hide them. The five promises made at midterm are not on this slide: HMAC authentication (done), reduce validation latency (done), store validated packets in flash memory (not built, designed), rate and flood detection (partly), end-to-end demo with real measurements (done).</aside>
+</section>

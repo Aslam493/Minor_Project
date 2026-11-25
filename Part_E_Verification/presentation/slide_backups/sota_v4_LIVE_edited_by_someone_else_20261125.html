@@ -1,0 +1,23 @@
+<section id="sota" class="sb">
+<div class="head"><p class="eyebrow">STATE OF THE ART AND OUR PROMISE</p><h2>What exists, the gap, and what we promised</h2></div>
+<div class="cols">
+<div class="left">
+<p class="colhead" style="margin-bottom:6px">WHAT EXISTS → HOW WE GO FURTHER</p>
+<div class="r2"><div><p class="n">SecOC</p><p class="y">AUTOSAR standard</p></div><div><p class="d">Counter-based freshness against CAN replay</p><p class="g">Same counter idea, but checked in Secure World</p></div></div>
+<div class="r2"><div><p class="n">TEECheck</p><p class="y">RTNS 2020</p></div><div><p class="d">A TEE vets frames at the sender: prevention</p><p class="g">We detect at the receiver, even when Linux is compromised</p></div></div>
+<div class="r2"><div><p class="n">iCORE</p><p class="y">SAC 2019</p></div><div><p class="d">A core kept in Secure World from boot, for monitoring</p><p class="g">Our core 1 uses this to judge CAN traffic</p></div></div>
+<div class="r2" style="border-bottom:2px solid #E1DDD1"><div><p class="n">EmLog</p><p class="y">WISTP 2018</p></div><div><p class="d">Tamper-resistant logging in a TEE</p><p class="g">The model for our secure log (future work)</p></div></div>
+</div>
+<div class="right">
+<p class="colhead" style="margin-bottom:6px">PROMISED AT MIDTERM → NOW</p>
+<div class="prom"><p class="num">1</p><div class="txt"><p class="a">HMAC authentication</p><p class="b">54.6 µs per frame</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">2</p><div class="txt"><p class="a">Reduce validation latency</p><p class="b">90× faster, 640 frames/s</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">3</p><div class="txt"><p class="a">Store validated packets in flash memory</p><p class="b">Designed, not built</p></div><p class="sp no">Not built</p></div>
+<div class="prom"><p class="num">4</p><div class="txt"><p class="a">Rate &amp; flood detection</p><p class="b">Every drop counted; no alarm yet</p></div><p class="sp wip">Partly</p></div>
+<div class="prom" style="border-bottom:none"><p class="num">5</p><div class="txt"><p class="a">End-to-end demo with real measurements</p><p class="b">Real two-Pi CAN-FD bus</p></div><p class="sp ok">Done</p></div>
+</div>
+</div>
+<div class="gapbox"><p class="s"><b>The gap we address:</b> in the work we surveyed, none detects CAN attacks from OP-TEE when Linux itself is compromised.</p></div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Left: the state of the art and how we go further. AUTOSAR SecOC uses counters against replay; we use the same idea, but the check runs in the Secure World. TEECheck, at RTNS 2020, vets frames at the sender with a TEE, which is prevention; our monitor detects at the receiver and still works when Linux is compromised. iCORE, at SAC 2019, keeps a core in the Secure World from boot for monitoring; our core 1 uses this idea to judge CAN traffic. EmLog, published at WISTP 2018, is tamper-resistant logging in a TEE and is the model for our secure log. Right: the five promises from the midterm, in its own words. HMAC and latency are done; storing packets in flash is designed but not built; rate and flood is partly done, because every dropped frame is counted but there is no flood alarm; and the end-to-end demo with real measurements is done. The gap: in the work we surveyed, none detects CAN attacks from OP-TEE when Linux itself is compromised.</aside>
+</section>
