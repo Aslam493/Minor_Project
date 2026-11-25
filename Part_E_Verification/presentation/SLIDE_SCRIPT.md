@@ -92,3 +92,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 12. Update 2026-11-25 (slide 11 text balanced)
 - Slide 11 text was trimmed and balanced: one main item with three short sub-points (secure log in flash: each record sealed in the Secure World (HMAC chain); Linux carries the records to the SD card; newest tag copied to the UART), then three one-line items (memory guard at EL2, real keys, flood alarm and more throughput), and one line "Today: the monitor detects, but does not block". The formula and the E2c limit moved to the speaker notes (E2c stays on slide 9). Type sizes raised so the slide still reads full.
+
+## 13. Update 2026-11-25
+- Slide 11: the words "promise 3" were removed from the first bullet; it now reads "Secure log in flash (designed, not built)".
