@@ -492,11 +492,11 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .pts li { font-size: 32px; line-height: 1.3; color: var(--soft); }
 .pts li b { color: var(--ink); }
 .fw3 { gap: 30px; }
-.fw3 ul.fl { margin: 0; padding-left: 52px; display: flex; flex-direction: column; gap: 26px; }
-.fw3 ul.fl > li { font-size: 42px; line-height: 1.25; color: var(--ink); }
+.fw3 ul.fl { margin: 0; padding-left: 52px; display: flex; flex-direction: column; gap: 34px; }
+.fw3 ul.fl > li { font-size: 46px; line-height: 1.25; color: var(--ink); }
 .fw3 ul.fl > li > b { color: var(--blue-dark); }
 .fw3 ul.fl ul { margin-top: 10px; padding-left: 40px; display: flex; flex-direction: column; gap: 8px; }
-.fw3 ul.fl ul li { font-size: 32px; line-height: 1.3; color: var(--soft); }
+.fw3 ul.fl ul li { font-size: 36px; line-height: 1.3; color: var(--soft); }
 .fw3 .tagline { font-size: 32px; font-weight: 600; color: var(--orange-dark); }
-.fw3 .lim { font-size: 28px; color: var(--soft); }
+.fw3 .lim { font-size: 30px; color: var(--soft); }
 .fw3 .lim b { color: var(--ink); }

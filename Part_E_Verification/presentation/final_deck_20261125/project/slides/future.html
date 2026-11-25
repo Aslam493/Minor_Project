@@ -1,26 +1,17 @@
 <section id="future" class="fw3">
 <div class="head"><h2>Future work</h2></div>
 <ul class="fl">
-<li><b>Secure log in flash</b> <span style="color:#9A4A0C">(midterm promise 3, designed, not built)</span>
+<li><b>Secure log in flash</b> <span style="color:#9A4A0C">(promise 3, designed, not built)</span>
 <ul>
-<li>Seal every record in the Secure World: tag(i) = HMAC( K_log , tag(i-1) + record(i) )</li>
-<li>Linux only carries the records to the SD card, the only flash on a Pi 3</li>
-<li>Copy the newest tag to the UART, so cutting off the end is caught</li>
+<li>Each record sealed in the Secure World (HMAC chain)</li>
+<li>Linux carries the records to the SD card</li>
+<li>Newest tag copied to the UART</li>
 </ul></li>
-<li><b>Memory guard at EL2</b>
-<ul>
-<li>A tiny hypervisor guards secure memory, because the Pi 3 has no TZASC</li>
-</ul></li>
-<li><b>Real keys</b>
-<ul>
-<li>Provisioned keys instead of prototype keys built into the image</li>
-</ul></li>
-<li><b>Flood alarm and more throughput</b>
-<ul>
-<li>An alarm when traffic exceeds the rate; bigger batches, the CPU is mostly idle</li>
-</ul></li>
+<li><b>Memory guard at EL2:</b> protects secure memory</li>
+<li><b>Real keys:</b> instead of prototype keys</li>
+<li><b>Flood alarm</b> and more throughput</li>
 </ul>
-<p class="lim"><b>Limits today:</b> detects but does not block · prototype keys · service control over ssh hangs (E2c)</p>
+<p class="lim"><b>Today:</b> the monitor detects, but does not block</p>
 <div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
 <aside>Future work, and the one I want to do next: a secure log in flash. It is the unfinished midterm promise 3, storing validated records in flash memory. Honest scope first: on the Pi 3 the Secure World cannot write the SD card, which is the only flash and is owned by Linux. So the path is: the Secure World keeps a ring of 24-byte records, one per check; each record is sealed inside the Secure World with a chain tag, tag i = HMAC(K_log, tag i-1 plus record i), using a log key that never leaves the Secure World; a Linux logger reads the sealed records every 250 ms and appends them to a file on the SD card; and the newest chain tag is also printed on the UART as a copy outside Linux. What it proves: any edit to a record, or a deletion in the middle, breaks the chain from that point on, for example if entry 3 is edited, entries 3, 4 and 5 no longer match, while entries 1 and 2 stay valid. What it cannot prove: Linux can still delete the file or cut off its end, which is why the UART copy of the newest tag is part of the plan; a rolled-back SD card cannot be detected without an outside anchor, because the Pi 3 has no secure counter and no secure storage. Three levels: level 1 is software only and is the plan; level 2 would be a small SPI flash chip on a bus Linux does not use, which needs extra hardware; level 3 is a board with a real memory firewall, such as the STM32MP1 or i.MX8. A stronger idea beyond the plain chain is forward secrecy, where the key moves on after every entry so old entries cannot be forged even if the key leaks later. Status: designed in monitor/AUDIT_LOG_DESIGN.md and AUDIT_LOG_PLAN.md, nothing built yet. After that: the memory guard at EL2, real key provisioning, a flood alarm, and more throughput. Known limits today: the monitor detects but does not block because the Pi 3 has no TZASC; the keys are prototype keys built into the image; controlling the forwarder service over ssh does not return (E2c, workaround documented, fix queued).</aside>
 </section>

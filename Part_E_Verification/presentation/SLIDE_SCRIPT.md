@@ -89,3 +89,6 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 11. Update 2026-11-25 (slide 11 is a pure bullet list, no boxes)
 - Slide 11 "Future work" is now plain bullet points with sub-bullets and no boxes: (1) secure log in flash (promise 3, designed, not built): seal in the Secure World with tag(i) = HMAC(K_log, tag(i-1) + record(i)), Linux only carries the records to the SD card, UART copy of the newest tag; (2) memory guard at EL2; (3) real keys; (4) flood alarm and more throughput; one line of limits at the bottom. The animated chain and the level boxes were removed; their detail stays in the speaker notes.
+
+## 12. Update 2026-11-25 (slide 11 text balanced)
+- Slide 11 text was trimmed and balanced: one main item with three short sub-points (secure log in flash: each record sealed in the Secure World (HMAC chain); Linux carries the records to the SD card; newest tag copied to the UART), then three one-line items (memory guard at EL2, real keys, flood alarm and more throughput), and one line "Today: the monitor detects, but does not block". The formula and the E2c limit moved to the speaker notes (E2c stays on slide 9). Type sizes raised so the slide still reads full.
