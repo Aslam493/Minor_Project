@@ -17,7 +17,16 @@ import collections, datetime, json, os, re, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__)); PV = os.path.abspath(os.path.join(HERE, "../.."))
 MC = os.path.join(PV, "tools/monitor_client"); BL = os.path.join(PV, "baseline")
-RX = os.environ.get("RX", "10.237.27.212"); SN = os.environ.get("SN", "10.237.27.144")
+def _addr(name, default):                       # order: value typed on the command line, then scripts/pi_addresses.env, then the old default
+    if os.environ.get(name): return os.environ[name]
+    try:
+        for ln in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pi_addresses.env")):
+            if ln.strip().startswith(name + "="): return ln.split("=", 1)[1].strip()
+    except OSError: pass
+    return default
+
+
+RX = _addr("RX", "10.237.27.212"); SN = _addr("SN", "10.237.27.144")
 FWD_SECONDS, SNAP_AT = int(os.environ.get("FWD_SECONDS", "36")), int(os.environ.get("SNAP_AT", "22"))
 STEP = os.environ.get("STEP", "")                                   # step name of the plan, e.g. s1, s2a: goes into every tag
 FWD_PREFIX = os.environ.get("FWD_PREFIX", "")                       # e.g. "chrt -f 50"

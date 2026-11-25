@@ -8,7 +8,9 @@
 # Stop: press q in the sender window, Ctrl+C in the receiver window. Afterwards (optional): python3 scripts/demo_stream_setup.py --remove-key
 # Environment: RX=<receiver ip> SN=<sender ip> COLS=170 ROWS=22 (window size in characters). TESTSEC=N runs a short logged test (windows close by themselves).
 cd "$(dirname "$0")/.." || exit 1
-export RX=${RX:-10.237.27.212} SN=${SN:-10.237.27.144}
+# the addresses come from scripts/pi_addresses.env (edit that file); RX=... SN=... typed in front of the command wins
+_RX0=$RX; _SN0=$SN; . "$(dirname "$0")/pi_addresses.env"; [ -n "$_RX0" ] && RX=$_RX0; [ -n "$_SN0" ] && SN=$_SN0
+export RX SN
 COLS=${COLS:-170}; ROWS=${ROWS:-22}
 python3 scripts/demo_stream_setup.py || { echo "setup failed: both Pis must be on (see the message above)"; exit 1; }
 ARGS="$*"; case "$ARGS" in *--quiet*) ARGS="${ARGS//--quiet/}";; *) ;; esac
