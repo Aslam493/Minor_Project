@@ -114,3 +114,8 @@ Audience: Prof. Kolin Paul, IIT Delhi. Presenter: Aslam. Required structure: tit
 
 ## 18. Update 2026-11-25 (slide 7 less text)
 - Slide 7: label above the title shortened to "WORK DONE · CHECKS AND ATTACKS"; the "Measured" line now has two values (heartbeat 321 on time, 0 late; 6,361 requests on time). The "8 late answers counted by both sides" is in the diagram (LATE 8 counted) and in the notes.
+
+## 19. Update 2026-11-25 (slide 3, state of the art, new content)
+- Slide 3 left column now shows NAMED related work taken from `Secure_CAN_Detection_Only_Design.md` section 2: AUTOSAR SecOC (counter-based replay protection for CAN), TEECheck (RTNS 2020, a TEE vets outgoing CAN frames: prevention), iCORE (SAC 2019, a core diverted into the Secure World at boot, as our core 1), EmLog (2017, tamper-resistant logging on OP-TEE), and the stated gap: "We found no work that pairs OP-TEE with CAN attack detection when Linux is compromised." The three generic approaches (checks in Linux, external HSM, TrustZone) were removed. Right column (the five midterm promises with status) unchanged.
+- TO CHECK BEFORE PRESENTING: the citations come from the design note, not from re-reading the papers; confirm titles, authors and years (SecOC has no year on the slide; Schneier and Kelsey 1998 is in the notes only). The gap statement is a "we found no" claim from the user's own literature search.
+- Previous version: `slide_backups/sota_v1_generic_20261125.html`.

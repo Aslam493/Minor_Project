@@ -1,0 +1,21 @@
+<section id="sota" class="big3">
+<div class="head"><p class="eyebrow">STATE OF THE ART AND OUR PROMISE</p><h2>What exists today, and what we promised for end-sem</h2></div>
+<div class="row" style="align-items:flex-start;gap:56px">
+<div class="sota" style="width:760px;flex:none">
+<p class="colhead">HOW TRUSTED CAN HANDLING IS DONE TODAY</p>
+<div class="sota-c"><p class="t">Checks and log inside Linux</p><p class="s">Simple, but fails if Linux is hacked.</p></div>
+<div class="sota-c"><p class="t">External HSM or logger</p><p class="s">Isolated, but extra hardware and cost.</p></div>
+<div class="sota-c ours"><p class="t">TrustZone + OP-TEE (ours)</p><p class="s">On-chip, no extra hardware. <b>To beat:</b> trust even when Linux is hacked.</p></div>
+</div>
+<div style="display:flex;flex-direction:column;flex:1">
+<p class="colhead" style="margin-bottom:6px">PROMISED AT MIDTERM → STATUS NOW</p>
+<div class="prom"><p class="num">1</p><div class="txt"><p class="a">HMAC authentication</p><p class="b">54.6 µs per frame</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">2</p><div class="txt"><p class="a">Reduce validation latency</p><p class="b">4.95 ms → 54.6 µs</p></div><p class="sp ok">Done</p></div>
+<div class="prom"><p class="num">3</p><div class="txt"><p class="a">Store validated packets in flash memory</p><p class="b">Designed as a forward-secure log</p></div><p class="sp no">Not built</p></div>
+<div class="prom"><p class="num">4</p><div class="txt"><p class="a">Rate &amp; flood detection</p><p class="b">Every drop counted; no alarm</p></div><p class="sp wip">Partly</p></div>
+<div class="prom" style="border-bottom:none"><p class="num">5</p><div class="txt"><p class="a">End-to-end demo with real measurements</p><p class="b">31 of 32 cases on the first run</p></div><p class="sp ok">Done</p></div>
+</div>
+</div>
+<div class="footer"><p>Secure CAN Monitor · Raspberry Pi 3 · OP-TEE</p><p class="pg"></p></div>
+<aside>Left: the three ways trusted CAN handling is done today, as shown at midterm. Checking in Linux is simple but trusts the operating system; an external HSM is isolated but adds hardware. Ours uses TrustZone on the same chip with a dedicated core. Right: the five items promised at midterm, in the midterm's own words. Three are done. Rate and flood detection is partly done: every dropped frame is counted exactly, but there is no separate flood alarm. Storing validated packets in flash is not built; it is designed as a forward-secure log and is the first item of future work. The end-to-end result: 31 of 32 test cases passed on the first run; the one failure, the forwarder not starting at boot (E2b), was fixed and re-tested, and one new limit was found after the fix (E2c).</aside>
+</section>

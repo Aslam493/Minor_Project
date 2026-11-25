@@ -561,3 +561,13 @@ x-connector.dash { border-style: dashed; color: #1B5A99; }
 .wrow.wide .hitmark { top: 10px; width: 30px; height: 30px; }
 .wrow.wh.wide { height: 64px; }
 .wrow.wh.wide .whd { font-size: 28px; top: 8px; }
+.big3 .rel { padding: 10px 0; border-bottom: 2px solid #E1DDD1; display: flex; flex-direction: column; gap: 2px; }
+.big3 .rel .a { font-size: 32px; font-weight: 600; color: var(--ink); }
+.big3 .rel .b { font-size: 28px; color: var(--soft); line-height: 1.25; }
+.big3 .gap { margin-top: 14px; }
+.big3 .rel { padding: 8px 0; }
+.big3 .rel .a { font-size: 30px; }
+.big3 .rel .b { font-size: 26px; }
+.big3 .gap .t { font-size: 32px; }
+.big3 .gap .s { font-size: 26px; }
+.big3 .prom { padding: 12px 0; }
